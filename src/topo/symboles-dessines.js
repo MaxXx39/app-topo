@@ -7,7 +7,7 @@ import { ARDOISE, BLANC_BLOC, equipementsVehicule } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
 
 import {
-  r3, plat, rectArrondi, cercle, triangle, tourner, boite, plein, motif, trait, piece, texte, epais, NOIR as NOIR_OUTILS,
+  r3, plat, rectArrondi, cercle, arc, triangle, tourner, boite, plein, motif, trait, piece, texte, epais, NOIR as NOIR_OUTILS,
 } from './symboles-outils.js';
 void r3; void plat; void boite; void NOIR_OUTILS; void tourner;
 export { rectArrondi, cercle };
@@ -254,6 +254,58 @@ export function portailCoulissant(largeur = 4) {
   for (const x of [-d - 0.1, d + 0.1]) res.push(...piece('#3a3f45', 'metal', rectArrondi(x - 0.15, -0.15, x + 0.15, 0.15, 0.02)));
   res.push(trait([[-d - 0.9, -0.05], [-d - 0.25, -0.05]], false, '#475569'), trait([[d + 0.25, -0.05], [d + largeur + 0.9, -0.05]], false, '#475569'));
   res.push(trait([[-d, 0.3], [d + largeur, 0.3]], false, '#94a3b8'));
+  return res;
+}
+
+/**
+ * Portail réglable (0.320.2) : genre 'portail' (2 vantaux), 'portillon' (1 vantail, charnière à gauche ou à droite) ou
+ * 'coulissant', avec la largeur de PASSAGE (libre entre les poteaux). Origine = milieu de l'ouverture, sur l'axe de la
+ * clôture (y = 0), intérieur du chantier en haut. Les vantaux sont fermés et se touchent (ou touchent le poteau) ; la zone
+ * balayée à l'ouverture est en jaune clair. Aucun trait ne dépasse des poteaux. Poteaux de 0,30 m centrés en ±(passage/2 + 0,15).
+ */
+export function portailGeneral({ genre = 'portail', passage = 5, charniere = 'gauche' } = {}) {
+  const P = passage;
+  const d = P / 2 + 0.15;
+  const res = [];
+  const secteur = (charnX, dirX, R) => {
+    // quart de disque centré sur la charnière, du vantail fermé (dirX) au vantail ouvert (vers le haut)
+    const a0 = dirX > 0 ? 0 : 180;
+    const pts = [[charnX, 0], ...Array.from({ length: 13 }, (_, i) => {
+      const a = (a0 + (90 - a0) * (i / 12)) * (Math.PI / 180);
+      return [charnX + R * Math.cos(a), R * Math.sin(a)];
+    })];
+    res.push(motif('#fde68a', pts));
+    res.push(...tirets(pts.slice(1), 0.22, 0.16, '#a16207'));
+    res.push(...tirets([[charnX, 0.12], [charnX, R]], 0.25, 0.18, '#a16207'));
+  };
+  if (genre === 'coulissant') {
+    res.push(motif('#fde68a', rectArrondi(P / 2, 0.12, P / 2 + P, 0.5, 0.02)));
+    res.push(...tirets(rectArrondi(P / 2, 0.12, P / 2 + P, 0.5, 0.02).concat([[P / 2, 0.12]]), 0.22, 0.16, '#a16207'));
+    res.push(...vantail(-P / 2, P));
+    res.push(plein('#a16207', 'peinture', [[P / 2 + 0.3, 0.31], [P / 2 + 1.2, 0.31], [P / 2 + 1.2, 0.4], [P / 2 + 1.8, 0.28], [P / 2 + 1.2, 0.16], [P / 2 + 1.2, 0.25], [P / 2 + 0.3, 0.25]]));
+  } else if (genre === 'portillon') {
+    const s = charniere === 'droite' ? 1 : -1; // côté de la charnière
+    secteur(s * P / 2, -s, P);
+    res.push(...vantail(-P / 2, P));
+  } else {
+    for (const s of [-1, 1]) secteur(s * P / 2, -s, P / 2);
+    res.push(...vantail(-P / 2, P / 2), ...vantail(0, P / 2));
+  }
+  for (const s of [-1, 1]) res.push(...piece('#3a3f45', 'metal', rectArrondi(s * d - 0.15, -0.15, s * d + 0.15, 0.15, 0.02)), plein('#cbd5e1', 'metal', cercle(s * d, 0, 0.05, 8)));
+  return res;
+}
+
+/**
+ * Cône de chantier vu de dessus avec un peu de relief (0.320.2) : socle en caoutchouc, cône orange à bande blanche
+ * (anneaux concentriques), sommet creux, reflet en haut à gauche. Environ 0,5 × 0,5 m, centré.
+ */
+export function cone3d() {
+  const res = [...piece('#2f353b', 'caoutchouc', rectArrondi(-0.25, -0.25, 0.25, 0.25, 0.045), '#111827')];
+  res.push(plein('#ea580c', 'peinture', cercle(0, 0, 0.215, 36)), trait(cercle(0, 0, 0.215, 36), true, '#9a3412'));
+  res.push(plein('#f8fafc', 'blanc', cercle(0, 0, 0.155, 36), cercle(0, 0, 0.105, 36)), trait(cercle(0, 0, 0.155, 36), true, '#94a3b8'), trait(cercle(0, 0, 0.105, 36), true, '#94a3b8'));
+  res.push(plein('#f97316', 'peinture', cercle(0, 0, 0.085, 28)), trait(cercle(0, 0, 0.085, 28), true, '#c2410c'));
+  res.push(plein('#7c2d12', 'peinture', cercle(0, 0, 0.032, 16)));
+  res.push(trait(arc(0, 0, 0.19, 105, 165, 8), false, '#fed7aa'), trait(arc(0, 0, 0.065, 110, 160, 5), false, '#ffedd5'));
   return res;
 }
 

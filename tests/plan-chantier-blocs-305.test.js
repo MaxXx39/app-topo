@@ -71,3 +71,22 @@ describe('finisseur Super 800 (0.306.0)', () => {
     expect(bib.find((x) => x.cle === 'base:Finisseur').nom).toBe('Finisseur Super 1900');
   });
 });
+
+import { texteDuBlocM, texteSymbolesM } from '../src/topo/plan-chantier.js';
+describe('taille du texte d\'un bloc (0.320.2)', () => {
+  it('celle du plan sauf si le bloc a la sienne', () => {
+    const plan = { tailleTexteMm: 3, echelle: 200 };
+    expect(texteDuBlocM(plan, {})).toBeCloseTo(texteSymbolesM(plan), 9);
+    expect(texteDuBlocM(plan, { texteMm: 6 })).toBeCloseTo(1.2, 9); // 6 mm × 200 / 1000
+  });
+});
+
+describe('0.320.2 inverserSens', () => {
+  it('retourne les points et refuse un objet sans points', async () => {
+    const { inverserSens } = await import('../src/topo/plan-chantier.js');
+    const o = { type: 'ligne', points: [[0, 0], [1, 0], [2, 0]] };
+    expect(inverserSens(o)).toBe(true);
+    expect(o.points.map((p) => p[0])).toEqual([2, 1, 0]);
+    expect(inverserSens({})).toBe(false);
+  });
+});

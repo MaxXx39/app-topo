@@ -14810,7 +14810,9 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-une-ligne .outil-ruban svg { width: 20px; height: 20px; }
 .page-chantier .ruban-une-ligne .champ-ortho { width: 46px; height: 26px; padding: 2px 3px; font-size: 12px; }
 .page-chantier .ruban-une-ligne [data-action="ortho"].actif::after { content: '✓'; position: absolute; right: 1px; top: -1px; font-size: 11px; font-weight: 900; color: #b45309; }
-.page-chantier .ruban-element .propre-element { height: 118px; align-content: flex-start; }
+/* 0.320.4 : un seul défilement pour le bandeau d'un élément (le bandeau entier), pas deux l'un dans l'autre. */
+.page-chantier .ruban-element { max-height: 40vh; overflow-y: auto; }
+.page-chantier .ruban-element .propre-element { height: auto; max-height: none; overflow: visible; align-content: flex-start; }
 
 /* 0.298.0 : Calage de plans, objets enlevés à la main (liste avec ↺ pour restaurer). */
 .liste-enleves { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; font-size: 0.82rem; }
@@ -15075,3 +15077,12 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .elements-chantier button.cadenas-liste { width: 26px; flex: none; justify-content: center; padding: 4px; opacity: 0.45; }
 .elements-chantier button.cadenas-liste.actif { opacity: 1; color: #b45309; }
 .bandeau-element [data-action="verrou"] svg, .ruban-element [data-action="verrou"] svg { display: block; }
+
+/* 0.320.0 : le ruban de Caler plan reste sur une ligne (défile si trop étroit) : deux groupes « Axe » en plus */
+.page-calage .ruban-calage { flex-wrap: nowrap; overflow-x: auto; }
+.page-calage .ruban-calage .groupe-ruban { flex-shrink: 0; }
+
+/* 0.320.1 : nom de plan coupé au milieu (l'indice « _ind-B » de la fin reste visible) */
+.oeil-plan .nom-plan-coupe { display: flex; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.oeil-plan .nom-plan-coupe .debut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.oeil-plan .nom-plan-coupe .fin { flex: none; white-space: nowrap; overflow: visible; }

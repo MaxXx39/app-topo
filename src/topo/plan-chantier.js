@@ -59,7 +59,7 @@ export const STYLES_LIGNE = [
   { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [1.5, 1.5], epaisseurMm: 0.6 },
   // 0.292.0 : lignes « en bande » (largeur réelle en m, qui suit l'échelle du plan) et barrière Heras.
   { cle: 'gba', nom: 'Glissière béton (GBA)', couleur: '#9aa3ab', tirets: [], epaisseurMm: 0.3, motif: { type: 'gba', largeurM: 0.6, elementM: 4 } },
-  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
+  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, texteDefaut: 'ÉCHAFAUDAGE', texteTousM: 15, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
   { cle: 'filet', nom: 'Filet de protection', couleur: '#2f9e55', tirets: [], epaisseurMm: 0.3, motif: { type: 'filet', largeurM: 0.35, elementM: 0.5 } },
   { cle: 'heras', nom: 'Barrière Heras', couleur: '#475569', tirets: [], epaisseurMm: 0.3, motif: { type: 'heras', largeurM: 0.8, elementM: 3.5 } },
   // 0.293.0 : barrière suisse à 2 lattes rouges et blanches, cheminement piéton (bande verte avec flèches).
@@ -85,6 +85,8 @@ export const POINTE_LARGEUR = 0.9; // m, largeur de la pointe à l'échelle ×1
 // 0.292.0 : taille du texte des symboles (mm sur le papier, la même pour tous les blocs) et matériaux des tas de stock.
 export const TAILLE_TEXTE_MM = 3;
 /** Hauteur (m sur le terrain) du texte des symboles : tailleTexteMm × échelle / 1000. */
+/** Taille du texte d'un bloc posé en m (0.320.2) : la sienne (o.texteMm, mm sur le papier) ou celle du plan. */
+export const texteDuBlocM = (plan, o) => texteSymbolesM(o?.texteMm ? { ...plan, tailleTexteMm: o.texteMm } : plan);
 export const texteSymbolesM = (plan) => Math.min(12, Math.max(0.5, plan?.tailleTexteMm ?? TAILLE_TEXTE_MM)) * ((plan?.echelle ?? ECHELLE_PAPIER) / 1000);
 export const MATERIAUX_TAS = [
   { cle: 'terre', nom: 'Terre végétale', couleur: '#6b4a2f' },
@@ -304,8 +306,8 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   for (let k = objets.length - 1; k >= 0; k--) {
     const o = objets[k];
     if (o.type === 'construction') {
-      const [a, b] = segmentConstruction(o);
-      if (distanceAuSegment(p, a, b) <= tolerance) return o;
+      const ps = segmentConstruction(o);
+      for (let i = 0; i + 1 < ps.length; i++) if (distanceAuSegment(p, ps[i], ps[i + 1]) <= tolerance) return o;
       continue;
     }
     if (estPose(o)) {
@@ -391,8 +393,8 @@ export function lignesPourAccroche(objets) {
  * (assez pour l'accroche et le toucher sur tout un chantier). Renvoie [[e, n], [e, n]].
  */
 export function segmentConstruction(o, prolongement = 5000) {
+  if (!o.infinie) return o.points; // 0.320.3 : un segment peut avoir plus de 2 points (polyligne, pas de prolongement)
   const [a, b] = o.points;
-  if (!o.infinie) return [a, b];
   const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const [ux, uy] = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
   return [[a[0] - ux * prolongement, a[1] - uy * prolongement], [b[0] + ux * prolongement, b[1] + uy * prolongement]];
@@ -1051,6 +1053,19 @@ export function arcSurCote(points, index, m, ferme = false, n = 16) {
 // arcs : o.arcs = [{ i (point de départ), n (points ajoutés), m (point de passage) }] et o.arcsLen (nombre de points quand
 // c'est vrai). Si le nombre de points change autrement (point ajouté ou retiré), les arcs sont oubliés : il reste des segments.
 
+/**
+ * Inverse le sens d'une ligne, d'une piste ou d'une flèche (0.320.2) : départ et arrivée s'échangent (la pointe d'une flèche,
+ * les pictogrammes de piéton, les chevrons suivent) ; les arcs gardent leur forme. Renvoie vrai si c'est fait.
+ */
+export function inverserSens(o) {
+  if (!['ligne', 'fleche', 'piste'].includes(o?.type) || !Array.isArray(o.points) || o.points.length < 2) return false;
+  const arcs = arcsDe(o);
+  const n = o.points.length;
+  o.points = [...o.points].reverse();
+  if (arcs.length) o.arcs = arcs.map((a) => ({ ...a, i: n - 2 - a.i - a.n }));
+  return true;
+}
+
 /** Arcs encore valables d'un élément. */
 export function arcsDe(o) {
   return Array.isArray(o?.arcs) && o.arcsLen === o.points?.length ? o.arcs : [];
@@ -1151,4 +1166,42 @@ export function pointDeBase(coins, p, tolerance) {
     if (d <= dMin) [dMin, meilleur] = [d, q];
   }
   return meilleur ?? p;
+}
+
+// ---------------------------------------------------------------- Texte d'une zone ou d'un bloc (0.320.5)
+// Le texte « surface / tas » d'une zone et le texte sur un bloc peuvent être déplacés par leur point d'accroche.
+// Le décalage `o.decalEtiq` [x, y] est en mètres, dans le repère du bloc (zone : repère du plan, rotation 0).
+
+/** Point de base du texte : centre de la zone, ou point du bloc. */
+export function baseEtiquette(o) {
+  return o.type === 'zone' ? centreZone(o.points) : [...o.point];
+}
+
+/** Vrai si l'objet affiche un texte qu'on peut déplacer (zone avec surface / tas / texte, bloc avec texte). */
+export function etiquettePresente(o) {
+  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && o.afficherHauteur));
+  return Boolean(estPose(o) && o.etiquette);
+}
+
+/** Point du plan (m) où se trouve le texte, décalage compris. */
+export function ancreEtiquette(o) {
+  const b = baseEtiquette(o);
+  const [x, y] = o.decalEtiq ?? [0, 0];
+  const r = ((o.type === 'zone' ? 0 : Number(o.rotation) || 0) * Math.PI) / 180;
+  return [b[0] + x * Math.cos(r) - y * Math.sin(r), b[1] + x * Math.sin(r) + y * Math.cos(r)];
+}
+
+/** Décalage (repère du bloc) pour que le texte soit au point `p`, le point de base étant `base`. */
+export function decalEtiquette(o, base, p) {
+  const dx = p[0] - base[0];
+  const dy = p[1] - base[1];
+  const r = ((o.type === 'zone' ? 0 : Number(o.rotation) || 0) * Math.PI) / 180;
+  return [dx * Math.cos(r) + dy * Math.sin(r), -dx * Math.sin(r) + dy * Math.cos(r)];
+}
+
+/** Le point p est-il sur la poignée du texte de l'objet ? */
+export function etiquetteSousLePoint(o, p, tolerance) {
+  if (!etiquettePresente(o)) return false;
+  const a = ancreEtiquette(o);
+  return Math.hypot(p[0] - a[0], p[1] - a[1]) <= tolerance * 1.3;
 }

@@ -162,10 +162,10 @@ describe('contrepoids, poids, HSC', () => {
 });
 
 describe('dessin à l\'échelle', () => {
-  it('de l\'arrière des contrepoids (−14,5 m) au bout de la flèche (portée maximale de la fiche à 5 cm)', () => {
+  it('de l\'arrière de la contre-flèche (sans les blocs de contrepoids, 0.320.4) au bout de la flèche (portée maximale de la fiche à 5 cm)', () => {
     for (const nom of [24.4, 40, 62.5]) {
       const s = grueFiche({ fleche: nom });
-      expect(cadre(s)[0]).toBeCloseTo(-DIMENSIONS.arriereTotal, 2);
+      expect(cadre(s)[0]).toBeCloseTo(-DIMENSIONS.contreFlecheArriere, 2);
       expect(cadre(s)[2]).toBeCloseTo(boutDeFleche(L, f(nom)), 2);
       expect(Math.abs(cadre(s)[2] - flecheDe(L, nom).rMax)).toBeLessThan(0.05);
     }

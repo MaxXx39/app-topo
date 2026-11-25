@@ -2173,6 +2173,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
   /** 0.260.0 : pastilles des dossiers d'une liste ; les toucher (Intermédiaire / Expert) ouvre la fenêtre de cases ; sans dossier : petit bouton « + dossier ». */
+  /** Nom d'un plan dans un menu étroit : si le nom est coupé, c'est au milieu : la fin (« _ind-B », l'indice) reste visible. */
+  const htmlNomDePlan = (nom) => {
+    const m = /^(.*)(_ind-[^_]+)$/i.exec(String(nom));
+    if (!m) return `<span title="${echapper(nom)}">${echapper(nom)}</span>`;
+    return `<span class="nom-plan-coupe" title="${echapper(nom)}"><span class="debut">${echapper(m[1])}</span><span class="fin">${echapper(m[2])}</span></span>`;
+  };
+
   const htmlDossiersCliquables = (id, noms = []) => {
     const liste = dossiersDuProjet ? dossiersDuProjet() : lireSousDossiers();
     return noms.length > 0
@@ -2366,7 +2373,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span>${htmlDossiersCliquables(plan.id, plan.sousDossiers)}</label>
+          ${htmlNomDePlan(plan.nom)}${htmlDossiersCliquables(plan.id, plan.sousDossiers)}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
         <label class="reglette-transparence reglette-plan"><b>Trans.</b>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>

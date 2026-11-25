@@ -7,8 +7,8 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
-  hachureZone, hachureDeLaZone, tiretsContour,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  hachureZone, hachureDeLaZone, tiretsContour, ancreEtiquette,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
@@ -73,10 +73,15 @@ function chemin(d, pts, ferme) {
   if (ferme) d.ctx.closePath();
 }
 
+/** Arrondi des coins d'une plaque (0.320.2) : 'normal' (avant), 'peu' (départ), 'carre'. Rayon = fraction de la hauteur. */
+export function rayonArrondi(a) {
+  return a === 'normal' ? 0.35 : a === 'carre' ? 0 : 0.12;
+}
+
 /**
  * Plaque à plusieurs lignes (0.295.1) : styles[i] = { g (gras), s (souligné) } pour la ligne i. Renvoie { w, h } (px).
  */
-export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu = false) {
+export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu = false, arrondi = 'peu', sansBord = false) {
   const interligne = h * 1.25;
   const police = (i) => `${styles[i]?.g ? 800 : 500} ${h}px system-ui, sans-serif`;
   let largeur = 0;
@@ -91,9 +96,9 @@ export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu 
     ctx.strokeStyle = 'rgba(43,52,64,0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - H / 2, w, H, h * 0.35);
+    ctx.roundRect(x - w / 2, y - H / 2, w, H, h * rayonArrondi(arrondi));
     ctx.fill();
-    ctx.stroke();
+    if (!sansBord) ctx.stroke();
   }
   ctx.fillStyle = couleurTexte;
   ctx.textAlign = 'center';
@@ -116,7 +121,7 @@ export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu 
 }
 
 /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
-export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36', nu = false) {
+export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36', nu = false, arrondi = 'peu', sansBord = false) {
   ctx.font = `${poids} ${h}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -126,9 +131,9 @@ export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36
     ctx.strokeStyle = 'rgba(43,52,64,0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * 0.35);
+    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * rayonArrondi(arrondi));
     ctx.fill();
-    ctx.stroke();
+    if (!sansBord) ctx.stroke();
   }
   ctx.fillStyle = couleurTexte;
   ctx.fillText(texte, x, y + h * 0.04);
@@ -280,7 +285,7 @@ export function dessinerObjet(d, o) {
     if (o.afficherSurface) parties.push(texteSurface(o.points));
     if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
     if (parties.length) {
-      const c = ecran(centreZone(o.points));
+      const c = ecran(ancreEtiquette(o)); // 0.320.5 : texte déplaçable par sa poignée
       plaque(ctx, parties.join(' · '), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
     }
   } else if (o.type === 'ligne') {
@@ -289,6 +294,7 @@ export function dessinerObjet(d, o) {
     // Ligne de construction (0.293.0, jamais imprimée) : trait cyan en tirets, droite infinie prolongée hors de l'écran.
     const a = ecran(o.points[0]);
     const b = ecran(o.points[1]);
+    const suite = o.points.length > 2 && !o.infinie ? o.points.map(ecran) : null; // 0.320.3 : polyligne de construction
     let [x1, y1, x2, y2] = [a.x, a.y, b.x, b.y];
     if (o.infinie) {
       const l = Math.hypot(x2 - x1, y2 - y1) || 1;
@@ -300,8 +306,11 @@ export function dessinerObjet(d, o) {
     ctx.lineWidth = o.coupe ? 2 : 1;
     ctx.setLineDash(o.coupe ? [14, 4, 2, 4] : ({ continu: [], points: [1.5, 5], mixte: [14, 4, 2, 4] }[o.trait] ?? [9, 5]));
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    if (suite) suite.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    else {
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = o.coupe ? '#dc2626' : couleur;
@@ -312,7 +321,7 @@ export function dessinerObjet(d, o) {
       ctx.fillText('B', b.x + 11, b.y - 8);
       ctx.textAlign = 'start';
     }
-    for (const q of [a, b]) {
+    for (const q of suite ?? [a, b]) {
       ctx.beginPath();
       ctx.moveTo(q.x - 4, q.y);
       ctx.lineTo(q.x + 4, q.y);
@@ -366,11 +375,14 @@ export function dessinerObjet(d, o) {
     }
     if (g.arc) g.arc.forEach((pt, i) => { const q = ecran(pt); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
     ctx.stroke();
-    // Flèches aux deux bouts de la ligne de cote (3 mm sur le papier).
-    const L = Math.max(5, 2.6 * mm);
+    // Flèches aux deux bouts de la ligne de cote (taille réglable, 2,6 mm sur le papier au départ).
+    const L = Math.max(5, (o.tailleFlecheMm ?? 2.6) * mm);
     const h = Math.max(9, (pc ? texteSymbolesM(pc) : 1) * e);
+    const style = o.styleCote ?? 'dessus';
+    const forme = o.fleche ?? 'fleche';
     // 0.317.0 : cote COURTE (la valeur ne tient pas entre les flèches) : flèches à l'extérieur, qui pointent vers les
     // traits de rappel, et valeur écrite au-delà du bout (comme dans AutoCAD) au lieu de tout recouvrir.
+    // 0.320.2 : `o.coteTexte` = 'debut' écrit la valeur au-delà du premier bout ; texte « dessus » = au-dessus de la ligne.
     let courte = false;
     let ux = 1;
     let uy = 0;
@@ -390,6 +402,22 @@ export function dessinerObjet(d, o) {
     for (const f of g.fleches) {
       const q = ecran(f.p);
       let a = Math.atan2(-f.dir[1], f.dir[0]);
+      if (forme === 'point') {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, L * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+      if (forme === 'tiret') {
+        const b = Math.atan2(-f.dir[1], f.dir[0]) + Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(q.x - (L / 2) * Math.cos(b), q.y - (L / 2) * Math.sin(b));
+        ctx.lineTo(q.x + (L / 2) * Math.cos(b), q.y + (L / 2) * Math.sin(b));
+        ctx.lineWidth = Math.max(1.2, 0.5 * mm);
+        ctx.stroke();
+        ctx.lineWidth = Math.max(0.8, 0.25 * mm);
+        continue;
+      }
       if (courte) {
         a += Math.PI; // le corps de la flèche est dehors, la pointe touche le trait de rappel
         ctx.beginPath();
@@ -404,31 +432,119 @@ export function dessinerObjet(d, o) {
       ctx.closePath();
       ctx.fill();
     }
-    // Valeur sur une plaque blanche, de la même taille que le texte des symboles, le long de la ligne de cote.
+    // Valeur de la même taille que le texte des symboles, le long de la ligne de cote.
     let t = ecran(g.texte.p);
     if (courte) {
       ctx.font = `600 ${h}px system-ui, sans-serif`;
       const demi = (ctx.measureText(g.texte.t).width + h * 0.7) / 2;
-      const bout = ecran(g.fleches[1].p);
-      const recul = 2.2 * L + demi + 4;
-      t = { x: bout.x + ux * recul, y: bout.y + uy * recul };
+      const debut = o.coteTexte === 'debut';
+      const bout = ecran(g.fleches[debut ? 0 : 1].p);
+      const recul = (forme === 'fleche' ? 2.2 * L : L * 0.6) + demi + 4;
+      const sens = debut ? -1 : 1;
+      t = { x: bout.x + sens * ux * recul, y: bout.y + sens * uy * recul };
     }
     ctx.save();
     ctx.translate(t.x, t.y);
     ctx.rotate((-g.texte.angle * Math.PI) / 180);
-    plaque(ctx, g.texte.t, 0, 0, h, 600, '#1b2b36', Boolean(o.nu));
+    // 'dessus' : posé au-dessus de la ligne (pas dessus) ; 'sur' : sur la ligne avec cadre ; 'coupee' : la ligne est cachée sous le texte.
+    const dessus = style === 'dessus' || style === 'dessus-cadre';
+    const decalage = dessus && !courte && o.genre !== 'angle' ? -(h * 0.78 + 0.5 * mm) : 0;
+    plaque(ctx, g.texte.t, 0, decalage, h, 600, '#1b2b36', style === 'dessus' ? true : style === 'dessus-cadre' ? false : style === 'coupee' ? false : Boolean(o.nu), o.arrondi ?? 'peu', style === 'coupee');
     ctx.restore();
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);
-    const lignesTxt = lignesDuTexte(o.texte);
-    const { w, h: hauteur } = (lignesTxt.length > 1 || o.styles?.some((x) => x?.g || x?.s)) ? plaqueMulti(ctx, lignesTxt, q.x, q.y, h, couleur, o.styles ?? [], Boolean(o.nu)) : plaque(ctx, o.texte, q.x, q.y, h, 600, couleur, Boolean(o.nu));
-    if (o.repere) dessinerRepere(d, o, q, w, hauteur);
+    const { w, h: hauteur, bas, ep } = plaqueTexte(ctx, o, q.x, q.y, h, couleur, e, mm);
+    if (o.repere) dessinerRepere(d, o, q, w, hauteur, bas, ep);
   }
 }
 
+/** Cadres d'un texte libre (0.320.3). */
+export const CADRES_TEXTE = [['arrondi', 'Arrondi'], ['carre', 'Carré'], ['rond', 'Rond (pilule)'], ['double', 'Double trait'], ['bas', 'Trait du bas seulement'], ['aucun', 'Sans cadre']];
+export const ALIGNEMENTS_TEXTE = [['g', 'À gauche'], ['c', 'Centré'], ['d', 'À droite']];
+/** Cadre réel d'un texte : `o.cadre`, sinon l'ancien réglage (`nu` = sans cadre, `arrondi` = coins). */
+export const cadreDuTexte = (o) => o.cadre ?? (o.nu ? 'aucun' : 'arrondi');
+
+/**
+ * Texte libre complet (0.320.3) : plusieurs lignes, chacune avec son alignement (`styles[i].a` g / c / d), sa hauteur
+ * (`.h`, m), sa couleur (`.k`), gras (`.g`) et souligné (`.s`) ; cadre `o.cadre`, épaisseur `o.epaisseurCadreMm` (aussi celle
+ * du repère), fond blanc ou `o.fond === 'transparent'`. Renvoie { w, h, bas } (px ; bas = trait du bas, pour le repère).
+ */
+export function plaqueTexte(ctx, o, x, y, h, couleur, e, mm) {
+  const lignes = lignesDuTexte(o.texte);
+  const st = (i) => o.styles?.[i] ?? {};
+  const hl = (i) => (st(i).h ? Math.max(7, st(i).h * e) : h);
+  const police = (i) => `${st(i).g ? 800 : 500} ${hl(i)}px system-ui, sans-serif`;
+  let largeur = 0;
+  lignes.forEach((l, i) => {
+    ctx.font = police(i);
+    largeur = Math.max(largeur, ctx.measureText(l).width);
+  });
+  const hauteurs = lignes.map((l, i) => hl(i) * 1.25);
+  const w = largeur + h * 0.7;
+  const H = hauteurs.reduce((a, b) => a + b, 0) + h * 0.4;
+  const cadre = cadreDuTexte(o);
+  const ep = Math.max(0.8, (o.epaisseurCadreMm ?? 0.3) * mm);
+  const x0 = x - w / 2;
+  const y0 = y - H / 2;
+  if (cadre !== 'aucun') {
+    const rayon = cadre === 'carre' ? 0 : cadre === 'rond' ? H / 2 : h * rayonArrondi(o.arrondi);
+    if (o.fond !== 'transparent' && cadre !== 'bas') {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, w, H, rayon);
+      ctx.fill();
+    }
+    ctx.strokeStyle = couleur;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = ep;
+    ctx.setLineDash([]);
+    if (cadre === 'bas') {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0 + H);
+      ctx.lineTo(x0 + w, y0 + H);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, w, H, rayon);
+      ctx.stroke();
+      if (cadre === 'double') {
+        const g = Math.max(2.5, ep * 2.5);
+        ctx.beginPath();
+        ctx.roundRect(x0 + g, y0 + g, w - 2 * g, H - 2 * g, Math.max(0, rayon - g));
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.textBaseline = 'middle';
+  let yy = y0 + h * 0.2;
+  lignes.forEach((l, i) => {
+    const a = st(i).a ?? 'c';
+    const px = a === 'g' ? x0 + h * 0.35 : a === 'd' ? x0 + w - h * 0.35 : x;
+    ctx.font = police(i);
+    ctx.textAlign = a === 'g' ? 'left' : a === 'd' ? 'right' : 'center';
+    ctx.fillStyle = st(i).k ?? couleur;
+    const cy = yy + hauteurs[i] / 2;
+    ctx.fillText(l, px, cy);
+    if (st(i).s) {
+      const lw = ctx.measureText(l).width;
+      const gauche = a === 'g' ? px : a === 'd' ? px - lw : px - lw / 2;
+      ctx.strokeStyle = st(i).k ?? couleur;
+      ctx.lineWidth = Math.max(1, hl(i) * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(gauche, cy + hl(i) * 0.48);
+      ctx.lineTo(gauche + lw, cy + hl(i) * 0.48);
+      ctx.stroke();
+    }
+    yy += hauteurs[i];
+  });
+  ctx.textAlign = 'center';
+  return { w, h: H, bas: cadre === 'bas' ? { gauche: x0, droite: x0 + w, y: y0 + H } : null, ep };
+}
+
 /** Ligne de repère d'un texte : du bord de la plaque au point visé, avec une flèche ou un point au bout. */
-function dessinerRepere(d, o, q, w, h) {
+function dessinerRepere(d, o, q, w, h, bas = null, ep = 1.2) {
   const { ctx } = d;
   const couleur = couleurObjet(d.pc ?? { couleurs: 'objets', phases: [] }, o);
   const t = ecranDe(d)(o.repere);
@@ -436,10 +552,12 @@ function dessinerRepere(d, o, q, w, h) {
   const dy = t.y - q.y;
   const k = Math.min((w / 2) / (Math.abs(dx) || 1e-9), (h / 2) / (Math.abs(dy) || 1e-9));
   if (k >= 1) return; // le point visé est sous la plaque
-  const dep = { x: q.x + dx * k, y: q.y + dy * k };
+  // Cadre « trait du bas » : le repère part du bout du trait du bas, du côté du point visé.
+  const dep = bas ? { x: dx < 0 ? bas.gauche : bas.droite, y: bas.y } : { x: q.x + dx * k, y: q.y + dy * k };
+  const echelle = o.echelleBout ?? 1;
   ctx.strokeStyle = couleur;
   ctx.fillStyle = couleur;
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = ep;
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.moveTo(dep.x, dep.y);
@@ -448,14 +566,14 @@ function dessinerRepere(d, o, q, w, h) {
   const bout = o.repereBout ?? 'fleche';
   if (bout === 'point') {
     ctx.beginPath();
-    ctx.arc(t.x, t.y, 3, 0, 2 * Math.PI);
+    ctx.arc(t.x, t.y, 3 * echelle, 0, 2 * Math.PI);
     ctx.fill();
   } else if (bout === 'fleche') {
     const a = Math.atan2(t.y - dep.y, t.x - dep.x);
     ctx.beginPath();
     ctx.moveTo(t.x, t.y);
-    ctx.lineTo(t.x - 10 * Math.cos(a - 0.35), t.y - 10 * Math.sin(a - 0.35));
-    ctx.lineTo(t.x - 10 * Math.cos(a + 0.35), t.y - 10 * Math.sin(a + 0.35));
+    ctx.lineTo(t.x - 10 * echelle * Math.cos(a - 0.35), t.y - 10 * echelle * Math.sin(a - 0.35));
+    ctx.lineTo(t.x - 10 * echelle * Math.cos(a + 0.35), t.y - 10 * echelle * Math.sin(a + 0.35));
     ctx.closePath();
     ctx.fill();
   }
@@ -466,6 +584,40 @@ function dessinerRepere(d, o, q, w, h) {
  * ligne) ; la ligne s'interrompt autour de chaque motif. pxMm = pixels pour 1 mm de papier.
  */
 export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}, pxM = null) {
+  dessinerLigneBase(ctx, pts, style, couleur, pxMm, o, pxM);
+  textesLeLong(ctx, pts, style, couleur, pxMm, o, pxM);
+}
+
+/**
+ * Texte répété le long d'une ligne (0.320.3), pour toutes les lignes : `o.texteLigne` (sinon `style.texteDefaut`, '' = aucun),
+ * `o.texteTousM` (m entre deux textes, 15 au départ), `o.texteLigneMm` (hauteur sur le papier, 2,5 mm). Jamais à l'envers.
+ */
+function textesLeLong(ctx, pts, style, couleur, pxMm, o, pxM) {
+  const texte = o.texteLigne ?? style.texteDefaut ?? '';
+  if (!texte || !pxM) return;
+  const tous = Math.max(1, Number(o.texteTousM ?? style.texteTousM ?? 15));
+  const taille = Math.max(7, (o.texteLigneMm ?? 2.5) * pxMm);
+  ctx.save();
+  ctx.font = `700 ${taille}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  const largeur = ctx.measureText(texte).width;
+  for (const r of positionsLeLong(pts, Math.max(tous * pxM, largeur * 1.3))) {
+    ctx.save();
+    ctx.translate(r.x, r.y);
+    ctx.rotate(r.angle > Math.PI / 2 || r.angle < -Math.PI / 2 ? r.angle + Math.PI : r.angle);
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.lineWidth = Math.max(2, taille * 0.28);
+    ctx.strokeText(texte, 0, taille * 0.04);
+    ctx.fillStyle = couleur;
+    ctx.fillText(texte, 0, taille * 0.04);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function dessinerLigneBase(ctx, pts, style, couleur, pxMm, o = {}, pxM = null) {
   const m = style.motif;
   const ech = o.echelleMotif ?? 1;
   const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
@@ -554,6 +706,28 @@ export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}, pxM = null
  * glissière béton GBA (éléments de 4 m), échafaudage (travées de 2,5 m avec croisillons), filet de protection (bande
  * hachurée), barrière Heras (panneaux de 3,5 m sur pieds). pxM = pixels pour 1 m sur le terrain.
  */
+/** Bords gauche et droit d'une polyligne décalée de `demi` (px), avec coins en biseau (mitre limitée). */
+function bordsBande(pts, demi) {
+  const L = [];
+  const R = [];
+  const normale = (a, b) => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l];
+  };
+  pts.forEach((p, i) => {
+    const n1 = i > 0 ? normale(pts[i - 1], p) : normale(p, pts[i + 1]);
+    const n2 = i + 1 < pts.length ? normale(p, pts[i + 1]) : n1;
+    let mx = n1[0] + n2[0];
+    let my = n1[1] + n2[1];
+    const lm = Math.hypot(mx, my);
+    if (lm < 1e-6) { mx = n2[0]; my = n2[1]; } else { mx /= lm; my /= lm; }
+    const k = Math.min(3, 1 / Math.max(0.2, mx * n2[0] + my * n2[1])) * demi;
+    L.push([p[0] + mx * k, p[1] + my * k]);
+    R.push([p[0] - mx * k, p[1] - my * k]);
+  });
+  return { L, R };
+}
+
 function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
   const w = Math.max(3, (o?.largeurM ?? m.largeurM) * pxM * ech); // 0.294.1 : largeur réglable par élément
   const tube = (largeur, style) => {
@@ -583,24 +757,55 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
     ctx.lineWidth = Math.max(0.8, w * 0.07);
     ctx.stroke();
   } else if (m.type === 'echafaudage') {
-    tube(w + 1.6, '#475569');
-    tube(w, 'rgba(226,232,240,0.85)');
+    // 0.320.3 : bande à coins propres (biseaux aux angles), travées régulières sur chaque tronçon, un croisillon en X par
+    // travée ; la couleur de la ligne s'applique au contour, aux montants et aux croisillons.
+    const { L, R } = bordsBande(pts, w / 2);
     ctx.beginPath();
-    for (let i = 0; i < reperes.length; i++) {
-      const r = reperes[i];
-      trans(r, w / 2);
-      const s = reperes[i + 1];
-      if (s) {
-        const [n1x, n1y] = [-Math.sin(r.angle), Math.cos(r.angle)];
-        const [n2x, n2y] = [-Math.sin(s.angle), Math.cos(s.angle)];
-        ctx.moveTo(r.x + (n1x * w) / 2, r.y + (n1y * w) / 2);
-        ctx.lineTo(s.x - (n2x * w) / 2, s.y - (n2y * w) / 2);
-        ctx.moveTo(r.x - (n1x * w) / 2, r.y - (n1y * w) / 2);
-        ctx.lineTo(s.x + (n2x * w) / 2, s.y + (n2y * w) / 2);
+    L.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    [...R].reverse().forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fill();
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = couleur;
+    ctx.fill();
+    ctx.restore();
+    const pas = Math.max(4, m.elementM * pxM * ech);
+    const mid = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    ctx.beginPath();
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+      const n = Math.max(1, Math.round(l / pas));
+      for (let k = 0; k <= n; k++) {
+        const a = mid(L[i], L[i + 1], k / n);
+        const b = mid(R[i], R[i + 1], k / n);
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        if (k < n) {
+          const a2 = mid(L[i], L[i + 1], (k + 1) / n);
+          const b2 = mid(R[i], R[i + 1], (k + 1) / n);
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b2[0], b2[1]);
+          ctx.moveTo(b[0], b[1]);
+          ctx.lineTo(a2[0], a2[1]);
+        }
       }
     }
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = Math.max(0.7, w * 0.06);
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = Math.max(0.7, w * 0.05);
+    ctx.stroke();
+    ctx.beginPath();
+    L.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.moveTo(R[0][0], R[0][1]);
+    R.forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.lineWidth = Math.max(1, w * 0.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(L[0][0], L[0][1]);
+    ctx.lineTo(R[0][0], R[0][1]);
+    ctx.moveTo(L.at(-1)[0], L.at(-1)[1]);
+    ctx.lineTo(R.at(-1)[0], R.at(-1)[1]);
     ctx.stroke();
   } else if (m.type === 'filet') {
     tube(w, 'rgba(47,158,85,0.28)');
@@ -684,9 +889,7 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
       ctx.setLineDash([pas, pas]);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
+      // 0.320.4 : plus de trait noir au milieu des lattes (demande du 25.11)
       ctx.lineCap = 'round';
     };
     for (const r of reperes) {
@@ -854,6 +1057,7 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
     } else if (p.g === 't') {
       // 0.292.0 : tous les textes ont la même taille (options.texteU, en unités du symbole) et une plaque blanche.
       if (p.brut) texteBrut(ctx, p, e, options.angle ?? 0);
+      else if (options.sansTexte) continue; // 0.320.3 : texte propre du bloc caché
       else texteDansSymbole(ctx, options.texteU ? { ...p, h: options.texteU } : p, e, options.angle ?? 0);
     }
   }
@@ -944,7 +1148,7 @@ export function dessinerSymbolePose(d, o) {
   };
   const unique = o.rendu?.mode === 'couleur' ? o.rendu.couleur : d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
   // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
-  const opts = { angle: rot, plat: d.pc?.rendu3d === false, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
+  const opts = { angle: rot, plat: d.pc?.rendu3d === false, couleurUnique: unique ?? undefined, texteU: d.pc ? texteDuBlocM(d.pc, o) / k : undefined, sansTexte: Boolean(o.sansTexte) };
   if (o.type === 'grue') {
     const g = grueDeLObjet(bib, o);
     if (!g) return manquant(d, o, q);
@@ -982,7 +1186,9 @@ export function dessinerSymbolePose(d, o) {
   debut();
   dessinerPrimitives(ctx, s.primitives, e, d.mm, opts);
   // 0.294.1 : texte libre au centre d'un bloc (ex. « Bureaux » sur un conteneur), même taille que les autres textes de symboles
-  if (o.etiquette) texteDansSymbole(ctx, { x: 0, y: 0, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
+  // 0.320.5 : le texte se décale par sa poignée (o.decalEtiq, repère du bloc)
+  const [ex, ey] = o.decalEtiq ?? [0, 0];
+  if (o.etiquette) texteDansSymbole(ctx, { x: ex, y: ey, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
   ctx.restore();
 }
 

@@ -4,11 +4,12 @@
 // blanche à taille unique (réglée par le plan : voir plans-chantier/dessin.js), il n'y a donc plus rien à faire ici pour eux.
 import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 import { transformerPrimitives, CATEGORIES_SYMBOLES } from './symboles.js';
-import { symbolesDessines, portail, portailCoulissant, trilattes } from './symboles-dessines.js';
+import { symbolesDessines, portail, portailCoulissant, trilattes, cone3d } from './symboles-dessines.js';
 import {
-  camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton, finisseur800,
+  camionCiterne, camionCarburant, camionBitume, camionBalai, fourgonBenne, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton, finisseur800,
   nacelle, elevateurCiseaux, compresseur, betonniere,
 } from './symboles-vehicules.js';
+import * as nv from './symboles-nouveaux-0203.js';
 import * as divers from './symboles-divers.js';
 import { rectArrondi, cercle, ellipse, epais, plein, piece, trait, tourner, deplacer, miroir } from './symboles-outils.js';
 
@@ -219,6 +220,7 @@ export function retoucherBibliotheque(symboles) {
     }
     if (s.nom === 'Voiture Grise' && par('Voiture Blanche')) t = tournerCommeModele(t, par('Voiture Blanche'));
     if (s.nom === 'Portail') t = { ...versSymbole('Portail', 'Sécurité', portail(5)), cle: s.cle };
+    if (s.nom === 'Cône') t = { ...versSymbole('Cône', 'Sécurité', cone3d()), cle: s.cle }; // 0.320.2 : un peu de relief
     if (s.nom === 'Tri Lattes') t = { ...versSymbole('Tri Lattes', 'Sécurité', trilattes()), cle: s.cle };
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
@@ -254,10 +256,12 @@ export function retoucherBibliotheque(symboles) {
   const nouveaux = [
     // Véhicules
     ['Tracteur + benne', 'Véhicules', tracteurBenne()], ['Camion citerne', 'Véhicules', camionCiterne()], ['Camion carburant', 'Véhicules', camionCarburant()],
-    ['Camion balai', 'Véhicules', camionBalai()], ['Camion bitume', 'Véhicules', camionBitume()],
+    ['Camion balai', 'Véhicules', camionBalai()], ['Camion bitume', 'Véhicules', camionBitume()], ['Fourgon benne', 'Véhicules', fourgonBenne()],
     ['Camion pompe à béton (plié)', 'Véhicules', pompeABeton(false), false], ['Camion pompe à béton (déplié)', 'Véhicules', pompeABeton(true), false],
     // Engins
-    ['Finisseur Super 800', 'Engins', finisseur800()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
+    ['Finisseur Super 800', 'Engins', finisseur800()], ['Raboteuse W100', 'Engins', nv.raboteuse100()], ['Raboteuse W50', 'Engins', nv.raboteuse50()],
+    ['Benne à béton (grue)', 'Grues', nv.bennePourGrue()], ['Ouvrier (vue de dessus)', 'Sécurité', nv.ouvrier()], ['Ouvrier à la raquette (vue de dessus)', 'Sécurité', nv.ouvrierRaquette()],
+    ['Ouvrier (silhouette)', 'Sécurité', nv.ouvrierSilhouette()], ['Signaleur à la raquette (silhouette)', 'Sécurité', nv.signaleurRaquette()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
     ['Élévateur à ciseaux', 'Engins', elevateurCiseaux()], ['Compresseur', 'Engins', compresseur()], ['Bétonnière', 'Engins', betonniere()],
     // Installations
     ['Centrale à béton mobile', 'Installations', divers.centraleBeton()], ['Silo à ciment', 'Installations', divers.siloCiment()],
