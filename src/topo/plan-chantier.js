@@ -48,7 +48,7 @@ export const STYLES_LIGNE = [
   { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f2a20c', tirets: [], epaisseurMm: 0.3, motif: { type: 'cloture', largeurM: 0.14, elementM: 3.5 } },
   { cle: 'flecheSimple', nom: 'Flèche simple  >', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'chevron', pasMm: 22, tailleMm: 2.6 } },
   { cle: 'flecheDouble', nom: 'Flèche double  < >', couleur: '#a21caf', tirets: [], epaisseurMm: 0.5, motif: { type: 'double', pasMm: 26, tailleMm: 2.6 } },
-  { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, texteDefaut: 'ELEC', texteTousM: 8, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, texteDefaut: '⚡', texteTousM: 8, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },
   { cle: 'eau', nom: 'Eau', couleur: '#38b2c4', tirets: [], epaisseurMm: 0.5, texteDefaut: 'EAU', texteTousM: 8, motif: { type: 'texte', texte: 'EAU', pasMm: 34, tailleMm: 2.6 } },
   { cle: 'gaz', nom: 'Gaz', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, texteDefaut: 'GAZ', texteTousM: 8, motif: { type: 'texte', texte: 'GAZ', pasMm: 34, tailleMm: 2.6 } },
   { cle: 'eu', nom: 'Eaux usées (EU)', couleur: '#8a9a3b', tirets: [], epaisseurMm: 0.5, texteDefaut: 'EU', texteTousM: 8, motif: { type: 'texte', texte: 'EU', pasMm: 34, tailleMm: 2.6 } },

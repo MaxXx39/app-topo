@@ -602,16 +602,31 @@ function textesLeLong(ctx, pts, style, couleur, pxMm, o, pxM) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  const largeur = ctx.measureText(texte).width;
+  const largeur = texte.trim() === '⚡' ? taille * 1.5 : ctx.measureText(texte).width;
   for (const r of positionsLeLong(pts, Math.max(tous * pxM, largeur * 1.3))) {
     ctx.save();
     ctx.translate(r.x, r.y);
     ctx.rotate(r.angle > Math.PI / 2 || r.angle < -Math.PI / 2 ? r.angle + Math.PI : r.angle);
     ctx.strokeStyle = 'rgba(255,255,255,0.92)';
     ctx.lineWidth = Math.max(2, taille * 0.28);
-    ctx.strokeText(texte, 0, taille * 0.04);
     ctx.fillStyle = couleur;
-    ctx.fillText(texte, 0, taille * 0.04);
+    if (texte.trim() === '⚡') {
+      // 0.320.10 : « ⚡ » = un éclair dessiné (pas l'émoji jaune), dans la couleur de la ligne
+      const u = (taille * 1.5) / 12;
+      ctx.beginPath();
+      ctx.moveTo(1.5 * u, -6 * u);
+      ctx.lineTo(-3 * u, 1 * u);
+      ctx.lineTo(0.5 * u, 1 * u);
+      ctx.lineTo(-1.5 * u, 7 * u);
+      ctx.lineTo(4.5 * u, -1 * u);
+      ctx.lineTo(1 * u, -1 * u);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    } else {
+      ctx.strokeText(texte, 0, taille * 0.04);
+      ctx.fillText(texte, 0, taille * 0.04);
+    }
     ctx.restore();
   }
   ctx.restore();
