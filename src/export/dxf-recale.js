@@ -11,7 +11,9 @@ import { couleurAci } from '../topo/dxf-plan.js';
  */
 export function genererDxfPlan(plan) {
   const { origine, calques = [], contenu = {} } = plan;
-  const nomCalque = (c) => nomDeCalque(calques[c]?.nom ?? '0');
+  // 0.320.1 : noms de calques sans fusion (ils étaient coupés à 31 caractères : « DXF-Nom - calque » finissaient tous pareils)
+  const noms = nomsDeCalques(calques);
+  const nomCalque = (c) => noms[c] ?? '0';
   const couleur = (objet) => (objet.k ? ['62', String(aciLePlusProche(objet.k))] : []);
   const e = (x) => fixe3(origine.est + x);
   const n = (y) => fixe3(origine.nord + y);
@@ -46,7 +48,7 @@ export function genererDxfPlan(plan) {
   for (const point of contenu.points ?? []) {
     entites.push(['0', 'POINT', '8', nomCalque(point.c), ...couleur(point), '10', e(point.x), '20', n(point.y), '30', fixe3(point.z ?? 0)]);
   }
-  const tableCalques = calques.map((c) => ['0', 'LAYER', '2', nomDeCalque(c.nom), '70', '0', '62', String(aciLePlusProche(c.couleur)), '6', 'CONTINUOUS']);
+  const tableCalques = calques.map((c, i) => ['0', 'LAYER', '2', noms[i], '70', '0', '62', String(aciLePlusProche(c.couleur)), '6', 'CONTINUOUS']);
   const lignes = [
     '0', 'SECTION', '2', 'HEADER', '9', '$ACADVER', '1', 'AC1009', '9', '$DWGCODEPAGE', '3', 'ANSI_1252', '9', '$INSUNITS', '70', '6', '0', 'ENDSEC',
     '0', 'SECTION', '2', 'TABLES', '0', 'TABLE', '2', 'LAYER', '70', String(tableCalques.length), ...tableCalques.flat(), '0', 'ENDTAB', '0', 'ENDSEC',
@@ -85,14 +87,29 @@ export function aciLePlusProche(hex) {
   return meilleur;
 }
 
-/** Nom de calque accepté par AutoCAD R12 : sans accent ni caractère spécial, 31 caractères au plus. */
+/**
+ * Noms de calques du fichier (R12 : 31 caractères au plus, sans accent ni caractère spécial). Un nom trop long garde son
+ * début (8 caractères) et sa fin (22 caractères), où se trouve ce qui distingue les calques ; deux calques ne reçoivent
+ * jamais le même nom (« ~2 », « ~3 »…, majuscules et minuscules comptent pour un seul nom, comme dans AutoCAD).
+ */
+export function nomsDeCalques(calques) {
+  const pris = new Set();
+  return calques.map((c) => {
+    let nom = nomDeCalque(c.nom);
+    if (nom.length > 31) nom = `${nom.slice(0, 8)}~${nom.slice(-22)}`;
+    let essai = nom;
+    for (let k = 2; pris.has(essai.toUpperCase()); k++) essai = `${nom.slice(0, 31 - `~${k}`.length)}~${k}`;
+    pris.add(essai.toUpperCase());
+    return essai;
+  });
+}
+
+/** Nom de calque accepté par AutoCAD R12 : sans accent ni caractère spécial (la longueur est réglée par nomsDeCalques). */
 function nomDeCalque(texte) {
   return (
     String(texte)
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
-      .toUpperCase()
-      .replace(/[^A-Z0-9_$-]+/g, '_')
-      .slice(0, 31) || '0'
+      .replace(/[^A-Za-z0-9_$-]+/g, '_') || '0'
   );
 }

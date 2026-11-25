@@ -15079,3 +15079,8 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 /* 0.320.0 : le ruban de Caler plan reste sur une ligne (défile si trop étroit) : deux groupes « Axe » en plus */
 .page-calage .ruban-calage { flex-wrap: nowrap; overflow-x: auto; }
 .page-calage .ruban-calage .groupe-ruban { flex-shrink: 0; }
+
+/* 0.320.1 : nom de plan coupé au milieu (l'indice « _ind-B » de la fin reste visible) */
+.oeil-plan .nom-plan-coupe { display: flex; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.oeil-plan .nom-plan-coupe .debut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.oeil-plan .nom-plan-coupe .fin { flex: none; white-space: nowrap; overflow: visible; }
