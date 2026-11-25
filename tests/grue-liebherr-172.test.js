@@ -211,6 +211,11 @@ describe('dessin à l\'échelle', () => {
     // case décochée : seulement le cercle principal ; ancien réglage « aucun » = décoché
     expect(grueFiche({ fleche: 50, cerclesCharge: false }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
+    // 5 m : un cercle tous les 5 m dès 20 m (50 m : 20, 25… 45), texte = la portée seule, aucune charge inventée
+    const cinq = grueFiche({ fleche: 50, cerclesMode: 'cinq' });
+    expect(cinq.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 20, 25, 30, 35, 40, 45]);
+    expect(cinq.rayon.filter((p) => p.g === 't').map((p) => p.t)).toContain('25 m');
+    expect(cinq.rayon.filter((p) => p.g === 't' && / t$/.test(p.t))).toHaveLength(1); // seule la charge du cercle principal (de la fiche)
     // Charge décochée : les cercles restent mais sans texte
     const sans = grueFiche({ fleche: 50, afficherCharge: false });
     expect(sans.rayon.filter((p) => p.g === 't')).toHaveLength(0);

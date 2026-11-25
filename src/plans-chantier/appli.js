@@ -1532,6 +1532,7 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `
       <h3>Plan</h3>
       <label class="champ-calage"><span>Échelle d'impression 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-champ="echelle"></label>
+      <label class="case-chantier" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> Effet 3D des symboles</label>
       <label class="champ-calage"><span>Texte des symboles (mm sur le papier)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm"></label>
       <h3>Phases</h3>
       <ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
@@ -1629,7 +1630,7 @@ export function ouvrirPlansChantier({
         ${champCase('Crochet', 'prop-case', 'afficherCrochet', g.afficherCrochet)}
         ${g.afficherCrochet ? champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm') : ''}
         ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
-        ${champCase('Cercles de charge', 'prop-case', 'cerclesCharge', g.cerclesCharge).replace('<label class="case-chantier"', '<label class="case-chantier" title="Ceux de la fiche technique (jamais inventés)"')}
+        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cerclesMode" title="Fiche : portées du tableau avec leur charge ; 5 m : un cercle tous les 5 m dès 20 m (sans charge)">${opt('fiche', 'Ceux de la fiche (charges)', g.cerclesMode === 'fiche')}${opt('cinq', 'Tous les 5 m dès 20 m', g.cerclesMode === 'cinq')}${opt('aucun', 'Aucun', g.cerclesMode === 'aucun')}</select></label>
         ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}`)
         + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
         <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
@@ -2204,6 +2205,13 @@ export function ouvrirPlansChantier({
       enregistrer();
       return vue?.redessinerDessus();
     }
+    if (c.dataset.champ === 'rendu3d') {
+      if (!avantChangement()) return majPanneau();
+      if (c.checked) delete p.rendu3d;
+      else p.rendu3d = false;
+      enregistrer();
+      return vue?.redessinerDessus();
+    }
     if (c.dataset.champ === 'tailleTexteMm') {
       const v = nombreDe(c);
       if (v === null || !avantChangement()) return majPanneau();
@@ -2283,7 +2291,7 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
-      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc' || cle === 'afficherCrochet' || cle === 'cerclesCharge') {
+      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc' || cle === 'afficherCrochet') {
         if (!avantChangement()) return;
         o[cle] = c.checked;
         enregistrer();

@@ -71,10 +71,11 @@ export function reglagesGrue(o = {}) {
   const r = borne(Number.isFinite(brut) ? brut : rMax, RAYON_MIN, rMax);
   const mode = o.mode === 'lm2' && fleche.charges2 ? 'lm2' : 'lm1';
   // 0.318.0 : cercles de charge = ceux de la fiche (case à cocher) ; l'ancien réglage « cercles » (aucun / principaux / tous) devient oui / non
-  const cerclesCharge = o.cerclesCharge !== undefined ? Boolean(o.cerclesCharge) : o.cercles !== 'aucun';
+  // 0.319.0 : trois choix : « fiche » (portées du tableau + charges), « cinq » (un cercle tous les 5 m dès 20 m, sans charge inventée), « aucun »
+  const cerclesMode = ['fiche', 'cinq', 'aucun'].includes(o.cerclesMode) ? o.cerclesMode : (o.cerclesCharge === false || o.cercles === 'aucun' ? 'aucun' : 'fiche');
   const nombreOu = (v, defaut) => (Number.isFinite(Number(v)) && v !== '' && v != null && Number(v) > 0 ? Number(v) : defaut);
   return {
-    modele, fleche, tour, hauteur, r: Math.round(r * 10) / 10, mode, cerclesCharge, afficherCrochet: o.afficherCrochet !== false,
+    modele, fleche, tour, hauteur, r: Math.round(r * 10) / 10, mode, cerclesMode, afficherCrochet: o.afficherCrochet !== false,
     texteFleche: String(o.texteFleche ?? '').trim().slice(0, 60), rotationFleche: Number(o.rotationFleche) || 0,
     zPied: Number.isFinite(Number(o.zPied)) && o.zPied !== '' && o.zPied != null ? Number(o.zPied) : 0,
     afficherCharge: o.afficherCharge !== false, afficherHsc: o.afficherHsc !== false,
@@ -315,12 +316,18 @@ function partieHaute(g) {
  * du tableau, dès 20 m, au moins 5 m d'écart), avec leur charge. Aucune portée n'est inventée.
  */
 function cerclesDeCharge(g) {
-  const { fleche: f, mode, cerclesCharge } = g;
+  const { fleche: f, mode, cerclesMode } = g;
   const tab = mode === 'lm2' && f.charges2 ? f.charges2 : f.charges;
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
   const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: Math.sqrt(Math.max(0, rr * rr - 49)), y: -7, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
-  if (cerclesCharge) {
+  if (cerclesMode === 'cinq') {
+    // un cercle tous les 5 m dès 20 m : seulement la portée écrite (la fiche ne donne pas de charge à ces rayons exacts)
+    for (let rr = 20; rr <= rMax - 5; rr += 5) {
+      res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' });
+      if (g.afficherCharge) res.push({ ...texteCercle(rr, 0), t: `${rr} m` });
+    }
+  } else if (cerclesMode === 'fiche') {
     let dernier = -Infinity;
     const gardes = tab.filter(([rr]) => rr <= rMax - 5 && rr >= 20).filter(([rr]) => (rr - dernier >= 5 ? ((dernier = rr), true) : false));
     for (const [rr, t] of gardes) {
@@ -338,7 +345,7 @@ function cerclesDeCharge(g) {
  */
 export function grueFiche(o = {}) {
   const g = reglagesGrue(o);
-  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesCharge, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB]);
+  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesMode, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB]);
   return garder(cle, () => {
     const dessous = g.massifs ? massifs(g) : [];
     const base = pied(g.tour);
