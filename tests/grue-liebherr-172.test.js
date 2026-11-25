@@ -199,7 +199,7 @@ describe('dessin à l\'échelle', () => {
     expect(cadre(b)[2]).toBeLessThan(cadre(a)[2] - 20);
   });
   it('cercles : le principal, puis (case cochée) seulement ceux de la fiche, avec leur charge', () => {
-    const s = grueFiche({ fleche: 50 });
+    const s = grueFiche({ fleche: 50, rayonCrochet: 10 });
     const rayons = s.rayon.filter((p) => p.g === 'c').map((p) => p.r);
     expect(rayons[0]).toBe(50);
     expect(rayons.slice(1)).toEqual([22, 30, 35, 40, 45]); // portées du tableau de la fiche (dès 20 m, 5 m d'écart au moins)
@@ -212,7 +212,7 @@ describe('dessin à l\'échelle', () => {
     expect(grueFiche({ fleche: 50, cerclesCharge: false }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     // 5 m : un cercle tous les 5 m dès 20 m (50 m : 20, 25… 45), texte = la portée seule, aucune charge inventée
-    const cinq = grueFiche({ fleche: 50, cerclesMode: 'cinq' });
+    const cinq = grueFiche({ fleche: 50, cerclesMode: 'cinq', rayonCrochet: 10 });
     expect(cinq.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 20, 25, 30, 35, 40, 45]);
     expect(cinq.rayon.filter((p) => p.g === 't').map((p) => p.t)).toContain('25 m');
     expect(cinq.rayon.filter((p) => p.g === 't' && / t$/.test(p.t))).toHaveLength(1); // seule la charge du cercle principal (de la fiche)
