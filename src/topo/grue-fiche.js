@@ -70,10 +70,12 @@ export function reglagesGrue(o = {}) {
   const brut = o.rayonCrochet === '' || o.rayonCrochet == null ? NaN : Number(o.rayonCrochet);
   const r = borne(Number.isFinite(brut) ? brut : rMax, RAYON_MIN, rMax);
   const mode = o.mode === 'lm2' && fleche.charges2 ? 'lm2' : 'lm1';
-  const cercles = ['aucun', 'tous', 'principaux'].includes(o.cercles) ? o.cercles : 'principaux';
+  // 0.318.0 : cercles de charge = ceux de la fiche (case à cocher) ; l'ancien réglage « cercles » (aucun / principaux / tous) devient oui / non
+  const cerclesCharge = o.cerclesCharge !== undefined ? Boolean(o.cerclesCharge) : o.cercles !== 'aucun';
   const nombreOu = (v, defaut) => (Number.isFinite(Number(v)) && v !== '' && v != null && Number(v) > 0 ? Number(v) : defaut);
   return {
-    modele, fleche, tour, hauteur, r: Math.round(r * 10) / 10, mode, cercles, rotationFleche: Number(o.rotationFleche) || 0,
+    modele, fleche, tour, hauteur, r: Math.round(r * 10) / 10, mode, cerclesCharge, afficherCrochet: o.afficherCrochet !== false,
+    texteFleche: String(o.texteFleche ?? '').trim().slice(0, 60), rotationFleche: Number(o.rotationFleche) || 0,
     zPied: Number.isFinite(Number(o.zPied)) && o.zPied !== '' && o.zPied != null ? Number(o.zPied) : 0,
     afficherCharge: o.afficherCharge !== false, afficherHsc: o.afficherHsc !== false,
     couleurTexte: /^#[0-9a-f]{6}$/i.test(o.couleurTexte ?? '') ? o.couleurTexte : COULEUR_TEXTE,
@@ -298,35 +300,35 @@ function partieHaute(g) {
     const bout = boutDeFleche(M, f);
     res.push(...troncon(D.flecheDebut, bout - 1.2, fl), ...pointeFleche(bout - 1.2, bout, fl));
   }
-  // Chariot et crochet au rayon choisi
+  // Chariot et crochet au rayon choisi (case « Crochet » : décochée, ni chariot ni crochet ni texte)
   const xc = Math.min(r, boutDeFleche(M, f) - 0.5); // le chariot s'arrête avant le bout de la flèche
-  res.push(...piece('#3a3f45', 'metal', rectArrondi(xc - 0.5, -fl * 0.65, xc + 0.5, fl * 0.65, 0.08, 2)), ...piece(NOIR, 'metal', cercle(r, 0, 0.28, 14)));
-  if (g.afficherCharge) {
+  if (g.afficherCrochet) res.push(...piece('#3a3f45', 'metal', rectArrondi(xc - 0.5, -fl * 0.65, xc + 0.5, fl * 0.65, 0.08, 2)), ...piece(NOIR, 'metal', cercle(r, 0, 0.28, 14)));
+  if (g.afficherCharge && g.afficherCrochet) {
     const ch = chargeAuRayon(f, r, mode);
     res.push(texte(`r ${fixe1(ch.rayon)} m · ${fixe2(ch.t)} t`, r, -1.7, 0.9, { k: g.couleurTexte }));
   }
   return res;
 }
 
-/** Cercles de charge : le principal (portée maximale du crochet), ceux du tableau, avec leur charge. */
+/**
+ * Cercles de charge : le principal (portée maximale du crochet) et, si la case est cochée, ceux de la fiche (les portées
+ * du tableau, dès 20 m, au moins 5 m d'écart), avec leur charge. Aucune portée n'est inventée.
+ */
 function cerclesDeCharge(g) {
-  const { fleche: f, mode, cercles } = g;
+  const { fleche: f, mode, cerclesCharge } = g;
   const tab = mode === 'lm2' && f.charges2 ? f.charges2 : f.charges;
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
   const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: Math.sqrt(Math.max(0, rr * rr - 49)), y: -7, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
-  if (cercles === 'tous') {
-    // tous les cercles du tableau de la fiche (portée : charge)
-    // 0.315.0 : si la fiche en donne beaucoup, au plus un cercle tous les 5 m (le premier de chaque tranche est gardé)
+  if (cerclesCharge) {
     let dernier = -Infinity;
     const gardes = tab.filter(([rr]) => rr <= rMax - 5 && rr >= 20).filter(([rr]) => (rr - dernier >= 5 ? ((dernier = rr), true) : false));
-    for (const [rr, t] of gardes) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, t));
-  } else if (cercles === 'principaux') {
-    // 0.314.0 : un cercle tous les 10 m (20, 30, 40…) avec la charge à cette portée (portée suivante du tableau, côté prudent) :
-    // marche pour toutes les fiches, même si leurs portées ne sont pas rondes (Condecta : 21,87 m, 30,68 m…).
-    for (let rr = 20; rr <= rMax - 5; rr += 10) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, chargeAuRayon(f, rr, mode).t));
+    for (const [rr, t] of gardes) {
+      res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' });
+      if (g.afficherCharge) res.push(texteCercle(rr, t));
+    }
   }
-  res.push(texteCercle(rMax, tab[tab.length - 1][1]));
+  if (g.afficherCharge) res.push(texteCercle(rMax, tab[tab.length - 1][1]));
   return res;
 }
 
@@ -336,7 +338,7 @@ function cerclesDeCharge(g) {
  */
 export function grueFiche(o = {}) {
   const g = reglagesGrue(o);
-  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cercles, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB]);
+  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesCharge, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB]);
   return garder(cle, () => {
     const dessous = g.massifs ? massifs(g) : [];
     const base = pied(g.tour);
@@ -347,7 +349,11 @@ export function grueFiche(o = {}) {
     const bas = [...dessous, ...base, ...mat(g.tour.mat), ...cote];
     let haut = partieHaute(g);
     // 0.315.0 : UNE étiquette le long de la flèche (côté opposé au texte du crochet) : longueur de flèche + HSC
-    if (g.afficherHsc) haut.push(texte(`Flèche ${fixe1(g.fleche.nom)} m · HSC ${fixe1(g.hauteur.h)} m`, (g.modele.dim.flecheDebut + boutDeFleche(g.modele, g.fleche)) / 2, g.modele.dim.flecheLargeur / 2 + 1.3, 0.9, { k: '#1e293b' }));
+    // 0.318.0 : l'étiquette de la flèche est toujours là : [texte libre ·] Flèche … m [· HSC … m si la case est cochée]
+    {
+      const etiquette = `${g.texteFleche ? `${g.texteFleche} · ` : ''}Flèche ${fixe1(g.fleche.nom)} m${g.afficherHsc ? ` · HSC ${fixe1(g.hauteur.h)} m` : ''}`;
+      haut.push(texte(etiquette, (g.modele.dim.flecheDebut + boutDeFleche(g.modele, g.fleche)) / 2, g.modele.dim.flecheLargeur / 2 + 1.3, 0.9, { k: '#1e293b' }));
+    }
     if (g.rotationFleche) haut = tournerPrims(haut, g.rotationFleche);
     const nom = `Grue ${g.modele.nom} · flèche ${fixe1(g.fleche.nom)} m`;
     const s = versSymbole(nom, 'Grues', [...bas, ...haut], { centre: false });

@@ -796,7 +796,7 @@ export function ouvrirPlansChantier({
     if (etat.outil === 'texte') {
       const texte = await demanderTexte({ titre: 'Texte à écrire sur le plan' });
       if (!texte || !avantChangement()) return;
-      const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte });
+      const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte, ...(etat.texteNu ? { nu: true } : {}) });
       etat.choisi = o.id;
       etat.outil = 'choisir';
       if (etat.texteRepere) etat.attenteRepere = o.id; // le prochain clic donne le point visé
@@ -859,12 +859,12 @@ export function ouvrirPlansChantier({
     if (!avantChangement()) return;
     let champs;
     if (etat.cotationGenre === 'angle') {
-      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3) }; // sommet = point 2
+      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3), ...(etat.cotationNu ? { nu: true } : {}) }; // sommet = point 2
     } else {
       const [A, B, C] = pts;
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
       const decalage = (((C[0] - A[0]) * -(B[1] - A[1])) + ((C[1] - A[1]) * (B[0] - A[0]))) / L; // distance signée de C à la droite A → B
-      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000 };
+      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000, ...(etat.cotationNu ? { nu: true } : {}) };
     }
     const o = ajouterObjet(plan(), champs);
     etat.saisie = null;
@@ -1473,6 +1473,7 @@ export function ouvrirPlansChantier({
       fleche: `${champNombre('Largeur de la ligne', 'reglage', 'largeurFleche', etat.largeurFleche, 0.05, 5, 0.05, 'm')}
         ${champNombre('Échelle de la pointe', 'reglage', 'echelleFleche', etat.echelleFleche, 0.3, 10, 0.1, '×')}`,
       texte: `${champNombre('Hauteur des lettres', 'reglage', 'tailleTexte', etat.tailleTexte, 0.2, 10, 0.1, 'm')}
+        ${champCase('Sans cadre ni fond', 'reglage-case', 'texteNu', etat.texteNu)}
         ${champCase('Avec ligne de repère', 'reglage-case', 'texteRepere', etat.texteRepere)}
         <label class="champ-calage"><span>Bout du repère</span><select data-reglage="repereBout">
           ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${etat.repereBout === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`,
@@ -1482,7 +1483,7 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Type</span><select data-reglage="constructionMode">
           ${[['droite', 'Droite (2 points)'], ['angle', 'Droite par un point et un angle'], ['segment', 'Segment (2 points ou longueur tapée)']].map(([v, t]) => `<option value="${v}" ${etat.constructionMode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <p class="aide-calage">Cyan en tirets, jamais imprimées ni exportées ; elles servent d'accroche (Sur ligne, Croisement, Perpendiculaire) et pour aligner. « Décaler » avec la case « En ligne de construction » donne une parallèle.</p>`,
-      cotation: `<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
+      cotation: `${champCase('Valeur sans cadre ni fond', 'reglage-case', 'cotationNu', etat.cotationNu)}<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
         ${selectGenresOutil('ligne', etat.style)}`,
@@ -1512,10 +1513,11 @@ export function ouvrirPlansChantier({
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
           ${styleLigne(o.style).motif?.type === 'chevron' ? '<button type="button" class="bouton-secondaire" data-action="inverser-sens">⇄ Inverser le sens de la flèche</button>' : ''}`,
         piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
-        cotation: o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm'),
+        cotation: champCase('Valeur sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu)) + (o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm')),
         texte: `<label class="champ-calage"><span>Texte (Entrée = nouvelle ligne)</span><textarea data-prop="texte" maxlength="400" rows="2">${echapper(o.texte)}</textarea></label>
           <div class="styles-lignes"><span>Style des lignes :</span>${lignesDuTexte(o.texte).map((l, i) => `<span class="style-ligne">${i + 1} <button type="button" data-style-ligne="${i}" data-s="g" class="${o.styles?.[i]?.g ? 'actif' : ''}" title="Gras" style="font-weight:800">G</button><button type="button" data-style-ligne="${i}" data-s="s" class="${o.styles?.[i]?.s ? 'actif' : ''}" title="Souligné" style="text-decoration:underline">S</button></span>`).join('')}</div>
           ${champNombre('Hauteur des lettres', 'prop', 'taille', o.taille ?? 1, 0.2, 10, 0.1, 'm')}
+          ${champCase('Sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu))}
           ${champCase('Ligne de repère', 'prop-case', 'repere', Boolean(o.repere) || etat.attenteRepere === o.id)}
           ${o.repere ? `<label class="champ-calage"><span>Bout du repère</span><select data-prop="repereBout">
             ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${(o.repereBout ?? 'fleche') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
@@ -1564,6 +1566,8 @@ export function ouvrirPlansChantier({
     if (!zone) return;
     // 0.305.0 : le bandeau est toujours là, à hauteur fixe (rien ne saute quand on choisit un élément ou un outil).
     zone.hidden = false;
+    // 0.318.0 : une grue d'après fiche a beaucoup de réglages : le bandeau grandit (sans défiler) tant qu'elle est choisie.
+    zone.classList.toggle('bandeau-grue', Boolean(o && o.type === 'grue' && o.modele === 'fiche'));
     const avecOutil = Boolean(reglagesOutil && etat.outil !== 'choisir');
     if (!o) {
       // 0.296.0 : les réglages de l'outil actif sont dans le bandeau du haut (plus dans la colonne de droite)
@@ -1622,18 +1626,20 @@ export function ouvrirPlansChantier({
       const bloc = (titre, contenu) => `<div class="groupe-grue"><b>${titre}</b>${contenu}</div>`;
       return bloc('Modèle', `<label class="champ-calage"><span>Modèle</span><select data-prop="modeleGrue">${tousLesModeles().map((m) => opt(m.id, m.nom, m.id === g.modele.id)).join('')}</select></label>`)
         + bloc('Flèche et charge', `<label class="champ-calage"><span>Flèche (m)</span><select data-prop="fleche">${g.modele.fleches.map((f) => opt(f.nom, `${f.nom.toFixed(1)} m`, f.nom === g.fleche.nom)).join('')}</select></label>
-        ${champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm')}
+        ${champCase('Crochet', 'prop-case', 'afficherCrochet', g.afficherCrochet)}
+        ${g.afficherCrochet ? champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm') : ''}
         ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
-        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles">${opt('principaux', 'Principaux (10 m)', g.cercles === 'principaux')}${opt('tous', 'Tous (5 m mini)', g.cercles === 'tous')}${opt('aucun', 'Aucun', g.cercles === 'aucun')}</select></label>
+        ${champCase('Cercles de charge (ceux de la fiche)', 'prop-case', 'cerclesCharge', g.cerclesCharge)}
         ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}`)
         + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
         <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
         ${champNombre('Z châssis', 'prop', 'zPied', g.zPied, -500, 5000, 0.01, 'm')}
         ${champCase('Massifs sous le pied', 'prop-case', 'massifs', g.massifs)}
         ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}`)
-        + bloc('Affichage', `${champCase('Texte charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
-        ${champCase('Étiquette flèche + HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
+        + bloc('Affichage', `${champCase('Charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
+        ${champCase('HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
         ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
+        <label class="champ-calage" title="Écrit avant « Flèche … m » sur la flèche"><span>Texte avant la flèche</span><input type="text" maxlength="60" value="${echapper(g.texteFleche)}" placeholder="ex. Grue G1" data-prop="texteFleche"></label>
         <label class="champ-calage"><span>Couleur des textes</span><input type="color" value="${g.couleurTexte}" data-prop="couleurTexte"></label>`);
     }
     if (o.type === 'grue' && o.modele === 'mobile') {
@@ -2277,9 +2283,17 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
-      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc') {
+      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc' || cle === 'afficherCrochet' || cle === 'cerclesCharge') {
         if (!avantChangement()) return;
         o[cle] = c.checked;
+        enregistrer();
+        majPanneau();
+        return vue?.redessinerDessus();
+      }
+      if (cle === 'nu') {
+        if (!avantChangement()) return;
+        if (c.checked) o.nu = true;
+        else delete o.nu;
         enregistrer();
         majPanneau();
         return vue?.redessinerDessus();

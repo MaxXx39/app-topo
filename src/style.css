@@ -15046,3 +15046,8 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .legende-comparateur label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .legende-comparateur input[type='color'] { width: 20px; height: 20px; padding: 0; border: 1px solid var(--bordure); border-radius: 4px; background: none; }
 .groupe-ruban[hidden] { display: none; }
+
+/* 0.318.0 : bandeau d'une grue d'après fiche : plus haut, tous les réglages visibles sans défiler. */
+.page-chantier .ruban-element.bandeau-grue { height: auto; overflow: visible; }
+.page-chantier .ruban-element.bandeau-grue .propre-element { height: auto; max-height: none; overflow: visible; flex: 1 1 100%; flex-basis: 100%; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue { align-items: center; }
