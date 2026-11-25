@@ -9,6 +9,7 @@ import {
   camionCiterne, camionCarburant, camionBitume, camionBalai, fourgonBenne, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton, finisseur800,
   nacelle, elevateurCiseaux, compresseur, betonniere,
 } from './symboles-vehicules.js';
+import * as nv from './symboles-nouveaux-0203.js';
 import * as divers from './symboles-divers.js';
 import { rectArrondi, cercle, ellipse, epais, plein, piece, trait, tourner, deplacer, miroir } from './symboles-outils.js';
 
@@ -258,7 +259,9 @@ export function retoucherBibliotheque(symboles) {
     ['Camion balai', 'Véhicules', camionBalai()], ['Camion bitume', 'Véhicules', camionBitume()], ['Fourgon benne', 'Véhicules', fourgonBenne()],
     ['Camion pompe à béton (plié)', 'Véhicules', pompeABeton(false), false], ['Camion pompe à béton (déplié)', 'Véhicules', pompeABeton(true), false],
     // Engins
-    ['Finisseur Super 800', 'Engins', finisseur800()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
+    ['Finisseur Super 800', 'Engins', finisseur800()], ['Raboteuse W100', 'Engins', nv.raboteuse100()], ['Raboteuse W50', 'Engins', nv.raboteuse50()],
+    ['Benne à béton (grue)', 'Grues', nv.bennePourGrue()], ['Ouvrier (vue de dessus)', 'Sécurité', nv.ouvrier()], ['Ouvrier à la raquette (vue de dessus)', 'Sécurité', nv.ouvrierRaquette()],
+    ['Ouvrier (silhouette)', 'Sécurité', nv.ouvrierSilhouette()], ['Signaleur à la raquette (silhouette)', 'Sécurité', nv.signaleurRaquette()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
     ['Élévateur à ciseaux', 'Engins', elevateurCiseaux()], ['Compresseur', 'Engins', compresseur()], ['Bétonnière', 'Engins', betonniere()],
     // Installations
     ['Centrale à béton mobile', 'Installations', divers.centraleBeton()], ['Silo à ciment', 'Installations', divers.siloCiment()],

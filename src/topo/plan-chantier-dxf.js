@@ -211,7 +211,10 @@ export function dxfPlanChantier(plan, bib, objets = null) {
 
 /** Bloc d'un élément posé : { nom, primitives, fleche } (grue = châssis + grue ; à étage = escalier + 2 conteneurs). */
 export function blocDuPose(o, bib, texteU = null) {
-  const pose = blocDuPoseBrut(o, bib);
+  let pose = blocDuPoseBrut(o, bib);
+  if (pose && o.sansTexte && pose.primitives.some((p) => p.g === 't' && !p.brut)) {
+    pose = { ...pose, nom: nomDeBloc(pose.base ?? pose.nom, '_SANSTXT'), primitives: pose.primitives.filter((p) => !(p.g === 't' && !p.brut)) };
+  }
   if (!pose || !texteU || !pose.primitives.some((p) => p.g === 't' && !p.brut)) return pose;
   // Texte de la même taille partout (0.292.0) : sa hauteur est écrite dans le bloc ; le nom du bloc la rappelle.
   return { ...pose, nom: nomDeBloc(pose.base ?? pose.nom, `_T${Math.round(texteU * 100)}`), primitives: pose.primitives.map((p) => (p.g === 't' && !p.brut ? { ...p, h: texteU } : p)) };

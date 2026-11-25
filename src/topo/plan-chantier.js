@@ -59,7 +59,7 @@ export const STYLES_LIGNE = [
   { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [1.5, 1.5], epaisseurMm: 0.6 },
   // 0.292.0 : lignes « en bande » (largeur réelle en m, qui suit l'échelle du plan) et barrière Heras.
   { cle: 'gba', nom: 'Glissière béton (GBA)', couleur: '#9aa3ab', tirets: [], epaisseurMm: 0.3, motif: { type: 'gba', largeurM: 0.6, elementM: 4 } },
-  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
+  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, texteDefaut: 'ÉCHAFAUDAGE', texteTousM: 15, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
   { cle: 'filet', nom: 'Filet de protection', couleur: '#2f9e55', tirets: [], epaisseurMm: 0.3, motif: { type: 'filet', largeurM: 0.35, elementM: 0.5 } },
   { cle: 'heras', nom: 'Barrière Heras', couleur: '#475569', tirets: [], epaisseurMm: 0.3, motif: { type: 'heras', largeurM: 0.8, elementM: 3.5 } },
   // 0.293.0 : barrière suisse à 2 lattes rouges et blanches, cheminement piéton (bande verte avec flèches).
@@ -306,8 +306,8 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   for (let k = objets.length - 1; k >= 0; k--) {
     const o = objets[k];
     if (o.type === 'construction') {
-      const [a, b] = segmentConstruction(o);
-      if (distanceAuSegment(p, a, b) <= tolerance) return o;
+      const ps = segmentConstruction(o);
+      for (let i = 0; i + 1 < ps.length; i++) if (distanceAuSegment(p, ps[i], ps[i + 1]) <= tolerance) return o;
       continue;
     }
     if (estPose(o)) {
@@ -393,8 +393,8 @@ export function lignesPourAccroche(objets) {
  * (assez pour l'accroche et le toucher sur tout un chantier). Renvoie [[e, n], [e, n]].
  */
 export function segmentConstruction(o, prolongement = 5000) {
+  if (!o.infinie) return o.points; // 0.320.3 : un segment peut avoir plus de 2 points (polyligne, pas de prolongement)
   const [a, b] = o.points;
-  if (!o.infinie) return [a, b];
   const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const [ux, uy] = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
   return [[a[0] - ux * prolongement, a[1] - uy * prolongement], [b[0] + ux * prolongement, b[1] + uy * prolongement]];

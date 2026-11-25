@@ -101,8 +101,17 @@ export function equipementsVehicule(nom, b) {
     const r = Math.min(0.16, L * 0.07);
     phare(b.xMin + L * 0.16, b.yMin + 0.1, r);
     phare(b.xMax - L * 0.16, b.yMin + 0.1, r);
-    feu(b.xMin + 0.05, b.yMax - 0.1, b.xMin + 0.3, b.yMax - 0.02);
-    feu(b.xMax - 0.3, b.yMax - 0.1, b.xMax - 0.05, b.yMax - 0.02);
+    if (/toupie/i.test(nom)) {
+      // 0.320.3 : toupie = feux au bout du châssis (la trémie dépasse derrière, d'environ 15 % de la longueur) et pas au bout de la trémie.
+      const yr = b.yMax - H * 0.152;
+      const xa = b.xMin + L * 0.1;
+      const xb = b.xMax - L * 0.1;
+      feu(xa + 0.02, yr - 0.1, xa + 0.27, yr - 0.02);
+      feu(xb - 0.27, yr - 0.1, xb - 0.02, yr - 0.02);
+    } else {
+      feu(b.xMin + 0.05, b.yMax - 0.1, b.xMin + 0.3, b.yMax - 0.02);
+      feu(b.xMax - 0.3, b.yMax - 0.1, b.xMax - 0.05, b.yMax - 0.02);
+    }
     const y = b.yMin + Math.min(1.0, H * 0.13);
     retro(b.xMin - 0.32, y, b.xMin - 0.18, y + 0.32, [b.xMin, y + 0.1, b.xMin - 0.2, y + 0.16]);
     retro(b.xMax + 0.18, y, b.xMax + 0.32, y + 0.32, [b.xMax, y + 0.1, b.xMax + 0.2, y + 0.16]);
