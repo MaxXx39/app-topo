@@ -184,7 +184,7 @@ export function plansDeLaFeuille(tous, deLEcran, reglages) {
     if (transparence === (p.transparence ?? 0)) return p;
     let m = copiesOpacite.get(p);
     if (!m) copiesOpacite.set(p, (m = new Map()));
-    if (!m.has(transparence)) m.set(transparence, { ...p, transparence, sourcePlan: p.sourcePlan ?? p });
+    if (!m.has(transparence)) m.set(transparence, Object.assign(Object.create(p), { transparence, sourcePlan: p.sourcePlan ?? p }) /* Object.create : un plan recalé hérite de son plan d'origine (un { ...p } perdait calques, couleur… et faisait une page blanche) */);
     return m.get(transparence);
   });
 }

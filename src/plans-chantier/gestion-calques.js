@@ -11,7 +11,7 @@ export function plansAvecCalques(plans, fond) {
     const signature = JSON.stringify(reglages);
     const vu = memoire.get(p.id);
     if (vu && vu.origine === p && vu.signature === signature) return vu.copie;
-    const copie = { ...p, calques: p.calques.map((c, i) => ({ ...c, ...(reglages[i] ?? {}) })) };
+    const copie = Object.assign(Object.create(p), { calques: p.calques.map((c, i) => ({ ...c, ...(reglages[i] ?? {}) })) }); // Object.create : garde ce qu'un plan recalé hérite
     memoire.set(p.id, { origine: p, signature, copie });
     return copie;
   });

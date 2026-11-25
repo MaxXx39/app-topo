@@ -25,3 +25,15 @@ describe('plans de la feuille (0.317.0)', () => {
     expect(plansDeLaFeuille(tous, [A], r)[0]).toBe(x);
   });
 });
+
+describe('plan recalé (hérité) avec opacité', () => {
+  it('la copie garde calques et contenu hérités', () => {
+    const base = { id: 'r', calques: [{ visible: true }], contenu: { x: 1 }, transparence: 0 };
+    const recale = Object.assign(Object.create(base), { origine: { est: 1, nord: 2 } });
+    const x = plansDeLaFeuille([recale], [recale], { r: { visible: true, opacite: 50 } })[0];
+    expect(x.transparence).toBe(50);
+    expect(x.calques).toBe(base.calques);
+    expect(x.contenu).toBe(base.contenu);
+    expect(x.origine).toEqual({ est: 1, nord: 2 });
+  });
+});
