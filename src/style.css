@@ -15075,3 +15075,7 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .elements-chantier button.cadenas-liste { width: 26px; flex: none; justify-content: center; padding: 4px; opacity: 0.45; }
 .elements-chantier button.cadenas-liste.actif { opacity: 1; color: #b45309; }
 .bandeau-element [data-action="verrou"] svg, .ruban-element [data-action="verrou"] svg { display: block; }
+
+/* 0.320.0 : le ruban de Caler plan reste sur une ligne (défile si trop étroit) : deux groupes « Axe » en plus */
+.page-calage .ruban-calage { flex-wrap: nowrap; overflow-x: auto; }
+.page-calage .ruban-calage .groupe-ruban { flex-shrink: 0; }
