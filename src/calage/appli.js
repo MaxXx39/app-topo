@@ -9,7 +9,7 @@
 // Calculs : topo/calage-plan.js (caler), topo/nettoyage-plan.js (nettoyer) ; rangement : calage/plans.js.
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { demanderChoix } from '../outils/choix.js';
+import { demanderChoix, demanderChamps } from '../outils/choix.js';
 import { peutConvertirDwg, choisirDwgBureau } from '../android/pont.js';
 import { indiceSuivant, reperesDuPlan, controlerIndice, partRetrouvee, TOLERANCE_REPERE_M, PART_MEME_ORIGINE, nomPlanCale, baseDuNomCale, typeDuFichier } from '../topo/indice-plan.js';
 import { lirePlanDxf, texteDuDxf, estEnMn95, nomXref } from '../topo/dxf-plan.js';
@@ -70,7 +70,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     // Calage automatique trouvé (retour de calerAutomatiquement + sources) ; calcul en cours ; vue « Ce qui a changé ».
     auto: null, calculAuto: false, voirChangements: false,
     // 0.298.0 : enlever des objets à la main (clic ou rectangle) ; montrer les objets enlevés (en rouge, clic = restaurer).
-    enleverMain: false, voirEnleves: false,
+    enleverMain: false, voirEnleves: false, choisirCalques: false, curseurZone: null,
     // 0.298.0 : plan reçu lu dans un PDF { page, mode ('traits' | 'image'), avertissements }, ou null.
     lecturePdf: null,
     // 0.309.0 : plan importé « déjà calé » (MN95, sans référence ni calage) : 1 Le plan → 2 Nettoyer → 3 Terminé.
@@ -105,7 +105,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       lu: null, fichier: '', nom: '', lecture: '', indice: 'A', nouvelIndice: null, elements: [], enCours: null, resultat: null,
       erreur: '', enregistre: null, recette: null, avant: [], dessinZone: null, selection: [], type: 'point', role: 'calage',
       auto: null, calculAuto: false, voirChangements: false, occupe: '', verif: null, modeReference: false, comparaison: null, baseId: '', refVisible: false,
-      enleverMain: false, voirEnleves: false, lecturePdf: null, dejaCale: false,
+      enleverMain: false, voirEnleves: false, choisirCalques: false, curseurZone: null, lecturePdf: null, dejaCale: false,
     });
   }
 
@@ -122,7 +122,25 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
 
   // --- Dessin de la page ---
 
+  // 0.316.0 : si le dessin d'une étape plante, l'écran de chargement ne reste plus bloqué : message clair + retour à la liste.
   function dessiner() {
+    try {
+      dessinerEtape();
+    } catch (erreur) {
+      console.error(erreur);
+      etat.occupe = '';
+      if (etat.modeReference && reserve) sortirReference();
+      etape = 'liste';
+      try {
+        dessinerEtape();
+      } catch (encore) {
+        page.innerHTML = `<p class="message-erreur">Le calage ne peut pas s'afficher : ${echapper(encore.message)}</p>`;
+      }
+      message(`Affichage impossible (${erreur.message}). Retour à la liste ; rien n'a été perdu.`, 8000);
+    }
+  }
+
+  function dessinerEtape() {
     vues.forEach((v) => v.detruire());
     vues = [];
     const etapes = etat.dejaCale ? [['plan', '1 Le plan'], ['nettoyer', '2 Nettoyer'], ['fin', '3 Terminé']] : simple ? [['plan', '1 Le plan'], ['caler', '2 Caler'], ['fin', '3 Terminé']] : [['plan', '1 Le plan'], ['caler', '2 Caler'], ['nettoyer', '3 Nettoyer'], ['fin', '4 Terminé']];
@@ -136,7 +154,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
         </nav>
       </header>
       <main class="contenu-calage ${etape === 'caler' || etape === 'nettoyer' || etape === 'comparer' ? 'en-calage' : ''}">${{ liste: htmlListe, plan: htmlPlan, caler: htmlCaler, nettoyer: htmlNettoyer, fin: htmlFin, comparer: htmlComparer }[etape]()}</main>
-      ${etat.occupe ? `<div class="chargement-calage" role="status"><div class="rond-chargement"></div><p>${echapper(etat.occupe)}</p></div>` : ''}`;
+      ${etat.occupe ? `<div class="chargement-calage" role="status"><div class="rond-chargement"></div><p>${echapper(etat.occupe)}</p><button type="button" class="lien-calage" data-action="masquer-chargement">Ça dure trop : masquer</button></div>` : ''}`;
     if (etape === 'caler') monterVues();
     if (etape === 'nettoyer') monterNettoyer();
     if (etape === 'comparer') monterComparer();
@@ -178,15 +196,60 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
         <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}${p.controle ? `<br><span class="aide-calage">Points : ${echapper(resumeControlePlan(p.controle))}</span>` : ''}</td>
         <td><strong>${echapper(c.indice ?? '')}</strong>${indices.length > 1 ? ` <span class="aide-calage">(${indices.length} indices)</span>` : ''}${c.indices?.at(-1)?.changements ? ` <span class="aide-calage" title="Objets ajoutés / supprimés depuis l'indice d'avant">+${c.indices.at(-1).changements.ajoutes} / −${c.indices.at(-1).changements.supprimes}</span>` : ''}${c.methode === 'automatique' ? ' <span class="aide-calage">· auto</span>' : ''}</td>
         <td>${dateCourte(c.le)}</td>
-        <td class="actions-ligne-calage">${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>`}
+        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-modifier-plan="${echapper(p.id)}" title="Nom, indice, dossier">Modifier…</button>${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>`}
           <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}" title="Contre un autre plan du projet">Vérifier</button>${controlerPlan ? `<button type="button" class="bouton-secondaire petit" data-controler="${echapper(p.id)}" title="Un point du plan contre un point levé (vert ≤ 2 mm, orange ≤ 15 mm)">Contrôler (points)</button>` : ''}</td>
       </tr>${indices.length > 1 && !simple ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
+    // 0.316.0 : les plans de référence du projet (MN95 ou locaux, pas calés par Topo) sont listés aussi.
+    const refs = plansDeReference(projet.plansDxf).filter((p) => !p.calage && (p.reference || p.dejaCale || p.local));
+    const lignesRefs = refs.map((p) => `<tr>
+        <td><strong>${echapper(p.nom)}</strong><br><span class="aide-calage">${echapper(p.reference?.fichier ?? '')}</span></td>
+        <td>${p.local ? 'locale (pas en MN95)' : 'MN95'}</td>
+        <td>${(p.sousDossiers ?? []).map(echapper).join(', ') || '<span class="aide-calage">sans dossier</span>'}</td>
+        <td>${dateCourte(p.reference?.le ?? p.importeLe)}</td>
+        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-modifier-plan="${echapper(p.id)}">Modifier…</button></td>
+      </tr>`).join('');
+    const tableRefs = refs.length ? `<h3 class="titre-section-calage">Références (${refs.length})</h3><div class="cadre-tableau-calage"><table class="tableau-calage">
+        <thead><tr><th>Référence</th><th>Repère</th><th>Dossier</th><th>Ajoutée le</th><th></th></tr></thead><tbody>${lignesRefs}</tbody></table></div>` : '';
     return `
       <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Caler un nouveau plan</button>${simple ? '' : '<button type="button" class="bouton-secondaire" data-action="deja-cale">＋ Importer un plan déjà calé (DXF / DWG)</button>'}</div>
       ${cales.length ? `<div class="cadre-tableau-calage"><table class="tableau-calage">
         <thead><tr><th>Plan</th><th>Référence</th><th>Échelle</th><th>Rotation</th><th>Vérification</th><th>Indice</th><th>Calé le</th><th></th></tr></thead>
-        <tbody>${lignes}</tbody></table></div>` : '<p class="vide">Aucun plan calé dans ce projet.</p>'}`;
+        <tbody>${lignes}</tbody></table></div>` : '<p class="vide">Aucun plan calé dans ce projet.</p>'}
+      ${tableRefs}`;
+  }
+
+  /** « Modifier… » : nom, indice (plans calés) et dossier d'un plan calé ou d'une référence. */
+  async function modifierPlanListe(id) {
+    const p = planParId(id);
+    if (!p) return;
+    const cale = Boolean(p.calage);
+    const champs = [{ cle: 'nom', titre: 'Nom', valeur: p.nom }];
+    if (cale) champs.push({ cle: 'indice', titre: 'Indice', valeur: p.calage.indice ?? '' });
+    const r = await demanderChamps({ titre: cale ? 'Modifier le plan calé' : 'Modifier la référence', champs });
+    if (!r) return;
+    const nom = r.nom.trim();
+    if (!nom) {
+      message('Le nom ne peut pas être vide.', 3000);
+      return;
+    }
+    let dossier;
+    if (dossiers().length) {
+      const cle = await demanderChoix({
+        titre: 'Dossier du projet',
+        boutons: [{ cle: '', texte: 'Sans dossier' }, ...dossiers().map((d) => ({ cle: d, texte: d, principal: (p.sousDossiers ?? [])[0] === d }))],
+      });
+      if (cle !== null && cle !== undefined) dossier = cle;
+    }
+    modifier(() => {
+      const indice = cale ? r.indice.trim() : null;
+      // Indice changé et nom de la forme « DXF-Nom_ind-A » : le nom suit le nouvel indice.
+      const suit = cale && indice !== (p.calage.indice ?? '') && nom === p.nom && /_ind-/i.test(nom);
+      p.nom = suit ? nomPlanCale(typeDuFichier(p.calage.fichier), nom, indice) : nom;
+      if (cale) p.calage = { ...p.calage, indice };
+      if (dossier !== undefined) p.sousDossiers = dossier ? [dossier] : [];
+    });
+    dessiner();
   }
 
   function htmlPlan() {
@@ -305,7 +368,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     const bouton = (action, icone, texte, extra = '') => `<button type="button" class="outil-ruban" data-action="${action}" ${extra}>${icone}<span>${texte}</span></button>`;
     return `
       <div class="ruban-calage" role="toolbar" aria-label="Outils du nettoyage">
-        ${groupeRuban('Calques choisis', `${bouton('ecarter-selection', '✕', 'Écarter la sélection', 'data-zone="bouton-ecarter"')}${bouton('vider-selection', '◌', 'Tout désélectionner')}${bouton('annuler-nettoyage', '↶', 'Annuler')}`)}
+        ${groupeRuban('Calques choisis', `${bouton('choisir-calques', '☝', 'Choisir des calques', 'data-zone="bouton-choisir"')}${bouton('ecarter-selection', '✕', 'Écarter la sélection', 'data-zone="bouton-ecarter"')}${bouton('vider-selection', '◌', 'Tout désélectionner')}${bouton('annuler-nettoyage', '↶', 'Annuler')}`)}
         ${groupeRuban('Zone à garder', '', 'data-zone="boutons-zone"')}
         ${groupeRuban('À la main', `${bouton('enlever-main', '✂', 'Enlever des objets', 'data-zone="bouton-enlever"')}${bouton('voir-enleves', '◍', 'Voir les enlevés', 'data-zone="bouton-voir-enleves"')}${bouton('restaurer-tout', '↺', 'Tout restaurer', 'data-zone="bouton-restaurer"')}`)}
         ${groupeRuban('Affichage', `${etat.modeReference || etat.dejaCale ? '' : bouton('voir-reference', '▥', 'Référence', `data-zone="bouton-reference" aria-pressed="${etat.refVisible}"`)}${ni ? bouton('voir-changements', '±', 'Ce qui a changé') : ''}`)}
@@ -496,7 +559,9 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
   function marquesNettoyer() {
     const zone = etat.dessinZone ?? etat.recette.zone;
     if (!zone?.length) return [];
-    return [{ type: 'zone', xy: zone.flatMap((p) => versMn95(p)), couleur: '#ea580c', attente: Boolean(etat.dessinZone) }];
+    // 0.316.0 : pendant le dessin, le trait en cours suit la souris (comme une zone de Plans de chantier).
+    const pts = etat.dessinZone && etat.curseurZone ? [...zone, etat.curseurZone] : zone;
+    return [{ type: 'zone', xy: pts.flatMap((p) => versMn95(p)), couleur: '#ea580c', attente: Boolean(etat.dessinZone), sommets: zone.length }];
   }
 
   // Ce qui a changé depuis un indice du projet (celui d'avant, ou un autre au choix) : refait quand le plan nettoyé ou la base change.
@@ -524,12 +589,17 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       // « Ce qui a changé » : cadré sur le plan lui-même ; sinon sur le plan nettoyé (la référence n'est plus montrée d'office).
       cadrage: () => (planNettoye().cale ? [planNettoye().cale] : reference() && !etat.modeReference ? [refGrise()] : []),
       marques: marquesNettoyer,
+      survol: (position) => {
+        etat.curseurZone = etat.dessinZone?.length ? versPlanRecu([position.est, position.nord]) : null;
+        return null;
+      },
       infobulle: (position, toleranceM) => {
         if (etat.dessinZone) return null;
         if (etat.enleverMain) {
           const o = objetAuPoint(position, toleranceM);
           return o ? libelleObjet(etat.lu, o.genre, etat.lu.contenu[o.genre][o.index]).texte : null;
         }
+        if (!etat.choisirCalques) return null;
         const c = calqueAuPoint(position, toleranceM);
         return c < 0 ? null : etat.lu.calques[c]?.nom ?? null;
       },
@@ -591,6 +661,8 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       }
       return;
     }
+    // 0.316.0 : on ne choisit un calque au clic que si le bouton « Choisir des calques » est actif.
+    if (!etat.choisirCalques) return;
     const c = calqueAuPoint(position, toleranceM);
     if (c < 0) return;
     basculerSelection(c);
@@ -653,6 +725,9 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     const bEnlever = page.querySelector('[data-zone="bouton-enlever"]');
     bEnlever.classList.toggle('actif', etat.enleverMain);
     bEnlever.setAttribute('aria-pressed', String(etat.enleverMain));
+    const bChoisir = page.querySelector('[data-zone="bouton-choisir"]');
+    bChoisir.classList.toggle('actif', etat.choisirCalques);
+    bChoisir.setAttribute('aria-pressed', String(etat.choisirCalques));
     page.querySelector('[data-zone="bouton-voir-enleves"]').classList.toggle('actif', etat.voirEnleves);
     page.querySelector('[data-zone="bouton-restaurer"]').disabled = enleves.length === 0;
     page.querySelector('[data-zone="voir-ecartes"]').textContent = etat.voirEcartes ? 'Voir tous les calques' : `Voir les écartés (${r.ecartes.length})`;
@@ -675,7 +750,8 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       : etat.enleverMain ? `Enlever : cliquez un objet, ou tirez un rectangle (gauche → droite = entièrement dedans, droite → gauche = qui touche). Molette = zoom.${etat.voirEnleves ? ' Clic sur un objet rouge = le remettre.' : ''}`
       : etat.voirEnleves ? 'En rouge : les objets enlevés à la main ; cliquez-en un pour le remettre.'
       : etat.selection.length ? `${etat.selection.length} calque(s) en rose : cliquez-en d'autres, ou « Écarter la sélection » pour les enlever du plan.`
-        : 'Cliquez un calque sur le plan ou dans la liste : il passe en rose. Choisissez-en plusieurs, puis « Écarter la sélection ».';
+        : etat.choisirCalques ? 'Cliquez un calque sur le plan ou dans la liste : il passe en rose. Choisissez-en plusieurs, puis « Écarter la sélection ».'
+          : 'Rien n\'est choisi au clic. Touchez « Choisir des calques » pour sélectionner des calques sur le plan.';
     page.querySelector('[data-zone="compteur"]').innerHTML = etat.dessinZone
       ? 'Cliquez les sommets de la zone ; double-clic, clic sur le premier sommet ou « Fermer la zone » pour finir.'
       : ch ? `<span style="color:#16a34a;font-weight:700">+${ch.d.compte.ajoutes} ajoutés</span> · <span style="color:#dc2626;font-weight:700">−${ch.d.compte.supprimes} supprimés</span> · ${ch.d.compte.inchanges} inchangés (gris)${ch.d.parCalque.length ? ` · surtout : ${ch.d.parCalque.slice(0, 4).map((c) => `${echapper(c.nom)} (+${c.ajoutes} / −${c.supprimes})`).join(', ')}` : ''}`
@@ -1056,7 +1132,9 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
 
   /** Ajout d'une référence : état du calage gardé, puis nettoyage du plan (déjà en MN95) sans calage. */
   function entrerReference(plan, fichier) {
-    reserve = { ...etat };
+    // 0.316.1 : l'état gardé ne doit PAS contenir le message de chargement (« Lecture de… ») : remis à la validation, il
+    // laissait l'écran de chargement tourner sans fin (retour du 25.11).
+    reserve = { ...etat, occupe: '' };
     const base = fichier.replace(/\.[^.]+$/, '');
     Object.assign(etat, {
       lu: plan, fichier, nom: base, modeReference: true, resultat: { similitude: { ...IDENTITE }, verdict: 'juste' }, nouvelIndice: null,
@@ -1070,6 +1148,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     if (!reserve) return;
     const nouvelleReference = idNouvelle && idNouvelle !== reserve.referenceId;
     Object.assign(etat, reserve);
+    etat.occupe = '';
     reserve = null;
     etat.modeReference = false;
     if (nouvelleReference) Object.assign(etat, { referenceId: idNouvelle, elements: [], enCours: null, resultat: null, recette: null, auto: null });
@@ -1416,6 +1495,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     // Nettoyer : toucher une ligne de calque (hors case et couleur) = le choisir (Suppr l'écarte).
     const ligne = ev.target.closest('[data-calque]');
     if (ligne && !ev.target.matches('input')) {
+      etat.choisirCalques = true;
       basculerSelection(Number(ligne.dataset.calque));
       return;
     }
@@ -1427,6 +1507,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     else if (action === 'choisir-dwg') choisirDwg();
     else if (action === 'choisir-dwg-ref') choisirDwg({ reference: true });
     else if (action === 'finir-axe') finirAxe();
+    else if (cible.dataset.modifierPlan) modifierPlanListe(cible.dataset.modifierPlan);
     else if (cible.dataset.indiceDe) commencerIndice(cible.dataset.indiceDe);
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
     else if (cible.dataset.controler) {
@@ -1507,6 +1588,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     else if (hachures) changerRecette((r) => { r.hachures = hachures; });
     else if (action === 'enlever-main') {
       etat.enleverMain = !etat.enleverMain;
+      if (etat.enleverMain) etat.choisirCalques = false;
       etat.selection = [];
       majNettoyer();
     } else if (action === 'voir-enleves') {
@@ -1519,12 +1601,20 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     else if (action === 'voir-ecartes') {
       etat.voirEcartes = !etat.voirEcartes;
       majNettoyer();
+    } else if (action === 'masquer-chargement') {
+      etat.occupe = '';
+      dessiner();
+    } else if (action === 'choisir-calques') {
+      etat.choisirCalques = !etat.choisirCalques;
+      if (etat.choisirCalques) { etat.enleverMain = false; etat.dessinZone = null; }
+      majNettoyer();
     } else if (action === 'annuler-nettoyage') {
       if (!etat.avant.length) return;
       etat.recette = JSON.parse(etat.avant.pop());
       majNettoyer();
     } else if (action === 'dessiner-zone') {
       etat.dessinZone = [];
+      etat.choisirCalques = false;
       majNettoyer();
     } else if (action === 'finir-zone') finirZone();
     else if (action === 'abandonner-zone') {

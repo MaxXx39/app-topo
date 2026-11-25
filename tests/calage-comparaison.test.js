@@ -57,7 +57,7 @@ describe('cotations et lignes de repère (calage seulement)', () => {
     expect(p.contenu.points).toHaveLength(0);
     expect(p.calques[p.contenu.traits[1].c].nom).toBe('COTES');
     const r = recetteDeDepart(p);
-    expect(r.types).toEqual(expect.objectContaining({ cotations: true, reperes: true, attributs: true, textes: false }));
+    expect(r.types).toEqual(expect.objectContaining({ cotations: true, reperes: true, attributs: false, textes: false }));
     const n = nettoyerPlan(p, r);
     expect(n.contenu.traits).toHaveLength(1);
     expect(n.contenu.textes).toHaveLength(0);

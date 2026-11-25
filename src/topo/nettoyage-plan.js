@@ -12,7 +12,7 @@
 export const TYPES_RETIRABLES = [
   ['cotations', 'Cotations'],
   ['reperes', 'Lignes de repère'],
-  ['attributs', 'Attributs'],
+  ['attributs', 'Attributs (valeurs des blocs : n° d\'axe…)'],
   ['textes', 'Textes'],
   ['splines', 'Splines'],
   ['pleins', 'Surfaces pleines'],
@@ -26,8 +26,8 @@ export function recetteDeDepart(plan, prefixe = '') {
   return {
     ecartes: plan.calques.filter((c) => c.visible === false).map((c) => c.nom),
     couleurs: {},
-    // Cochés au départ comme sur la maquette validée le 22.11 : cotations, lignes de repère, attributs.
-    types: { cotations: true, reperes: true, attributs: true, textes: false, splines: false, pleins: false },
+    // Cochés au départ : cotations, lignes de repère. Attributs gardés (valeur écrite comme un texte, comme « Burst » d'AutoCAD ; demande du 25.11).
+    types: { cotations: true, reperes: true, attributs: false, textes: false, splines: false, pleins: false },
     hachures: 'garder',
     zone: null,
     enleves: [],

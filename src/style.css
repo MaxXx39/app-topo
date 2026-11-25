@@ -15032,3 +15032,16 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 /* 0.315.0 : avertissement « inclinaison perdue, canne bullée » (Expert) pendant / après une mesure de durée */
 .avertissement-bulle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; padding: 4px 8px; border-radius: 6px; background: #fffbeb; border: 1px solid #f59e0b; color: #92400e; font-size: 12px; }
 .avertissement-bulle[hidden] { display: none; }
+
+/* 0.316.0 : Comparer des PDF — ruban sur une seule ligne (zoom compris), couleurs A / B au choix. */
+.page-comparateur .ruban-calage { flex-wrap: nowrap; overflow-x: auto; gap: 2px; align-items: center; }
+.page-comparateur .ruban-calage .groupe-ruban { flex-direction: row; align-items: center; flex-shrink: 0; padding: 0 4px; gap: 0; }
+.page-comparateur .ruban-calage .titre-groupe { display: none; }
+.page-comparateur .ruban-calage .boutons-groupe { display: flex; align-items: center; gap: 2px; }
+.page-comparateur .ruban-calage .outil-ruban { min-width: 38px; padding: 2px 5px; }
+.page-comparateur .ruban-calage .outil-ruban span { font-size: 0.6rem; white-space: nowrap; }
+.page-comparateur .ruban-calage .reglage-ruban { font-size: 0.65rem; display: flex; flex-direction: column; align-items: center; }
+.page-comparateur .ruban-calage .reglage-ruban input[type='range'] { width: 70px; }
+.page-comparateur .ruban-calage select { max-width: 130px; }
+.legende-comparateur label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.legende-comparateur input[type='color'] { width: 20px; height: 20px; padding: 0; border: 1px solid var(--bordure); border-radius: 4px; background: none; }

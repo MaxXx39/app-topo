@@ -44,13 +44,29 @@ export async function creerRapport({ comparaison, planches, options, cartouche }
     for (const p of planches) {
       const { largeur: WA, hauteur: HA } = p.tailleA;
       const page = pdf.addPage([WA, HA]);
-      if (!sources.has(p.fichierB)) sources.set(p.fichierB, await PDFDocument.load(p.docBOctets, { ignoreEncryption: true }));
-      const [embarquee] = await pdf.embedPages([sources.get(p.fichierB).getPage(p.pageB - 1)]);
-      const pose = poseDeB(p.planche.alignement, HA, p.tailleB.hauteur);
-      page.drawPage(embarquee, { x: pose.x, y: pose.y, xScale: pose.echelle, yScale: pose.echelle, rotate: { type: 'degrees', angle: pose.rotationDeg } });
+      // Fond vectoriel : le plan B posé (comme avant), le plan A tel quel, ou rien (superposition grise en image).
+      if (p.fond !== 'gris') {
+        const parA = p.fond === 'a';
+        const idFichier = parA ? p.fichierA : p.fichierB;
+        const octetsFond = parA ? p.docAOctets : p.docBOctets;
+        const numero = parA ? p.pageA : p.pageB;
+        if (!sources.has(idFichier)) sources.set(idFichier, await PDFDocument.load(octetsFond, { ignoreEncryption: true }));
+        const [embarquee] = await pdf.embedPages([sources.get(idFichier).getPage(numero - 1)]);
+        if (parA) page.drawPage(embarquee, { x: 0, y: 0 });
+        else {
+          const pose = poseDeB(p.planche.alignement, HA, p.tailleB.hauteur);
+          page.drawPage(embarquee, { x: pose.x, y: pose.y, xScale: pose.echelle, yScale: pose.echelle, rotate: { type: 'degrees', angle: pose.rotationDeg } });
+        }
+      }
       if (p.imageDifferences) {
         const img = await pdf.embedPng(p.imageDifferences);
         page.drawImage(img, { x: 0, y: 0, width: WA, height: HA });
+      }
+      // Différences en traits vectoriels (A seul / B seul), dans les couleurs choisies.
+      const cA = rgb(...hexVersRgb(comparaison.couleurs?.a ?? '#dc2626'));
+      const cB = rgb(...hexVersRgb(comparaison.couleurs?.b ?? '#2563eb'));
+      for (const [liste, couleur] of [[p.traitsA ?? [], cA], [p.traitsB ?? [], cB]]) {
+        for (const t of liste) page.drawLine({ start: { x: t[0], y: HA - t[1] }, end: { x: t[2], y: HA - t[3] }, thickness: 0.9, color: couleur });
       }
       // Nuages numérotés.
       for (const m of p.planche.modifications.filter(garder)) {
@@ -68,7 +84,13 @@ export async function creerRapport({ comparaison, planches, options, cartouche }
       const titre = texteWinAnsi(`${comparaison.nom} - ${p.titre}`);
       page.drawRectangle({ x: 8, y: HA - 22, width: Math.min(WA - 16, police.widthOfTextAtSize(titre, 8) + 120), height: 16, color: rgb(1, 1, 1), opacity: 0.9 });
       page.drawText(titre, { x: 12, y: HA - 17, size: 8, font: gras, color: NUIT });
-      page.drawText(texteWinAnsi('rouge = supprimé (A), bleu = ajouté (B)'), { x: 18 + gras.widthOfTextAtSize(titre, 8), y: HA - 17, size: 7, font: police, color: GRIS });
+      // Légende : carrés aux couleurs choisies pour A (supprimé) et B (ajouté) ; gris = identique (superposition grise).
+      let lx = 18 + gras.widthOfTextAtSize(titre, 8);
+      for (const [texte, couleur] of [['supprime (A)', cA], ['ajoute (B)', cB], ...(p.fond === 'gris' ? [['identique', GRIS]] : [])]) {
+        page.drawRectangle({ x: lx, y: HA - 18, width: 7, height: 7, color: couleur });
+        page.drawText(texte, { x: lx + 10, y: HA - 17, size: 7, font: police, color: GRIS });
+        lx += 18 + police.widthOfTextAtSize(texte, 7);
+      }
     }
   }
 
@@ -90,7 +112,7 @@ export async function creerRapport({ comparaison, planches, options, cartouche }
   for (let k = 0; k < nbPages; k += 1) {
     const page = pdf.addPage(A3_PAYSAGE);
     page.drawText(texteWinAnsi(`Comparaison : ${comparaison.nom}`), { x: 40, y: H - 50, size: 16, font: gras, color: NUIT });
-    page.drawText(texteWinAnsi(`${lignes.length} modification(s) - rouge = supprimé (ancien indice), bleu = ajouté (nouvel indice)`), { x: 40, y: H - 70, size: 9, font: police, color: GRIS });
+    page.drawText(texteWinAnsi(`${lignes.length} modification(s) - A = ancien indice (supprimé), B = nouvel indice (ajouté)`), { x: 40, y: H - 70, size: 9, font: police, color: GRIS });
     let y = H - 100;
     let x = 40;
     for (const [nom, l] of colonnes) {

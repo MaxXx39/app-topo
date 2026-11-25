@@ -418,3 +418,116 @@ export function poseDeB(alignement, hauteurA, hauteurB) {
   const [vx, vy] = appliquerAlignement(alignement, [0, hauteurB]); // coin bas gauche de B, dans le repère de A
   return { x: vx, y: hauteurA - vy, echelle: alignement.s, rotationDeg: -alignement.r };
 }
+
+// --- 0.316.0 : recalage sur axes, accroche, différences vectorielles ---
+
+/** Point de A → point de B (inverse de appliquerAlignement). */
+export function inverserAlignement({ x, y, s, r }, [qx, qy]) {
+  const t = (-r * Math.PI) / 180;
+  const dx = (qx - x) / s;
+  const dy = (qy - y) / s;
+  return [Math.cos(t) * dx - Math.sin(t) * dy, Math.sin(t) * dx + Math.cos(t) * dy];
+}
+
+/**
+ * Recalage « sur axes » : un trait de A (axeA = [x1, y1, x2, y2], repère de A) et un trait de B (axeB, repère d'ORIGINE de
+ * B) doivent coïncider. B est tourné pour que les deux traits soient parallèles (rotation la plus petite, ±90°) et
+ * déplacé perpendiculairement au trait ; sa position le long du trait ne change pas (un point la fixe ensuite).
+ * garderEchelle : l'échelle actuelle est gardée (toujours le cas ici : un trait ne donne pas d'échelle).
+ */
+export function alignementSurAxes(alignement, axeA, axeB) {
+  const [ax, ay] = [axeA[2] - axeA[0], axeA[3] - axeA[1]];
+  const [bx, by] = [axeB[2] - axeB[0], axeB[3] - axeB[1]];
+  const la = Math.hypot(ax, ay);
+  const lb = Math.hypot(bx, by);
+  if (!la || !lb) return null;
+  // Rotation = direction de A / direction de B (nombres complexes unitaires), côté du sens le plus proche de la rotation nulle.
+  let [ur, ui] = [(ax * bx + ay * by) / (la * lb), (ay * bx - ax * by) / (la * lb)];
+  if (ur < 0) [ur, ui] = [-ur, -ui];
+  const s = alignement.s;
+  const r = (Math.atan2(ui, ur) * 180) / Math.PI;
+  const tourne = { ...alignement, r };
+  // Milieu du trait de B ramené dans A, puis corrigé de sa distance au trait de A (perpendiculairement).
+  const milieuB = appliquerAlignement({ x: 0, y: 0, s, r }, [(axeB[0] + axeB[2]) / 2, (axeB[1] + axeB[3]) / 2]);
+  const courant = [milieuB[0] + alignement.x, milieuB[1] + alignement.y];
+  const [nx, ny] = [-ay / la, ax / la];
+  const d = (courant[0] - axeA[0]) * nx + (courant[1] - axeA[1]) * ny;
+  return { ...tourne, x: alignement.x - d * nx, y: alignement.y - d * ny };
+}
+
+/** Décale B le long du trait de A pour que le point b (repère de B) tombe en face du point a (repère de A). */
+export function alignementLeLongDeLAxe(alignement, axeA, a, b) {
+  const [ax, ay] = [axeA[2] - axeA[0], axeA[3] - axeA[1]];
+  const l = Math.hypot(ax, ay);
+  if (!l) return null;
+  const [ux, uy] = [ax / l, ay / l];
+  const bA = appliquerAlignement(alignement, b);
+  const d = (a[0] - bA[0]) * ux + (a[1] - bA[1]) * uy;
+  return { ...alignement, x: alignement.x + d * ux, y: alignement.y + d * uy };
+}
+
+/**
+ * Accroche d'un point p sur des segments [[x1, y1, x2, y2]] : l'extrémité la plus proche à moins de tol (« sommet »),
+ * sinon le point le plus proche sur un trait à moins de tol (« ligne », avec le trait). Renvoie null si rien.
+ */
+export function accrocherSegments(segments, p, tol) {
+  let sommet = null;
+  let dSommet = tol;
+  let ligne = null;
+  let dLigne = tol;
+  for (const s of segments) {
+    for (let k = 0; k < 4; k += 2) {
+      const d = Math.hypot(s[k] - p[0], s[k + 1] - p[1]);
+      if (d < dSommet) {
+        dSommet = d;
+        sommet = { type: 'sommet', point: [s[k], s[k + 1]], segment: s };
+      }
+    }
+    const [dx, dy] = [s[2] - s[0], s[3] - s[1]];
+    const n = dx * dx + dy * dy;
+    if (!n) continue;
+    const t = Math.max(0, Math.min(1, ((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / n));
+    const q = [s[0] + t * dx, s[1] + t * dy];
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (d < dLigne) {
+      dLigne = d;
+      ligne = { type: 'ligne', point: q, segment: s };
+    }
+  }
+  return sommet ?? ligne;
+}
+
+/**
+ * Parties des traits `segments` ([x1, y1, x2, y2], unités du plan) qui ne sont PAS couvertes par l'encre de l'autre plan
+ * (masque dilaté à la tolérance, w × h pixels, k pixels par unité). Renvoie les morceaux à dessiner en vectoriel :
+ * [[x1, y1, x2, y2]] (même unités). Un morceau = suite d'échantillons non couverts (pas de 1 pixel).
+ */
+export function morceauxDifferents(segments, masqueAutre, w, h, k) {
+  const sortie = [];
+  const couvert = (x, y) => {
+    const px = Math.round(x * k);
+    const py = Math.round(y * k);
+    if (px < 0 || py < 0 || px >= w || py >= h) return true; // hors page : pas une différence
+    return masqueAutre[py * w + px] === 1;
+  };
+  for (const s of segments) {
+    const L = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    const n = Math.max(1, Math.ceil(L * k));
+    let debut = null;
+    let fin = null;
+    for (let i = 0; i <= n; i += 1) {
+      const t = i / n;
+      const x = s[0] + t * (s[2] - s[0]);
+      const y = s[1] + t * (s[3] - s[1]);
+      if (!couvert(x, y)) {
+        if (!debut) debut = [x, y];
+        fin = [x, y];
+      } else if (debut) {
+        sortie.push([debut[0], debut[1], fin[0], fin[1]]);
+        debut = null;
+      }
+    }
+    if (debut) sortie.push([debut[0], debut[1], fin[0], fin[1]]);
+  }
+  return sortie.filter((m) => Math.hypot(m[2] - m[0], m[3] - m[1]) > 0);
+}
