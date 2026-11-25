@@ -149,3 +149,46 @@ describe('rangement des PDF des comparaisons', () => {
     expect(annuler(h).comparaisons[0].fichiers[0].donnees).toBe('JVBERi0xLjQ=');
   });
 });
+
+describe('0.316.0 : axes, accroche, différences vectorielles', () => {
+  it('alignementSurAxes : trait de B tourné de 30° et décalé tombe sur le trait de A', async () => {
+    const m = await import('../src/topo/comparaison-pdf.js');
+    const axeA = [0, 0, 100, 0];
+    const t = (30 * Math.PI) / 180;
+    // Trait de B : le trait de A tourné de -30°, déplacé de (5, 40).
+    const rot = (p) => [5 + Math.cos(-t) * p[0] - Math.sin(-t) * p[1], 40 + Math.sin(-t) * p[0] + Math.cos(-t) * p[1]];
+    const b1 = rot([10, 0]);
+    const b2 = rot([90, 0]);
+    const al = m.alignementSurAxes(m.ALIGNEMENT_NEUTRE, axeA, [...b1, ...b2]);
+    const q1 = m.appliquerAlignement(al, b1);
+    const q2 = m.appliquerAlignement(al, b2);
+    expect(Math.abs(q1[1])).toBeLessThan(1e-9);
+    expect(Math.abs(q2[1])).toBeLessThan(1e-9);
+    expect(al.r).toBeCloseTo(30, 6);
+  });
+  it('alignementLeLongDeLAxe : le point de B arrive en face du point de A', async () => {
+    const m = await import('../src/topo/comparaison-pdf.js');
+    const al = m.alignementLeLongDeLAxe({ x: 0, y: 0, s: 1, r: 0 }, [0, 0, 100, 0], [50, 0], [20, 0]);
+    expect(m.appliquerAlignement(al, [20, 0])[0]).toBeCloseTo(50, 9);
+  });
+  it('accrocherSegments : sommet puis ligne', async () => {
+    const m = await import('../src/topo/comparaison-pdf.js');
+    const segs = [[0, 0, 10, 0], [10, 0, 10, 10]];
+    expect(m.accrocherSegments(segs, [9.8, 0.1], 1).type).toBe('sommet');
+    const l = m.accrocherSegments(segs, [5, 0.4], 1);
+    expect(l.type).toBe('ligne');
+    expect(l.point[0]).toBeCloseTo(5, 9);
+    expect(m.accrocherSegments(segs, [50, 50], 1)).toBeNull();
+  });
+  it('morceauxDifferents : seule la partie non couverte reste', async () => {
+    const m = await import('../src/topo/comparaison-pdf.js');
+    const w = 100;
+    const h = 10;
+    const masque = new Uint8Array(w * h);
+    for (let x = 0; x < 50; x += 1) masque[5 * w + x] = 1; // l'autre plan couvre x < 50
+    const r = m.morceauxDifferents([[0, 5, 99, 5]], masque, w, h, 1);
+    expect(r).toHaveLength(1);
+    expect(r[0][0]).toBeGreaterThanOrEqual(50);
+    expect(r[0][2]).toBe(99);
+  });
+});

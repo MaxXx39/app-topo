@@ -84,7 +84,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
           ctx.fill();
           ctx.globalAlpha = 1;
         }
-        for (const q of pts) ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+        pts.slice(0, m.sommets ?? pts.length).forEach((q) => ctx.fillRect(q.x - 3, q.y - 3, 6, 6));
         continue;
       }
       if (m.type === 'axe') {

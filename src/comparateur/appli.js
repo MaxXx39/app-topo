@@ -12,13 +12,16 @@ import {
   ALIGNEMENT_NEUTRE, MM_PAR_POINT, appliquerAlignement, matriceAlignement, composer, masqueEncre, superposer, teinter,
   differencesTextes, listerModifications, titreModification, apparierPages, motsDeLaPage, nomSansIndice, apparierFichiers,
   mesurerLongueur, mesurerSurface, etalonner, arcsDeNuage, alignementDepuisSimilitude, seTouchent,
+  dilater, inverserAlignement, alignementSurAxes, alignementLeLongDeLAxe, accrocherSegments, morceauxDifferents,
 } from '../topo/comparaison-pdf.js';
 import { documentDe, fermerDocuments, taillePage, rendrePage, segmentsDeLaPage, textesDeLaPage, base64DesOctets, octetsDeBase64 } from './lecture.js';
 import { detecterEnArrierePlan } from './calculs.js';
 import { calculerAuto } from '../calage/calcul-auto.js';
 
-const COULEURS = { a: [220, 38, 38], b: [37, 99, 235], identique: [150, 158, 166] };
-const COULEURS_CSS = { a: '#dc2626', b: '#2563eb' };
+const COULEURS_DEPART = { a: '#dc2626', b: '#2563eb' }; // A = rouge, B = bleu (réponse du 22.11) ; au choix depuis la 0.316.0
+const GRIS_IDENTIQUE = [150, 158, 166];
+const LETTRES_PLANS = ['A', 'B', 'C', 'D', 'E']; // jusqu'à 5 plans à comparer, deux à la fois (0.316.0)
+const rgbDeCss = (css) => [1, 3, 5].map((i) => parseInt(String(css).slice(i, i + 2), 16) || 0);
 const ETATS = [['toutes', 'Toutes'], ['traiter', 'À traiter'], ['validee', 'Validées'], ['ignoree', 'Ignorées']];
 const MODES = [['superpose', '◩', 'Superposition'], ['rideau', '◫', 'Rideau'], ['clignote', '◐', 'Clignotement'], ['cote', '▥', 'Côte à côte']];
 const ANNOTATIONS = [['nuage', '☁', 'Nuage'], ['fleche', '↗', 'Flèche'], ['note', '✎', 'Note'], ['distance', '↔', 'Distance'], ['surface', '▱', 'Surface'], ['etalonner', '📏', 'Étalonner']];
@@ -41,7 +44,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   const etat = {
     ecran: 'liste', comparaison: null, planche: 0, mode: 'superpose', outil: null, saisie: [], filtre: 'toutes',
     panneau: 'modifs', choisie: null, verrouEchelle: true, rideau: 0.5, occupe: '', nouvelle: null,
-    rapport: { planches: true, ignorees: false, commentaires: true },
+    rapport: { planches: true, ignorees: false, commentaires: true, fond: 'b', vectoriel: false },
   };
   let vue = null; // { zoom (px CSS par point), cx, cy (point au centre) }
   let minuterieRendu = 0;
@@ -49,6 +52,9 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   let images = null; // dernier rendu : { vue, A (ImageData teinté), B, superpose, w, h, dpr }
 
   const comp = () => etat.comparaison;
+  /** Couleurs de A et de B (au choix, gardées dans la comparaison) : CSS et [r, g, b]. */
+  const couleursCss = () => ({ ...COULEURS_DEPART, ...(comp()?.couleurs ?? {}) });
+  const couleursRgb = () => ({ a: rgbDeCss(couleursCss().a), b: rgbDeCss(couleursCss().b), identique: GRIS_IDENTIQUE });
   const planche = () => comp()?.planches[etat.planche] ?? null;
   const fichier = (id) => comp().fichiers.find((f) => f.id === id);
   const enregistrerProjet = () => {
@@ -66,10 +72,14 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   page.addEventListener('cancel', (ev) => {
     ev.preventDefault();
     if (etat.outil || etat.saisie.length) {
+      const ancien = etat.outil;
       etat.outil = null;
       etat.saisie = [];
-      majOutils();
-      dessinerDessus();
+      etat.axe = null;
+      passerEnRecalage(ancien).then(() => {
+        majOutils();
+        dessinerDessus();
+      });
       return;
     }
     fermer();
@@ -115,6 +125,8 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
           <span class="aide-calage">${n.A.length ? n.A.map((f) => echapper(f.nom)).join(', ') : 'aucun fichier'}</span>
           <label class="bouton-secondaire bouton-fichier cote-b">Plan(s) B · nouvel indice…<input type="file" accept=".pdf,application/pdf" multiple data-fichiers="B" hidden></label>
           <span class="aide-calage">${n.B.length ? n.B.map((f) => echapper(f.nom)).join(', ') : 'aucun fichier'}</span>
+          ${n.A.length === 1 && n.B.length === 1 ? `<label class="bouton-secondaire bouton-fichier">＋ Autres plans (C, D, E : 3 au plus)…<input type="file" accept=".pdf,application/pdf" multiple data-fichiers="X" hidden></label>
+          <span class="aide-calage">${n.X.length ? n.X.map((f, i) => `${LETTRES_PLANS[2 + i]} · ${echapper(f.nom)}`).join(', ') : 'jusqu\'à 5 plans en tout : on en compare deux à la fois à l\'écran'}</span>` : ''}
         </div>
         <label class="champ-calage"><span>Nom</span><input type="text" data-champ="nom-comparaison" value="${echapper(n.nom)}"></label>
         <div class="barre-calage"><button type="button" class="bouton" data-action="creer" ${n.A.length && n.B.length ? '' : 'aria-disabled="true"'}>Comparer →</button><button type="button" class="lien-calage" data-action="annuler-nouvelle">abandonner</button></div>
@@ -124,9 +136,10 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
         const aTraiter = mods.filter((m) => m.etat === 'traiter').length;
         const nomsA = c.fichiers.filter((f) => f.cote === 'A').map((f) => f.nom);
         const nomsB = c.fichiers.filter((f) => f.cote === 'B').map((f) => f.nom);
+        const autres = c.fichiers.filter((f) => ['C', 'D', 'E'].includes(f.cote));
         return `<article class="carte-calage fiche-comparaison">
           <div class="ligne-titre"><strong>${echapper(c.nom)}</strong><span class="aide-calage">${dateCourte(c.modifieLe)}</span></div>
-          <div class="aide-calage"><span class="indice-a">A</span> ${echapper(nomsA.join(', '))}<br><span class="indice-b">B</span> ${echapper(nomsB.join(', '))}</div>
+          <div class="aide-calage"><span class="indice-a">A</span> ${echapper(nomsA.join(', '))}<br><span class="indice-b">B</span> ${echapper(nomsB.join(', '))}${autres.map((f) => `<br><b>${f.cote}</b> ${echapper(f.nom)}`).join('')}</div>
           <div class="barre-calage"><span>${c.planches.length} planche(s) · <b class="chiffre">${mods.length}</b> modification(s)</span>
             ${aTraiter ? `<span class="pastille-calage p-revoir">${aTraiter} à traiter</span>` : mods.length ? '<span class="pastille-calage p-juste">toutes vues</span>' : ''}</div>
           <div class="barre-calage"><button type="button" class="bouton-secondaire petit" data-ouvrir="${echapper(c.id)}">Ouvrir</button><button type="button" class="bouton-secondaire petit" data-rapport="${echapper(c.id)}">Rapport</button><button type="button" class="lien-calage" data-supprimer="${echapper(c.id)}">supprimer</button></div>
@@ -136,9 +149,60 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
 
   async function lireFichiersChoisis(cote, liste) {
     const fichiers = await Promise.all([...liste].map(async (f) => ({ nom: f.name, donnees: base64DesOctets(new Uint8Array(await f.arrayBuffer())) })));
-    etat.nouvelle[cote] = fichiers;
+    etat.nouvelle[cote] = cote === 'X' ? fichiers.slice(0, 3) : fichiers;
+    if (cote === 'X' && fichiers.length > 3) message('Seuls les 3 premiers sont gardés : 5 plans au plus (A à E).', 4000);
+    if (cote !== 'X' && (etat.nouvelle.A.length !== 1 || etat.nouvelle.B.length !== 1)) etat.nouvelle.X = [];
     if (cote === 'A' && !etat.nouvelle.nomTouche) etat.nouvelle.nom = fichiers.length === 1 ? nomSansIndice(fichiers[0].nom) : `${fichiers.length} plans`;
     dessiner();
+  }
+
+  /** Planches (pages appariées par leurs mots) entre deux PDF : { planches, seuls } ; titre avec les lettres si plus de 2 plans. */
+  async function planchesDeLaPaire(fa, fb, nomA = fa.nom, nomB = fb.nom, avecLettres = false) {
+    const [docA, docB] = await Promise.all([documentDe(fa), documentDe(fb)]);
+    const mots = async (doc) => Promise.all(Array.from({ length: doc.numPages }, (_, i) => textesDeLaPage(doc, i + 1).then(motsDeLaPage)));
+    const pages = docA.numPages === 1 && docB.numPages === 1 ? [{ a: 1, b: 1 }] : apparierPages(await mots(docA), await mots(docB));
+    const planches = [];
+    const seuls = [];
+    for (const p of pages) {
+      if (!p.a || !p.b) {
+        seuls.push(`${p.a ? nomA : nomB} page ${p.a ?? p.b}`);
+        continue;
+      }
+      const lettres = avecLettres ? ` · ${fa.cote} ↔ ${fb.cote}` : '';
+      planches.push({ id: nouvelId(), a: { fichier: fa.id, page: p.a }, b: { fichier: fb.id, page: p.b }, titre: `${nomSansIndice(nomA)}${lettres}${docA.numPages > 1 || docB.numPages > 1 ? ` · page A ${p.a} ↔ B ${p.b}` : ''}`, alignement: { ...ALIGNEMENT_NEUTRE }, modifications: [], annotations: [] });
+    }
+    return { planches, seuls };
+  }
+
+  /** Choix de la paire de plans montrée (plans C, D, E…) : retrouve la planche de cette paire ou la crée. */
+  async function choisirPaire(idA, idB) {
+    const c = comp();
+    if (idA === idB) {
+      message('Choisissez deux plans différents.', 3000);
+      dessiner();
+      return;
+    }
+    let i = c.planches.findIndex((p) => p.a.fichier === idA && p.b.fichier === idB);
+    if (i < 0) {
+      occuper('Appariement des pages…');
+      try {
+        const fa = fichier(idA);
+        const fb = fichier(idB);
+        const r = await planchesDeLaPaire(fa, fb, fa.nom, fb.nom, true);
+        if (!r.planches.length) throw new Error('aucune page en commun entre ces deux plans');
+        i = c.planches.length;
+        c.planches.push(...r.planches);
+        enregistrerProjet();
+        if (r.seuls.length) message(`Sans correspondance : ${r.seuls.join(', ')}`, 6000);
+      } catch (erreur) {
+        message(`Paire impossible : ${erreur.message}`, 6000);
+        occuper('');
+        dessiner();
+        return;
+      }
+      occuper('');
+    }
+    await changerPlanche(i);
   }
 
   /** Crée la comparaison : fichiers appariés par leur nom, planches par leurs mots, zones à ignorer reprises. */
@@ -150,7 +214,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     }
     occuper('Lecture des PDF…');
     try {
-      const fichiers = [...n.A.map((f) => ({ ...f, cote: 'A' })), ...n.B.map((f) => ({ ...f, cote: 'B' }))].map((f) => ({ id: nouvelId(), ...f }));
+      const fichiers = [...n.A.map((f) => ({ ...f, cote: 'A' })), ...n.B.map((f) => ({ ...f, cote: 'B' })), ...n.X.map((f, i) => ({ ...f, cote: LETTRES_PLANS[2 + i] }))].map((f) => ({ id: nouvelId(), ...f }));
       const parNom = (cote, nom) => fichiers.find((f) => f.cote === cote && f.nom === nom);
       const paires = n.A.length === 1 && n.B.length === 1 ? [{ a: n.A[0].nom, b: n.B[0].nom }] : apparierFichiers(n.A.map((f) => f.nom), n.B.map((f) => f.nom));
       const planches = [];
@@ -162,16 +226,9 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
         }
         const fa = parNom('A', a);
         const fb = parNom('B', b);
-        const [docA, docB] = await Promise.all([documentDe(fa), documentDe(fb)]);
-        const mots = async (doc) => Promise.all(Array.from({ length: doc.numPages }, (_, i) => textesDeLaPage(doc, i + 1).then(motsDeLaPage)));
-        const pages = docA.numPages === 1 && docB.numPages === 1 ? [{ a: 1, b: 1 }] : apparierPages(await mots(docA), await mots(docB));
-        for (const p of pages) {
-          if (!p.a || !p.b) {
-            seuls.push(`${p.a ? a : b} page ${p.a ?? p.b}`);
-            continue;
-          }
-          planches.push({ id: nouvelId(), a: { fichier: fa.id, page: p.a }, b: { fichier: fb.id, page: p.b }, titre: `${nomSansIndice(a)}${docA.numPages > 1 || docB.numPages > 1 ? ` · page A ${p.a} ↔ B ${p.b}` : ''}`, alignement: { ...ALIGNEMENT_NEUTRE }, modifications: [], annotations: [] });
-        }
+        const r = await planchesDeLaPaire(fa, fb, a, b);
+        planches.push(...r.planches);
+        seuls.push(...r.seuls);
       }
       if (!planches.length) throw new Error('aucune paire de plans trouvée (noms ou pages trop différents)');
       // Zones à ignorer (cartouche…) reprises d'une comparaison précédente du même plan.
@@ -217,11 +274,13 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     const outil = (cle, icone, texte, attr = 'data-outil') => `<button type="button" class="outil-ruban" ${attr}="${cle}">${icone}<span>${texte}</span></button>`;
     return `
       <div class="ruban-calage" role="toolbar" aria-label="Outils de comparaison">
+        ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5" aria-label="Zoom avant">＋</button><button type="button" class="outil-ruban" data-zoom="0.667" aria-label="Zoom arrière">−</button><button type="button" class="outil-ruban" data-zoom="tout" aria-label="Tout voir">⤢<span>Tout</span></button>')}
         ${groupe('Planche', `<button type="button" class="outil-ruban" data-planche="-1" aria-label="Planche précédente">◀</button>
           <select data-champ="planche" class="choix-planche">${c.planches.map((x, i) => `<option value="${i}" ${i === etat.planche ? 'selected' : ''}>${i + 1}. ${echapper(x.titre)}</option>`).join('')}</select>
           <button type="button" class="outil-ruban" data-planche="1" aria-label="Planche suivante">▶</button>`)}
+        ${(comp().fichiers ?? []).some((f) => ['C', 'D', 'E'].includes(f.cote)) ? groupe('Plans', `<select data-champ="plan-a" aria-label="Plan ancien (couleur A)">${plansDeLaComparaison().map((f) => `<option value="${echapper(f.id)}" ${f.id === p?.a.fichier ? 'selected' : ''}>${f.cote} · ${echapper(f.nom)}</option>`).join('')}</select><span class="aide-calage">↔</span><select data-champ="plan-b" aria-label="Plan nouveau (couleur B)">${plansDeLaComparaison().map((f) => `<option value="${echapper(f.id)}" ${f.id === p?.b.fichier ? 'selected' : ''}>${f.cote} · ${echapper(f.nom)}</option>`).join('')}</select>`) : ''}
         ${groupe('Affichage', MODES.map(([cle, i, t]) => outil(cle, i, t, 'data-mode')).join(''))}
-        ${groupe('Recalage de B', `${outil('auto', '⚡', 'Auto', 'data-action')}${outil('deux-points', '⊡', '2 points')}${outil('main', '✥', 'À la main')}
+        ${groupe('Recalage de B', `${outil('auto', '⚡', 'Auto', 'data-action')}${outil('deux-points', '⊡', '2 points')}${outil('axe', '⟂', 'Sur axe')}${outil('main', '✥', 'À la main')}
           <label class="case-ruban"><input type="checkbox" data-champ="verrou" ${etat.verrouEchelle ? 'checked' : ''}> échelle 100 %</label>
           ${outil('reinitialiser', '↺', 'Remettre', 'data-action')}`)}
         ${groupe('Détection', `<label class="reglage-ruban">Tolérance <input type="range" min="0" max="2" step="0.1" value="${c.tolerance}" data-champ="tolerance"><span class="chiffre" data-zone="tolerance">${fixe(c.tolerance, 1)} mm</span></label>
@@ -229,13 +288,12 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
           ${outil('zone', '⬚', 'Zone à ignorer')}<button type="button" class="outil-ruban ${c.textes ? 'actif' : ''}" data-action="textes">T<span>Textes / cotes</span></button>
           ${outil('detecter', '⟳', 'Détecter', 'data-action')}`)}
         ${groupe('Annoter', ANNOTATIONS.map(([cle, i, t]) => outil(cle, i, t)).join(''))}
-        ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
       </div>
       <p class="consigne-calage" data-zone="consigne"></p>
       <div class="travail-comparateur">
         <div class="vue-calage vue-comparateur">
           <div class="tete-vue"><strong>${echapper(p?.titre ?? '')}</strong>
-            <span class="legende-comparateur"><span><i style="background:${COULEURS_CSS.a}"></i>Supprimé (A)</span><span><i style="background:${COULEURS_CSS.b}"></i>Ajouté (B)</span><span><i style="background:rgb(${COULEURS.identique})"></i>Identique</span></span></div>
+            <span class="legende-comparateur" data-zone="legende"></span></div>
           <div class="toile-comparateur" data-toile>
             <canvas class="fond-comparateur"></canvas><canvas class="fond-comparateur deuxieme" hidden></canvas><canvas class="dessus-comparateur"></canvas>
             <div class="poignee-rideau" hidden><span>⇔</span></div>
@@ -252,13 +310,25 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       </div>`;
   }
 
+  /** Les plans (PDF) de la comparaison, dans l'ordre A, B, C, D, E (une seule « paire » de dossiers : A et B seulement). */
+  const plansDeLaComparaison = () => (comp()?.fichiers ?? []).filter((f) => LETTRES_PLANS.includes(f.cote)).sort((u, v) => u.cote.localeCompare(v.cote));
+
+  function majLegende() {
+    const z = page.querySelector('[data-zone="legende"]');
+    if (!z) return;
+    const c = couleursCss();
+    z.innerHTML = `<label><input type="color" data-couleur="a" value="${c.a}" aria-label="Couleur de A"> Supprimé (A)</label><label><input type="color" data-couleur="b" value="${c.b}" aria-label="Couleur de B"> Ajouté (B)</label><span><i style="background:rgb(${GRIS_IDENTIQUE})"></i>Identique</span>`;
+  }
+
   function majOutils() {
     if (etat.ecran !== 'comparer') return;
+    majLegende();
     page.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('actif', b.dataset.mode === etat.mode));
     page.querySelectorAll('[data-outil]').forEach((b) => b.classList.toggle('actif', b.dataset.outil === etat.outil));
     page.querySelector('[data-action="textes"]')?.classList.toggle('actif', Boolean(comp().textes));
     const consignes = {
-      'deux-points': ['Cliquez le point 1 sur A (rouge / gris)…', '… puis le même point sur B (bleu).', 'Cliquez le point 2 sur A…', '… puis le même point 2 sur B.'][etat.saisie.length] ?? '',
+      'deux-points': ['Point 1 : cliquez-le sur A (à gauche, accroche sur sommet ou trait)…', '… puis le même point 1 sur B (à droite).', 'Point 2 : cliquez-le sur A…', '… puis le même point 2 sur B.'][etat.saisie.length] ?? '',
+      axe: !etat.axe?.a ? 'Cliquez un trait de A (à gauche).' : !etat.axe.b ? 'Cliquez le trait de B qui correspond (à droite).' : etat.saisie.length ? 'Cliquez le même point sur B (à droite).' : 'Facultatif : un point de A (à gauche) puis le même sur B, pour caler le long du trait. Échap pour finir.',
       main: 'Glissez pour déplacer B ; flèches du clavier = 0,1 mm (Maj = 1 mm).',
       zone: 'Tracez un rectangle (cartouche, date…) : ce qui est dedans n\'est plus détecté.',
       nuage: 'Tracez le rectangle du nuage.',
@@ -384,9 +454,9 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       const r = Math.round((comp().tolerance / MM_PAR_POINT) * vue.zoom * dpr);
       images = {
         vue: vueRendue, w, h, W, H, dpr,
-        superpose: superposer(encreA, encreB, W, H, r, COULEURS),
-        A: teinter(encreA, COULEURS.a),
-        B: teinter(encreB, COULEURS.b),
+        superpose: superposer(encreA, encreB, W, H, r, couleursRgb()),
+        A: teinter(encreA, couleursRgb().a),
+        B: teinter(encreB, couleursRgb().b),
       };
       afficher();
     } catch (erreur) {
@@ -467,6 +537,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     c.style.height = `${h}px`;
     const ctx = c.getContext('2d');
     const copies = etat.mode === 'cote' ? [0, w + 4] : [0];
+    const recale = OUTILS_RECALAGE.includes(etat.outil);
     for (const decalage of copies) {
       ctx.setTransform(dpr, 0, 0, dpr, decalage * dpr, 0);
       const E = (pt) => versEcran(pt, w, h);
@@ -508,8 +579,9 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       ctx.textBaseline = 'alphabetic';
       // Annotations.
       for (const a of p.annotations ?? []) dessinerAnnotation(ctx, a, E, '#7c3aed');
+      if (recale) dessinerRecalage(ctx, decalage === 0 ? 'a' : 'b', E);
       // Saisie en cours.
-      if (etat.saisie.length) dessinerAnnotation(ctx, { genre: etat.outil === 'surface' ? 'surface-ouverte' : etat.outil, points: etat.saisie }, E, '#ea580c');
+      if (!recale && etat.saisie.length) dessinerAnnotation(ctx, { genre: etat.outil === 'surface' ? 'surface-ouverte' : etat.outil, points: etat.saisie }, E, '#ea580c');
     }
   }
 
@@ -573,8 +645,12 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       const r = t.getBoundingClientRect();
       const w = etat.mode === 'cote' ? Math.floor(t.clientWidth / 2) - 2 : t.clientWidth;
       let x = ev.clientX - r.left;
-      if (etat.mode === 'cote' && x > w + 2) x -= w + 4;
-      return { x, y: ev.clientY - r.top, w, h: t.clientHeight };
+      let cote = 'a';
+      if (etat.mode === 'cote' && x > w + 2) {
+        x -= w + 4;
+        cote = 'b';
+      }
+      return { x, y: ev.clientY - r.top, w, h: t.clientHeight, cote };
     };
     t.addEventListener('wheel', (ev) => {
       if (!vue) return;
@@ -600,7 +676,10 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       geste = { ...pos, depart: versPage(pos.x, pos.y, pos.w, pos.h), vue: { ...vue }, glisse: false, alignement: { ...planche().alignement } };
     });
     t.addEventListener('pointermove', (ev) => {
-      if (!geste) return;
+      if (!geste) {
+        if (etat.outil === 'deux-points' || etat.outil === 'axe') survolerRecalage(position(ev));
+        return;
+      }
       if (geste.rideau) {
         const r = t.getBoundingClientRect();
         etat.rideau = Math.min(0.98, Math.max(0.02, (ev.clientX - r.left) / r.width));
@@ -667,7 +746,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   }
 
   /** Clic (sans glisser) dans la vue, selon l'outil. */
-  async function cliquer(ici) {
+  async function cliquer(ici, pos = { cote: 'a' }) {
     const p = planche();
     const o = etat.outil;
     if (!o) {
@@ -682,15 +761,8 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       }
       return;
     }
-    if (o === 'deux-points') {
-      etat.saisie.push(ici);
-      if (etat.saisie.length === 4) {
-        const [a1, b1, a2, b2] = etat.saisie;
-        etat.saisie = [];
-        recalerParDeuxPoints(a1, b1, a2, b2);
-      }
-      majOutils();
-      dessinerDessus();
+    if (o === 'deux-points' || o === 'axe') {
+      await clicRecalage(ici, pos);
       return;
     }
     if (o === 'note') {
@@ -747,6 +819,210 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   }
 
   // ---------------------------------------------------------------- Recalage de B
+
+  // 0.316.0 : « 2 points » et « Sur axe » comme dans Caler plan : A à gauche, B à droite, accroche sur les sommets et
+  // les traits du PDF (point 1 sur A puis sur B, point 2 sur A puis sur B ; ou un trait de A puis un trait de B).
+  const OUTILS_RECALAGE = ['deux-points', 'axe'];
+
+  /** Entrée / sortie d'un outil de recalage : plan côte à côte pendant l'outil, l'affichage d'avant ensuite. */
+  async function passerEnRecalage(ancien) {
+    const veut = OUTILS_RECALAGE.includes(etat.outil);
+    const avait = OUTILS_RECALAGE.includes(ancien);
+    etat.survol = null;
+    if (veut && !avait) {
+      etat.modeAvantRecalage = etat.mode;
+      if (etat.mode !== 'cote') {
+        etat.mode = 'cote';
+        vue = null;
+        majOutils();
+        await cadrer();
+      }
+      await chargerSegments();
+    } else if (!veut && avait && etat.modeAvantRecalage && etat.modeAvantRecalage !== 'cote') {
+      etat.mode = etat.modeAvantRecalage;
+      etat.modeAvantRecalage = null;
+      vue = null;
+      majOutils();
+      await cadrer();
+    }
+  }
+
+  /** Traits des deux PDF (en points, y vers le bas) pour l'accroche ; B dans son repère d'origine. */
+  async function chargerSegments() {
+    const p = planche();
+    const cle = `${p.a.fichier}:${p.a.page}|${p.b.fichier}:${p.b.page}`;
+    if (etat.segments?.cle === cle) return;
+    occuper('Lecture des traits pour l\'accroche…');
+    try {
+      const [docA, docB] = await Promise.all([documentDe(fichier(p.a.fichier)), documentDe(fichier(p.b.fichier))]);
+      const [sa, sb] = await Promise.all([segmentsDeLaPage(docA, p.a.page), segmentsDeLaPage(docB, p.b.page)]);
+      const enPoints = (liste) => liste.map((q) => q.map((v) => v / MM_PAR_POINT));
+      etat.segments = { cle, a: enPoints(sa), b: enPoints(sb) };
+      if (!sa.length || !sb.length) message('Peu de traits dans un des PDF (plan scanné ?) : pas d\'accroche, le point cliqué est pris tel quel.', 6000);
+    } catch (erreur) {
+      etat.segments = { cle, a: [], b: [] };
+      message(`Accroche indisponible : ${erreur.message}`, 5000);
+    }
+    occuper('');
+  }
+
+  /** Accroche sous la souris : { cote, type, point (repère de la vue : A, ou B posé), segment (repère d'origine du plan) }. */
+  function accrocheSous(pos) {
+    if (!etat.segments || !vue) return null;
+    const ici = versPage(pos.x, pos.y, pos.w, pos.h);
+    const tol = 12 / vue.zoom;
+    if (pos.cote === 'a') {
+      const r = accrocherSegments(etat.segments.a, ici, tol);
+      return r ? { cote: 'a', ...r } : null;
+    }
+    const al = planche().alignement;
+    const r = accrocherSegments(etat.segments.b, inverserAlignement(al, ici), tol / al.s);
+    return r ? { cote: 'b', ...r, point: appliquerAlignement(al, r.point) } : null;
+  }
+
+  function survolerRecalage(pos) {
+    cancelAnimationFrame(etat.imageSurvol);
+    etat.imageSurvol = requestAnimationFrame(() => {
+      etat.survol = accrocheSous(pos);
+      etat.pointeur = { cote: pos.cote };
+      dessinerDessus();
+    });
+  }
+
+  /** Marques du recalage (accroche sous la souris, points déjà posés) pour la copie « a » ou « b » de la vue. */
+  function dessinerRecalage(ctx, cote, E) {
+    const marque = (pt, texte, couleur) => {
+      const [x, y] = E(pt);
+      ctx.strokeStyle = couleur;
+      ctx.fillStyle = couleur;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, 2 * Math.PI);
+      ctx.moveTo(x - 11, y);
+      ctx.lineTo(x + 11, y);
+      ctx.moveTo(x, y - 11);
+      ctx.lineTo(x, y + 11);
+      ctx.stroke();
+      if (texte) {
+        ctx.font = 'bold 12px system-ui, sans-serif';
+        ctx.fillText(texte, x + 10, y - 9);
+      }
+    };
+    etat.saisie.forEach((pt, i) => {
+      if ((i % 2 === 0 ? 'a' : 'b') === cote) marque(pt, `P${Math.floor(i / 2) + 1}`, '#ea580c');
+    });
+    const axe = (seg, couleur, enB) => {
+      const [p, q] = enB ? [appliquerAlignement(planche().alignement, [seg[0], seg[1]]), appliquerAlignement(planche().alignement, [seg[2], seg[3]])] : [[seg[0], seg[1]], [seg[2], seg[3]]];
+      const [x1, y1] = E(p);
+      const [x2, y2] = E(q);
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    };
+    if (etat.axe?.a && cote === 'a') axe(etat.axe.a, '#ea580c', false);
+    if (etat.axe?.b && cote === 'b') axe(etat.axe.b, '#ea580c', true);
+    const s = etat.survol;
+    if (s && s.cote === cote) {
+      if (etat.outil === 'axe' && !etat.axe?.point && s.segment && ((cote === 'a' && !etat.axe?.a) || (cote === 'b' && etat.axe?.a && !etat.axe?.b))) axe(s.segment, '#0ea5e9', cote === 'b');
+      else {
+        const [x, y] = E(s.point);
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 2;
+        if (s.type === 'sommet') ctx.strokeRect(x - 6, y - 6, 12, 12);
+        else {
+          ctx.beginPath();
+          ctx.moveTo(x - 6, y - 6);
+          ctx.lineTo(x + 6, y + 6);
+          ctx.moveTo(x + 6, y - 6);
+          ctx.lineTo(x - 6, y + 6);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  /** Clic d'un outil de recalage : le point accroché (ou le point cliqué), du bon côté. */
+  async function clicRecalage(ici, pos) {
+    const accroche = accrocheSous(pos);
+    const point = accroche?.point ?? ici;
+    const p = planche();
+    if (etat.outil === 'deux-points') {
+      const attendu = etat.saisie.length % 2 === 0 ? 'a' : 'b';
+      if (pos.cote !== attendu) {
+        message(attendu === 'a' ? 'Cliquez le point sur A (à gauche).' : 'Cliquez le même point sur B (à droite).', 3000);
+        return;
+      }
+      etat.saisie.push(point);
+      if (etat.saisie.length === 4) {
+        const [a1, b1, a2, b2] = etat.saisie;
+        etat.saisie = [];
+        recalerParDeuxPoints(a1, b1, a2, b2);
+        await passerEnRecalage('deux-points');
+      }
+      majOutils();
+      dessinerDessus();
+      return;
+    }
+    // Sur axe : un trait de A, un trait de B, puis (facultatif) un point de chaque pour caler le long du trait.
+    etat.axe ??= { a: null, b: null };
+    const ax = etat.axe;
+    if (!ax.a || !ax.b) {
+      const cote = ax.a ? 'b' : 'a';
+      if (pos.cote !== cote) {
+        message(cote === 'a' ? 'Cliquez un trait de A (à gauche).' : 'Cliquez le trait de B qui correspond (à droite).', 3000);
+        return;
+      }
+      if (!accroche?.segment) {
+        message('Aucun trait ici : cliquez sur un trait du plan.', 3000);
+        return;
+      }
+      ax[cote] = accroche.segment;
+      if (ax.a && ax.b) {
+        const al = alignementSurAxes(p.alignement, ax.a, ax.b);
+        if (!al) {
+          message('Trait trop court : choisissez-en un autre.', 3000);
+          ax.b = null;
+          return;
+        }
+        p.alignement = al;
+        p.alignePar = 'sur axe';
+        enregistrerProjet();
+        majPied();
+        rendreBientot(0);
+        message('Traits alignés. Pour caler le long du trait : cliquez un point de A puis le même sur B (ou Échap pour finir).', 7000, { ok: true });
+      }
+      majOutils();
+      dessinerDessus();
+      return;
+    }
+    const attendu = etat.saisie.length % 2 === 0 ? 'a' : 'b';
+    if (pos.cote !== attendu) {
+      message(attendu === 'a' ? 'Cliquez le point sur A (à gauche).' : 'Cliquez le même point sur B (à droite).', 3000);
+      return;
+    }
+    etat.saisie.push(point);
+    if (etat.saisie.length === 2) {
+      const [a, bVu] = etat.saisie;
+      etat.saisie = [];
+      const b = inverserAlignement(p.alignement, bVu);
+      p.alignement = alignementLeLongDeLAxe(p.alignement, ax.a, a, b) ?? p.alignement;
+      p.alignePar = 'sur axe + point';
+      etat.outil = null;
+      etat.axe = null;
+      enregistrerProjet();
+      majPied();
+      rendreBientot(0);
+      detecter();
+      await passerEnRecalage('axe');
+    }
+    majOutils();
+    dessinerDessus();
+  }
 
   /** Similitude B → A par 2 paires de points (cliqués dans le repère de A ; B ramené par l'alignement actuel). */
   function recalerParDeuxPoints(a1, b1Vu, a2, b2Vu) {
@@ -921,7 +1197,14 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
         <section class="carte-calage">
           <h3>Rapport « ${echapper(c.nom)} »</h3>
           <p class="aide-calage">${c.planches.length} planche(s) · ${mods.length} modification(s) · ${mods.filter((m) => m.etat === 'traiter').length} à traiter</p>
-          <label><input type="checkbox" data-rapport-option="planches" ${r.planches ? 'checked' : ''}> Planches avec les nuages numérotés (plan B en vectoriel)</label>
+          <label><input type="checkbox" data-rapport-option="planches" ${r.planches ? 'checked' : ''}> Planches avec les nuages numérotés</label>
+          <fieldset class="choix-fond-rapport" ${r.planches ? '' : 'disabled'}>
+            <legend>Plan de chaque planche</legend>
+            <label><input type="radio" name="fond-rapport" data-fond="b" ${r.fond === 'b' ? 'checked' : ''}> Plan B (nouvel indice) en vectoriel + les différences en couleur</label>
+            <label><input type="radio" name="fond-rapport" data-fond="a" ${r.fond === 'a' ? 'checked' : ''}> Plan A (ancien indice) en vectoriel + les différences en couleur</label>
+            <label><input type="radio" name="fond-rapport" data-fond="gris" ${r.fond === 'gris' ? 'checked' : ''}> Superposition comme à l'écran : identique en gris, A et B dans leur couleur (image)</label>
+            <label class="${r.fond === 'gris' ? 'grise' : ''}"><input type="checkbox" data-rapport-option="vectoriel" ${r.vectoriel && r.fond !== 'gris' ? 'checked' : ''} ${r.fond === 'gris' ? 'disabled' : ''}> Différences en traits vectoriels (nets) au lieu d'une image ; les textes et aplats modifiés sont alors seulement dans les nuages</label>
+          </fieldset>
           <label><input type="checkbox" data-rapport-option="ignorees" ${r.ignorees ? 'checked' : ''}> Modifications ignorées aussi</label>
           <label><input type="checkbox" data-rapport-option="commentaires" ${r.commentaires ? 'checked' : ''}> Commentaires</label>
           <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomRapport('pdf'))}</span></p>
@@ -932,8 +1215,8 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
 
   const nomRapport = (ext) => `${nomFichierExport(projet.cartouche?.affaire ?? '', `comparaison_${comp().nom}`)}.${ext}`;
 
-  /** Image d'une planche (repère de A, k px par point) : superposition complète, ou seulement les différences (transparent ailleurs). */
-  async function imagePlanche(p, k, { differencesSeules = false } = {}) {
+  /** Encre de A et de B (B posé par l'alignement) à k pixels par point : { encreA, encreB, W, H, taille }. */
+  async function masquesPlanche(p, k) {
     const [docA, docB] = await Promise.all([documentDe(fichier(p.a.fichier)), documentDe(fichier(p.b.fichier))]);
     const taille = await taillePage(docA, p.a.page);
     const W = Math.round(taille.largeur * k);
@@ -944,18 +1227,39 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     await Promise.all([rendrePage(docA, p.a.page, cA, M, W, H), rendrePage(docB, p.b.page, cB, composer(M, matriceAlignement(p.alignement)), W, H)]);
     const encreA = masqueEncre(cA.getContext('2d').getImageData(0, 0, W, H).data);
     const encreB = masqueEncre(cB.getContext('2d').getImageData(0, 0, W, H).data);
+    cA.width = 0;
+    cB.width = 0;
+    return { encreA, encreB, W, H, taille };
+  }
+
+  /** Image d'une planche (repère de A, k px par point) : superposition complète, ou seulement les différences (transparent ailleurs). */
+  async function imagePlanche(p, k, { differencesSeules = false } = {}) {
+    const { encreA, encreB, W, H, taille } = await masquesPlanche(p, k);
     const r = Math.round((comp().tolerance / MM_PAR_POINT) * k);
-    const rgba = superposer(encreA, encreB, W, H, r, COULEURS, { sansIdentiques: differencesSeules });
+    const rgba = superposer(encreA, encreB, W, H, r, couleursRgb(), { sansIdentiques: differencesSeules });
     if (differencesSeules) for (let i = 0; i < W * H; i += 1) if (rgba[4 * i] === 255 && rgba[4 * i + 1] === 255 && rgba[4 * i + 2] === 255) rgba[4 * i + 3] = 0;
     const c = document.createElement('canvas');
     c.width = W;
     c.height = H;
     c.getContext('2d').putImageData(new ImageData(rgba, W, H), 0, 0);
-    cA.width = 0;
-    cB.width = 0;
     const blob = await new Promise((tenir) => c.toBlob(tenir, 'image/png'));
     c.width = 0;
     return { blob, taille };
+  }
+
+  /** Différences en TRAITS : morceaux des traits de A absents de B (et inversement), en points de A, y vers le bas. */
+  async function traitsDifferents(p, k) {
+    const { encreA, encreB, W, H } = await masquesPlanche(p, k);
+    const r = Math.round((comp().tolerance / MM_PAR_POINT) * k);
+    const [docA, docB] = await Promise.all([documentDe(fichier(p.a.fichier)), documentDe(fichier(p.b.fichier))]);
+    const [sa, sb] = await Promise.all([segmentsDeLaPage(docA, p.a.page), segmentsDeLaPage(docB, p.b.page)]);
+    const enPoints = (liste) => liste.map((q) => q.map((v) => v / MM_PAR_POINT));
+    const segsA = enPoints(sa);
+    const segsB = enPoints(sb).map((q) => [...appliquerAlignement(p.alignement, [q[0], q[1]]), ...appliquerAlignement(p.alignement, [q[2], q[3]])]);
+    return {
+      traitsA: morceauxDifferents(segsA, dilater(encreB, W, H, r), W, H, k),
+      traitsB: morceauxDifferents(segsB, dilater(encreA, W, H, r), W, H, k),
+    };
   }
 
   async function exporterRapport() {
@@ -966,18 +1270,24 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       for (let i = 0; i < c.planches.length; i += 1) {
         const p = c.planches[i];
         occuper(`Rapport : planche ${i + 1} / ${c.planches.length}…`);
+        const fA = fichier(p.a.fichier);
         const fB = fichier(p.b.fichier);
         const tailleB = await taillePage(await documentDe(fB), p.b.page);
+        const fond = etat.rapport.fond;
         let imageDifferences = null;
+        let traits = {};
         let tailleA = null;
         if (etat.rapport.planches) {
-          const docA = await documentDe(fichier(p.a.fichier));
+          const docA = await documentDe(fA);
           tailleA = await taillePage(docA, p.a.page);
           const k = Math.min(3, 3600 / Math.max(tailleA.largeur, tailleA.hauteur));
-          const { blob } = await imagePlanche(p, k, { differencesSeules: true });
-          imageDifferences = new Uint8Array(await blob.arrayBuffer());
+          if (fond !== 'gris' && etat.rapport.vectoriel) traits = await traitsDifferents(p, k);
+          else {
+            const { blob } = await imagePlanche(p, k, { differencesSeules: fond !== 'gris' });
+            imageDifferences = new Uint8Array(await blob.arrayBuffer());
+          }
         }
-        planches.push({ planche: p, titre: `${i + 1}. ${p.titre}`, fichierB: fB.id, docBOctets: octetsDeBase64(fB.donnees), pageB: p.b.page, tailleA, tailleB, imageDifferences });
+        planches.push({ planche: p, titre: `${i + 1}. ${p.titre}`, fond, fichierA: fA.id, docAOctets: octetsDeBase64(fA.donnees), pageA: p.a.page, fichierB: fB.id, docBOctets: octetsDeBase64(fB.donnees), pageB: p.b.page, tailleA, tailleB, imageDifferences, ...traits });
       }
       const { creerRapport } = await import('./rapport.js');
       const octets = await creerRapport({
@@ -1049,7 +1359,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       dessiner();
       if (d.ecran === 'comparer') await preparerPlanche();
     } else if (d.action === 'nouvelle') {
-      etat.nouvelle = { A: [], B: [], nom: '', nomTouche: false };
+      etat.nouvelle = { A: [], B: [], X: [], nom: '', nomTouche: false };
       dessiner();
     } else if (d.action === 'annuler-nouvelle') {
       etat.nouvelle = null;
@@ -1068,8 +1378,11 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
         cadrer();
       } else afficher();
     } else if (d.outil) {
+      const ancien = etat.outil;
       etat.outil = etat.outil === d.outil ? null : d.outil;
       etat.saisie = [];
+      etat.axe = null;
+      await passerEnRecalage(ancien);
       majOutils();
       dessinerDessus();
     } else if (d.action === 'auto') {
@@ -1139,13 +1452,25 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     const t = ev.target;
     if (t.dataset.fichiers && t.files?.length) lireFichiersChoisis(t.dataset.fichiers, t.files);
     else if (t.dataset.champ === 'planche') changerPlanche(Number(t.value));
-    else if (t.dataset.champ === 'verrou') etat.verrouEchelle = t.checked;
+    else if (t.dataset.champ === 'plan-a' || t.dataset.champ === 'plan-b') {
+      choisirPaire(page.querySelector('[data-champ="plan-a"]').value, page.querySelector('[data-champ="plan-b"]').value);
+    } else if (t.dataset.couleur) {
+      comp().couleurs = { ...couleursCss(), [t.dataset.couleur]: t.value };
+      enregistrerProjet();
+      rendreBientot(0);
+    } else if (t.dataset.champ === 'verrou') etat.verrouEchelle = t.checked;
     else if (t.dataset.champ === 'tolerance' || t.dataset.champ === 'regroupement') {
       comp()[t.dataset.champ] = Number(t.value);
       enregistrerProjet();
       if (t.dataset.champ === 'tolerance') rendreBientot(0);
       detecter();
-    } else if (t.dataset.rapportOption) etat.rapport[t.dataset.rapportOption] = t.checked;
+    } else if (t.dataset.fond) {
+      etat.rapport.fond = t.dataset.fond;
+      dessiner();
+    } else if (t.dataset.rapportOption) {
+      etat.rapport[t.dataset.rapportOption] = t.checked;
+      if (t.dataset.rapportOption === 'planches') dessiner();
+    }
   });
   page.addEventListener('input', (ev) => {
     const t = ev.target;
