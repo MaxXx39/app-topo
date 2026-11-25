@@ -2,7 +2,7 @@
 // Dessin des plans par dessinerPlansDxf (comme le plan principal), molette = zoom autour de la souris,
 // glisser = déplacer, deux doigts = zoomer ; au survol, l'accroche trouvée est montrée avant le clic.
 // Les marques (P1, A1, V1…) sont dessinées par-dessus, sur un 2e canvas.
-import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
+import { dessinerPlansDxf, surImageChargee } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 
 const SEUIL_GLISSER_PX = 5; // au-delà, c'est un déplacement, pas un clic
@@ -57,6 +57,9 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
     dessinerPlansDxf(fond, plans(), vue, densite);
     dessinerDessus();
   }
+
+  // 0.319.9 : un plan PDF en image se charge après coup : on redessine quand il est prêt (sinon la vue restait blanche)
+  const arreterImages = surImageChargee(() => redessiner());
 
   function dessinerDessus() {
     const densite = window.devicePixelRatio || 1;
@@ -273,6 +276,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
       redessiner();
     },
     detruire() {
+      arreterImages();
       observateur.disconnect();
       conteneur.replaceChildren();
     },

@@ -3,7 +3,7 @@
 // pistes, flèches, textes), l'objet choisi, le dessin en cours et l'accroche.
 // Molette = zoom autour de la souris ; glisser dans le vide = déplacer ; deux doigts = zoomer ;
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
-import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
+import { dessinerPlansDxf, surImageChargee } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
@@ -139,6 +139,9 @@ export function creerVueChantier(conteneur, options) {
     }
     ctx.setLineDash([]);
   }
+
+  // 0.319.9 : un plan PDF en image se charge après coup : on redessine quand il est prêt (sinon la vue restait blanche)
+  const arreterImages = surImageChargee(() => redessiner());
 
   function redessinerDessus() {
     if (!vue) return;
@@ -519,6 +522,7 @@ export function creerVueChantier(conteneur, options) {
       redessiner();
     },
     detruire() {
+      arreterImages();
       observateur.disconnect();
       conteneur.replaceChildren();
     },
