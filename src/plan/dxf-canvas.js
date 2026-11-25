@@ -93,11 +93,15 @@ export function aDessiner(objet, zone, echelle) {
 
 // Images des plans PDF scannés (0.130.0), rangées par contenu : décodées une seule fois.
 const images = new Map();
-let quandImagePrete = null;
+const quandImagePrete = new Set();
 
-/** Fonction appelée quand une image de plan finit de se charger (pour redessiner le plan). */
+/**
+ * Fonction appelée quand une image de plan finit de se charger (pour redessiner le plan). 0.319.9 : plusieurs vues
+ * peuvent s'abonner (plan, Caler plan, Plans de chantier) ; renvoie une fonction qui se désabonne.
+ */
 export function surImageChargee(fonction) {
-  quandImagePrete = fonction;
+  quandImagePrete.add(fonction);
+  return () => quandImagePrete.delete(fonction);
 }
 
 /** Image prête à dessiner, ou null (elle se charge : surImageChargee sera appelée). */
@@ -105,7 +109,7 @@ function imageDuPlan(donnees) {
   let image = images.get(donnees);
   if (!image) {
     image = new Image();
-    image.addEventListener('load', () => quandImagePrete?.());
+    image.addEventListener('load', () => quandImagePrete.forEach((f) => f()));
     image.src = donnees;
     images.set(donnees, image);
   }

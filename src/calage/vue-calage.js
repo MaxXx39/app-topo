@@ -2,7 +2,8 @@
 // Dessin des plans par dessinerPlansDxf (comme le plan principal), molette = zoom autour de la souris,
 // glisser = déplacer, deux doigts = zoomer ; au survol, l'accroche trouvée est montrée avant le clic.
 // Les marques (P1, A1, V1…) sont dessinées par-dessus, sur un 2e canvas.
-import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
+import { dessinerPlansDxf, surImageChargee } from '../plan/dxf-canvas.js';
+import { groupePrincipal } from '../topo/cadrage-plan.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 
 const SEUIL_GLISSER_PX = 5; // au-delà, c'est un déplacement, pas un clic
@@ -44,7 +45,11 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
 
   function cadrer() {
     const { largeur, hauteur } = taille();
-    const coins = cadrage().flatMap((p) => (p.bornes ? [{ est: p.bornes.estMin, nord: p.bornes.nordMin }, { est: p.bornes.estMax, nord: p.bornes.nordMax }] : []));
+    // 0.319.10 : objets très éloignés (près de 0,0 + plan en MN95) écartés du cadrage, sinon la vue reste blanche
+    const coins = cadrage().flatMap((p) => {
+      const b = groupePrincipal(p)?.bornes ?? p.bornes;
+      return b ? [{ est: b.estMin, nord: b.nordMin }, { est: b.estMax, nord: b.nordMax }] : [];
+    });
     vue = cadrerSurPoints(coins, largeur, hauteur, 20);
     redessiner();
   }
@@ -57,6 +62,9 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
     dessinerPlansDxf(fond, plans(), vue, densite);
     dessinerDessus();
   }
+
+  // 0.319.9 : un plan PDF en image se charge après coup : on redessine quand il est prêt (sinon la vue restait blanche)
+  const arreterImages = surImageChargee(() => redessiner());
 
   function dessinerDessus() {
     const densite = window.devicePixelRatio || 1;
@@ -273,6 +281,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
       redessiner();
     },
     detruire() {
+      arreterImages();
       observateur.disconnect();
       conteneur.replaceChildren();
     },

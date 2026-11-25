@@ -199,7 +199,7 @@ describe('dessin à l\'échelle', () => {
     expect(cadre(b)[2]).toBeLessThan(cadre(a)[2] - 20);
   });
   it('cercles : le principal, puis (case cochée) seulement ceux de la fiche, avec leur charge', () => {
-    const s = grueFiche({ fleche: 50 });
+    const s = grueFiche({ fleche: 50, rayonCrochet: 10 });
     const rayons = s.rayon.filter((p) => p.g === 'c').map((p) => p.r);
     expect(rayons[0]).toBe(50);
     expect(rayons.slice(1)).toEqual([22, 30, 35, 40, 45]); // portées du tableau de la fiche (dès 20 m, 5 m d'écart au moins)
@@ -212,7 +212,7 @@ describe('dessin à l\'échelle', () => {
     expect(grueFiche({ fleche: 50, cerclesCharge: false }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     // 5 m : un cercle tous les 5 m dès 20 m (50 m : 20, 25… 45), texte = la portée seule, aucune charge inventée
-    const cinq = grueFiche({ fleche: 50, cerclesMode: 'cinq' });
+    const cinq = grueFiche({ fleche: 50, cerclesMode: 'cinq', rayonCrochet: 10 });
     expect(cinq.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 20, 25, 30, 35, 40, 45]);
     expect(cinq.rayon.filter((p) => p.g === 't').map((p) => p.t)).toContain('25 m');
     expect(cinq.rayon.filter((p) => p.g === 't' && / t$/.test(p.t))).toHaveLength(1); // seule la charge du cercle principal (de la fiche)
@@ -304,7 +304,10 @@ describe('textes de la grue (0.315.0)', () => {
   // Cadre approximatif d'un texte (largeur ≈ 0,55 × hauteur par lettre ; tourné de 90° = échangé)
   const cadreTexte = (p) => {
     const w = p.t.length * p.h * 0.55;
-    const [lx, ly] = (p.a ?? 0) % 180 === 90 ? [p.h, w] : [w, p.h];
+    const a = ((p.a ?? 0) * Math.PI) / 180;
+    // boîte tournée de l'angle du texte : on prend son rectangle englobant
+    const lx = Math.abs(w * Math.cos(a)) + Math.abs(p.h * Math.sin(a));
+    const ly = Math.abs(w * Math.sin(a)) + Math.abs(p.h * Math.cos(a));
     return [p.x - lx / 2, p.y - ly / 2, p.x + lx / 2, p.y + ly / 2];
   };
   const croise = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];

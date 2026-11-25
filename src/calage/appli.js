@@ -13,6 +13,7 @@ import { demanderChoix, demanderChamps } from '../outils/choix.js';
 import { peutConvertirDwg, choisirDwgBureau } from '../android/pont.js';
 import { indiceSuivant, reperesDuPlan, controlerIndice, partRetrouvee, TOLERANCE_REPERE_M, PART_MEME_ORIGINE, nomPlanCale, baseDuNomCale, typeDuFichier } from '../topo/indice-plan.js';
 import { lirePlanDxf, texteDuDxf, estEnMn95, nomXref } from '../topo/dxf-plan.js';
+import { groupePrincipal } from '../topo/cadrage-plan.js';
 import { planRecale } from '../topo/recalage.js';
 import { accrocher, accrocherTrait, sourcesDesPlans } from '../topo/accroche.js';
 import { caler, droiteParPoints, ErreurCalage, appliquerSimilitude, inverserSimilitude, versHelmert, resultatAutomatique, SEUIL_JUSTE_M, SEUIL_A_REVOIR_M } from '../topo/calage-plan.js';
@@ -265,6 +266,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       resume = `<p class="resume-plan-recu"><strong>${echapper(etat.fichier)}</strong> : ${lu.compte.objets} objets, ${lu.calques.length} calques, étendue ${nombre(b.estMax - b.estMin, 1)} × ${nombre(b.nordMax - b.nordMin, 1)} (unités du plan).</p>
         ${xrefs.length ? `<ul class="xrefs-calage">${xrefs.map((x) => `<li class="${x.etat === 'introuvable' ? 'alerte' : ''}">Xref « ${echapper(x.nom)} » : ${ETATS[x.etat]}${x.etat === 'introuvable' ? ` <span class="aide-calage">${echapper(x.chemin)}</span>` : ''}</li>`).join('')}</ul>` : ''}
         ${xrefs.some((x) => x.etat === 'introuvable') ? '<p class="note-calage alerte">⚠ Un xref manque : rechoisissez le plan avec ses xrefs (Ctrl + clic), sinon son contenu ne sera pas sur le plan calé.</p>' : ''}
+        ${(() => { const g = groupePrincipal(lu); return g ? `<p class="note-calage alerte">⚠ ${g.ecartes} objet(s) très éloigné(s) du reste (ex. dessinés près de 0,0) : l'écran cadre sur le plan principal. Pour les enlever : Nettoyer › zone à garder.</p>` : ''; })()}
         ${geles ? `<p class="aide-calage">${geles} calque(s) gelé(s) ou éteint(s) : écartés d'office au nettoyage.</p>` : ''}
         ${etat.lecturePdf ? `<p class="aide-calage">PDF, page ${etat.lecturePdf.page}, lu ${etat.lecturePdf.mode === 'traits' ? 'en traits' : 'en image'} (taille de la feuille : le calage trouve l'échelle).</p>${etat.lecturePdf.avertissements.map((a) => `<p class="aide-calage">⚠ ${echapper(a)}</p>`).join('')}` : ''}
         ${etat.dejaCale ? (estEnMn95(b) ? '<p class="note-calage ok">✓ En MN95 : importé tel quel, sans calage.</p>'

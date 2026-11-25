@@ -320,23 +320,34 @@ function cerclesDeCharge(g) {
   const tab = mode === 'lm2' && f.charges2 ? f.charges2 : f.charges;
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
-  const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: Math.sqrt(Math.max(0, rr * rr - 49)), y: -7, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
+  // 0.319.8 : texte debout (90°), le bout du texte à 50 cm du bord de la flèche, sur le cercle ; il tourne avec la grue.
+  // Un texte qui toucherait celui du crochet (rayon voisin) n'est pas écrit : le texte du crochet donne déjà r et la charge.
+  const demi = g.modele.dim.flecheLargeur / 2;
+  const longueur = (t) => t.length * 0.9 * 0.55;
+  const textCrochet = g.afficherCrochet ? longueur(`r ${fixe1(g.r)} m · ${fixe2(chargeAuRayon(f, g.r, mode).t)} t`) : 0;
+  const texteCercle = (rr, txt) => {
+    const y = -(demi + 0.5 + longueur(txt) / 2);
+    const x = Math.sqrt(Math.max(0, rr * rr - y * y));
+    if (textCrochet && Math.abs(x - g.r) < textCrochet / 2 + 0.6) return null;
+    return { g: 't', k: g.couleurTexte, perso: true, x, y, h: 0.9, a: 90, t: txt, ah: 1, av: 2 };
+  };
+  const ecrire = (rr, t, seul) => { const p = texteCercle(rr, seul ?? `${rr} m · ${fixe2(t)} t`); if (p) res.push(p); };
   if (cerclesMode === 'cinq') {
     // un cercle tous les 5 m dès 20 m : seulement la portée écrite (la fiche ne donne pas de charge à ces rayons exacts)
     for (let rr = 20; rr <= rMax - 5; rr += 5) {
       res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' });
-      if (g.afficherCharge) res.push({ ...texteCercle(rr, 0), t: `${rr} m` });
+      if (g.afficherCharge) ecrire(rr, 0, `${rr} m`);
     }
   } else if (cerclesMode === 'fiche') {
     let dernier = -Infinity;
     const gardes = tab.filter(([rr]) => rr <= rMax - 5 && rr >= 20).filter(([rr]) => (rr - dernier >= 5 ? ((dernier = rr), true) : false));
     for (const [rr, t] of gardes) {
       res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' });
-      if (g.afficherCharge) res.push(texteCercle(rr, t));
+      if (g.afficherCharge) ecrire(rr, t);
     }
   }
-  if (g.afficherCharge) res.push(texteCercle(rMax, tab[tab.length - 1][1]));
-  return res;
+  if (g.afficherCharge) ecrire(rMax, tab[tab.length - 1][1]);
+  return g.rotationFleche ? tournerPrims(res, g.rotationFleche) : res;
 }
 
 /**
