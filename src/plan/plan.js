@@ -1019,11 +1019,18 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       if (angle > 90) { angle -= 180; retourne = true; } else if (angle < -90) { angle += 180; retourne = true; }
       const versDebut = abscisse > 0 ? -1 : 1; // dans le sens de la ligne (+1) ou contre (−1)
       const dir = retourne ? -versDebut : versDebut; // même chose dans le repère du texte
+      // Même dessin que l'écart gauche / droite : pointe pleine + texte à côté, ×1,5 (0.321.1).
       const g = creerElement('g', { transform: `translate(${(p.x + nx * 26 * cote).toFixed(1)} ${(p.y + ny * 26 * cote).toFixed(1)}) rotate(${angle.toFixed(1)})` });
-      const fleche = creerElement('path', { d: `M0 0H${dir * 34} M${dir * 34} 0l${-dir * 9} -6 M${dir * 34} 0l${-dir * 9} 6`, class: `fleche-pied ${classe}` });
-      const t = creerElement('text', { x: -dir * 8, y: 6, 'text-anchor': dir > 0 ? 'end' : 'start', class: `cote-ligne ${classe}` });
+      const signe = -dir; // le corps de la flèche et le texte sont derrière la pointe
+      const interieur = creerElement('g', { transform: 'translate(0 -6) scale(1.5)' });
+      const pointe = creerElement('polygon', { points: `0,0 ${15 * signe},-8 ${15 * signe},8`, class: 'pointe-ecart' });
+      const couleur = classe === 'cote-debut' ? '#15803d' : '#b45309';
+      pointe.style.fill = couleur;
+      const t = creerElement('text', { x: 19 * signe, y: 4.5, 'text-anchor': signe > 0 ? 'start' : 'end', class: 'cote-ligne texte-fleche-ecart' });
+      t.style.fill = couleur;
       t.textContent = texte;
-      g.append(fleche, t);
+      interieur.append(pointe, t);
+      g.append(interieur);
       groupe.append(g);
     };
     if (abscisse < 0) {
