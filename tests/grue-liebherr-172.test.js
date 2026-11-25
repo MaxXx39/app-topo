@@ -304,7 +304,10 @@ describe('textes de la grue (0.315.0)', () => {
   // Cadre approximatif d'un texte (largeur ≈ 0,55 × hauteur par lettre ; tourné de 90° = échangé)
   const cadreTexte = (p) => {
     const w = p.t.length * p.h * 0.55;
-    const [lx, ly] = (p.a ?? 0) % 180 === 90 ? [p.h, w] : [w, p.h];
+    const a = ((p.a ?? 0) * Math.PI) / 180;
+    // boîte tournée de l'angle du texte : on prend son rectangle englobant
+    const lx = Math.abs(w * Math.cos(a)) + Math.abs(p.h * Math.sin(a));
+    const ly = Math.abs(w * Math.sin(a)) + Math.abs(p.h * Math.cos(a));
     return [p.x - lx / 2, p.y - ly / 2, p.x + lx / 2, p.y + ly / 2];
   };
   const croise = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];

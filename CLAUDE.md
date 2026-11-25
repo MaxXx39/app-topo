@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.319.5)
+## Fonctionnalités (état à la 0.319.6)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -155,6 +155,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot b = 0.302.0 (fait, voir plus bas)** — Plateformes : **pente au milieu du côté, à l'intérieur, sous le « + »** ; **berme côté par côté, discrète** (petit « ⋯ » sur la ligne du côté : berme oui / non, hauteur, largeur, talus ③ ; par défaut = réglage de la plateforme ; côté réglé à part marqué) ; **Groupes** (nom « Groupe », PAS « Phase » : plusieurs plateformes = une seule surface du projet, talus seulement sur le tour extérieur) ; **étapes** (une plateforme peut prendre une autre plateforme comme référence ; panneau « Étapes » dans la page Plateformes : déblai / remblai de chaque passage + total depuis le terrain ; « à voir pour la suite, on fera une maquette »).
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
+
+## 0.319.6 — Textes des cercles de charge orientés selon le cercle (retour du 25.11)
+- Les textes « 20 m · 5.2 t » sont posés sur le cercle (à 7 m sous l'axe de la flèche) et **tournés selon sa tangente** (angle = 90° + angle du point, `texteCercle` de `grue-fiche.js`) : avant, ils restaient à 90° et ne suivaient plus le cercle à cause du décalage. Test de non-chevauchement adapté aux textes tournés. Essayé en Playwright (Liebherr 40 m, cercles tous les 5 m).
 
 ## 0.319.5 — Feuille : VRAIE cause de la page blanche trouvée (plan PDF calé + opacité)
 - Un plan calé / recalé (`planRecale`) est `Object.create(plan)` : calques, couleur, transparence… sont **hérités**. `{ ...p }` ne les copiait pas → `preparer` plantait (`plan.calques` absent) → page blanche. `plansDeLaFeuille` et `plansAvecCalques` font maintenant `Object.assign(Object.create(p), …)`. Test `feuille-plans.test.js` (plan hérité). **Règle : ne jamais copier un plan du projet avec `{ ...p }`.**

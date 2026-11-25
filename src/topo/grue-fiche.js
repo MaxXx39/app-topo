@@ -320,7 +320,12 @@ function cerclesDeCharge(g) {
   const tab = mode === 'lm2' && f.charges2 ? f.charges2 : f.charges;
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
-  const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: Math.sqrt(Math.max(0, rr * rr - 49)), y: -7, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
+  // 0.319.6 : le texte est posé sur le cercle (à 7 m sous l'axe de la flèche) et suit sa tangente : angle = 90° + angle du point
+  const texteCercle = (rr, t) => {
+    const x = Math.sqrt(Math.max(0, rr * rr - 49));
+    const angle = 90 + (Math.atan2(-7, x) * 180) / Math.PI;
+    return { g: 't', k: g.couleurTexte, perso: true, x, y: -7, h: 0.9, a: Math.round(angle * 100) / 100, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 };
+  };
   if (cerclesMode === 'cinq') {
     // un cercle tous les 5 m dès 20 m : seulement la portée écrite (la fiche ne donne pas de charge à ces rayons exacts)
     for (let rr = 20; rr <= rMax - 5; rr += 5) {
