@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.319.3)
+## Fonctionnalités (état à la 0.319.4)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -155,6 +155,10 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot b = 0.302.0 (fait, voir plus bas)** — Plateformes : **pente au milieu du côté, à l'intérieur, sous le « + »** ; **berme côté par côté, discrète** (petit « ⋯ » sur la ligne du côté : berme oui / non, hauteur, largeur, talus ③ ; par défaut = réglage de la plateforme ; côté réglé à part marqué) ; **Groupes** (nom « Groupe », PAS « Phase » : plusieurs plateformes = une seule surface du projet, talus seulement sur le tour extérieur) ; **étapes** (une plateforme peut prendre une autre plateforme comme référence ; panneau « Étapes » dans la page Plateformes : déblai / remblai de chaque passage + total depuis le terrain ; « à voir pour la suite, on fera une maquette »).
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
+
+## 0.319.4 — Feuille : aperçu dessiné à part (page blanche, retour du 25.11)
+- `dessinerApercu` dessine la page sur une toile à part puis la copie d'un coup ; une erreur de dessin est écrite en message (au lieu d'une page vide) ; un dessin plus ancien ne recouvre plus un plus récent. **Cause de la page blanche avec opacité toujours non reproduite** (essais : petit plan, plan de 60 000 traits, curseur au clavier) : si ça recommence, noter le message affiché et le type de plan (DXF, PDF image…).
+- L'interrupteur « Effet 3D des symboles » est dans l'onglet **Dessiner**, panneau de droite, bloc « Plan ».
 
 ## 0.319.3 — Accroches du châssis : visibles seulement quand la grue est choisie (retour du 25.11)
 - Les carrés bleus (4 coins + axe de la tour) n'apparaissent plus que sur la grue choisie (`vue.js`), plus en permanence.
