@@ -13,8 +13,8 @@ describe('noms de calques exportés (0.320.1)', () => {
     expect(noms[0]).toMatch(/MURS$/);
     expect(noms[1]).toMatch(/AXES$/);
   });
-  it('un nom court reste lisible (casse gardée, sans accent)', () => {
-    expect(nomsDeCalques([{ nom: 'Béton armé' }, { nom: 'MURS' }])).toEqual(['Beton_arme', 'MURS']);
+  it('un nom court reste lisible (majuscules, sans accent)', () => {
+    expect(nomsDeCalques([{ nom: 'Béton armé' }, { nom: 'MURS' }])).toEqual(['BETON_ARME', 'MURS']);
   });
   it('le fichier a un calque et une couleur par calque', () => {
     const plan = {

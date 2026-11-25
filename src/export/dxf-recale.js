@@ -90,7 +90,7 @@ export function aciLePlusProche(hex) {
 /**
  * Noms de calques du fichier (R12 : 31 caractères au plus, sans accent ni caractère spécial). Un nom trop long garde son
  * début (8 caractères) et sa fin (22 caractères), où se trouve ce qui distingue les calques ; deux calques ne reçoivent
- * jamais le même nom (« ~2 », « ~3 »…, majuscules et minuscules comptent pour un seul nom, comme dans AutoCAD).
+ * jamais le même nom (« ~2 », « ~3 »…).
  */
 export function nomsDeCalques(calques) {
   const pris = new Set();
@@ -104,12 +104,13 @@ export function nomsDeCalques(calques) {
   });
 }
 
-/** Nom de calque accepté par AutoCAD R12 : sans accent ni caractère spécial (la longueur est réglée par nomsDeCalques). */
+/** Nom de calque accepté par AutoCAD R12 : sans accent ni caractère spécial, en majuscules (la longueur est réglée par nomsDeCalques). */
 function nomDeCalque(texte) {
   return (
     String(texte)
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
-      .replace(/[^A-Za-z0-9_$-]+/g, '_') || '0'
+      .toUpperCase()
+      .replace(/[^A-Z0-9_$-]+/g, '_') || '0'
   );
 }
