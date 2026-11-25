@@ -1132,7 +1132,9 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
 
   /** Ajout d'une référence : état du calage gardé, puis nettoyage du plan (déjà en MN95) sans calage. */
   function entrerReference(plan, fichier) {
-    reserve = { ...etat };
+    // 0.316.1 : l'état gardé ne doit PAS contenir le message de chargement (« Lecture de… ») : remis à la validation, il
+    // laissait l'écran de chargement tourner sans fin (retour du 25.11).
+    reserve = { ...etat, occupe: '' };
     const base = fichier.replace(/\.[^.]+$/, '');
     Object.assign(etat, {
       lu: plan, fichier, nom: base, modeReference: true, resultat: { similitude: { ...IDENTITE }, verdict: 'juste' }, nouvelIndice: null,
@@ -1146,6 +1148,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     if (!reserve) return;
     const nouvelleReference = idNouvelle && idNouvelle !== reserve.referenceId;
     Object.assign(etat, reserve);
+    etat.occupe = '';
     reserve = null;
     etat.modeReference = false;
     if (nouvelleReference) Object.assign(etat, { referenceId: idNouvelle, elements: [], enCours: null, resultat: null, recette: null, auto: null });

@@ -280,7 +280,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
           <button type="button" class="outil-ruban" data-planche="1" aria-label="Planche suivante">▶</button>`)}
         ${(comp().fichiers ?? []).some((f) => ['C', 'D', 'E'].includes(f.cote)) ? groupe('Plans', `<select data-champ="plan-a" aria-label="Plan ancien (couleur A)">${plansDeLaComparaison().map((f) => `<option value="${echapper(f.id)}" ${f.id === p?.a.fichier ? 'selected' : ''}>${f.cote} · ${echapper(f.nom)}</option>`).join('')}</select><span class="aide-calage">↔</span><select data-champ="plan-b" aria-label="Plan nouveau (couleur B)">${plansDeLaComparaison().map((f) => `<option value="${echapper(f.id)}" ${f.id === p?.b.fichier ? 'selected' : ''}>${f.cote} · ${echapper(f.nom)}</option>`).join('')}</select>`) : ''}
         ${groupe('Affichage', MODES.map(([cle, i, t]) => outil(cle, i, t, 'data-mode')).join(''))}
-        ${groupe('Recalage de B', `${outil('auto', '⚡', 'Auto', 'data-action')}${outil('deux-points', '⊡', '2 points')}${outil('axe', '⟂', 'Sur axe')}${outil('main', '✥', 'À la main')}
+        ${groupe('Recalage de B', `${outil('auto', '⚡', 'Auto', 'data-action')}${outil('deux-points', '⊡', '2 points')}${outil('axe', '⟂', 'Sur axe')}<span class="choix-axe" data-zone="choix-axe" hidden><button type="button" class="outil-ruban petit" data-axe-mode="trait" title="Cliquer un trait du plan">╱<span>Trait</span></button><button type="button" class="outil-ruban petit" data-axe-mode="points" title="Deux points avec accroche">⁚<span>2 points</span></button></span>${outil('main', '✥', 'À la main')}
           <label class="case-ruban"><input type="checkbox" data-champ="verrou" ${etat.verrouEchelle ? 'checked' : ''}> échelle 100 %</label>
           ${outil('reinitialiser', '↺', 'Remettre', 'data-action')}`)}
         ${groupe('Détection', `<label class="reglage-ruban">Tolérance <input type="range" min="0" max="2" step="0.1" value="${c.tolerance}" data-champ="tolerance"><span class="chiffre" data-zone="tolerance">${fixe(c.tolerance, 1)} mm</span></label>
@@ -323,12 +323,18 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   function majOutils() {
     if (etat.ecran !== 'comparer') return;
     majLegende();
+    const choixAxe = page.querySelector('[data-zone="choix-axe"]');
+    if (choixAxe) {
+      choixAxe.hidden = etat.outil !== 'axe';
+      choixAxe.querySelectorAll('[data-axe-mode]').forEach((b) => b.classList.toggle('actif', b.dataset.axeMode === (etat.axeMode ?? 'trait')));
+    }
     page.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('actif', b.dataset.mode === etat.mode));
     page.querySelectorAll('[data-outil]').forEach((b) => b.classList.toggle('actif', b.dataset.outil === etat.outil));
     page.querySelector('[data-action="textes"]')?.classList.toggle('actif', Boolean(comp().textes));
     const consignes = {
       'deux-points': ['Point 1 : cliquez-le sur A (à gauche, accroche sur sommet ou trait)…', '… puis le même point 1 sur B (à droite).', 'Point 2 : cliquez-le sur A…', '… puis le même point 2 sur B.'][etat.saisie.length] ?? '',
-      axe: !etat.axe?.a ? 'Cliquez un trait de A (à gauche).' : !etat.axe.b ? 'Cliquez le trait de B qui correspond (à droite).' : etat.saisie.length ? 'Cliquez le même point sur B (à droite).' : 'Facultatif : un point de A (à gauche) puis le même sur B, pour caler le long du trait. Échap pour finir.',
+      axe: !etat.axe?.a ? ((etat.axeMode ?? 'trait') === 'points' ? `Axe de A : cliquez le point ${(etat.axePts?.length ?? 0) + 1} sur A (à gauche, avec accroche).` : 'Cliquez un trait de A (à gauche).')
+        : !etat.axe.b ? ((etat.axeMode ?? 'trait') === 'points' ? `Axe de B : cliquez le point ${(etat.axePts?.length ?? 0) + 1} sur B (à droite, avec accroche).` : 'Cliquez le trait de B qui correspond (à droite).') : etat.saisie.length ? 'Cliquez le même point sur B (à droite).' : 'Facultatif : un point de A (à gauche) puis le même sur B, pour caler le long du trait. Échap pour finir.',
       main: 'Glissez pour déplacer B ; flèches du clavier = 0,1 mm (Maj = 1 mm).',
       zone: 'Tracez un rectangle (cartouche, date…) : ce qui est dedans n\'est plus détecté.',
       nuage: 'Tracez le rectangle du nuage.',
@@ -924,11 +930,14 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       ctx.stroke();
       ctx.globalAlpha = 1;
     };
+    (etat.axePts ?? []).forEach((pt, i) => {
+      if ((!etat.axe?.a ? 'a' : 'b') === cote) marque(pt, `P${i + 1}`, '#ea580c');
+    });
     if (etat.axe?.a && cote === 'a') axe(etat.axe.a, '#ea580c', false);
     if (etat.axe?.b && cote === 'b') axe(etat.axe.b, '#ea580c', true);
     const s = etat.survol;
     if (s && s.cote === cote) {
-      if (etat.outil === 'axe' && !etat.axe?.point && s.segment && ((cote === 'a' && !etat.axe?.a) || (cote === 'b' && etat.axe?.a && !etat.axe?.b))) axe(s.segment, '#0ea5e9', cote === 'b');
+      if (etat.outil === 'axe' && (etat.axeMode ?? 'trait') === 'trait' && s.segment && ((cote === 'a' && !etat.axe?.a) || (cote === 'b' && etat.axe?.a && !etat.axe?.b))) axe(s.segment, '#0ea5e9', cote === 'b');
       else {
         const [x, y] = E(s.point);
         ctx.strokeStyle = '#0ea5e9';
@@ -974,14 +983,32 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
     if (!ax.a || !ax.b) {
       const cote = ax.a ? 'b' : 'a';
       if (pos.cote !== cote) {
-        message(cote === 'a' ? 'Cliquez un trait de A (à gauche).' : 'Cliquez le trait de B qui correspond (à droite).', 3000);
+        message(cote === 'a' ? 'Cliquez l\'axe sur A (à gauche).' : 'Cliquez l\'axe correspondant sur B (à droite).', 3000);
         return;
       }
-      if (!accroche?.segment) {
-        message('Aucun trait ici : cliquez sur un trait du plan.', 3000);
-        return;
+      if ((etat.axeMode ?? 'trait') === 'points') {
+        // Axe défini par 2 points accrochés (sur A, puis sur B).
+        etat.axePts = [...(etat.axePts ?? []), point];
+        if (etat.axePts.length < 2) {
+          majOutils();
+          dessinerDessus();
+          return;
+        }
+        const [u, v] = etat.axePts;
+        etat.axePts = [];
+        if (Math.hypot(v[0] - u[0], v[1] - u[1]) < 1e-6) {
+          message('Les deux points sont confondus : recommencez.', 3000);
+          return;
+        }
+        // Sur B, les points sont ramenés dans le repère d'origine de B (comme un trait du PDF).
+        ax[cote] = cote === 'a' ? [u[0], u[1], v[0], v[1]] : [...inverserAlignement(p.alignement, u), ...inverserAlignement(p.alignement, v)];
+      } else {
+        if (!accroche?.segment) {
+          message('Aucun trait ici : cliquez sur un trait du plan.', 3000);
+          return;
+        }
+        ax[cote] = accroche.segment;
       }
-      ax[cote] = accroche.segment;
       if (ax.a && ax.b) {
         const al = alignementSurAxes(p.alignement, ax.a, ax.b);
         if (!al) {
@@ -1377,11 +1404,19 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
         vue = null;
         cadrer();
       } else afficher();
+    } else if (d.axeMode) {
+      etat.axeMode = d.axeMode;
+      etat.axe = null;
+      etat.axePts = [];
+      etat.saisie = [];
+      majOutils();
+      dessinerDessus();
     } else if (d.outil) {
       const ancien = etat.outil;
       etat.outil = etat.outil === d.outil ? null : d.outil;
       etat.saisie = [];
       etat.axe = null;
+      etat.axePts = [];
       await passerEnRecalage(ancien);
       majOutils();
       dessinerDessus();
