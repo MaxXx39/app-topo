@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf, surImageChargee } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs, etiquettePresente, ancreEtiquette } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { pointsDePrise } from '../topo/prise-bloc.js';
@@ -207,6 +207,23 @@ export function creerVueChantier(conteneur, options) {
     ctx.stroke();
   }
 
+  // 0.320.5 : losange blanc au point du texte (zone ou bloc) : le prendre pour le déplacer.
+  function poigneeEtiquette(ctx, o) {
+    if (!etiquettePresente(o)) return;
+    const q = ecran(ancreEtiquette(o));
+    ctx.beginPath();
+    ctx.moveTo(q.x, q.y - 6);
+    ctx.lineTo(q.x + 6, q.y);
+    ctx.lineTo(q.x, q.y + 6);
+    ctx.lineTo(q.x - 6, q.y);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = ORANGE;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
   function dessinerChoix(ctx, o) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 1.5;
@@ -262,6 +279,7 @@ export function creerVueChantier(conteneur, options) {
           ctx.stroke();
         }
       }
+      poigneeEtiquette(ctx, o);
       return;
     }
     const pts = pointsDe(o);
@@ -290,6 +308,7 @@ export function creerVueChantier(conteneur, options) {
       ctx.fill();
       ctx.fillStyle = '#ffffff';
     }
+    poigneeEtiquette(ctx, o); // 0.320.5 : poignée du texte de la zone (surface, tas, texte)
     // 0.299.0 : petit « + » au milieu de chaque côté (ligne, zone, flèche, piste) : clic ou glisser = ajouter un point.
     for (const { index, milieu } of milieuxDesCotes(o)) {
       // 0.307.0 : pas de « + » sur les petits côtés (ceux d'un arc), trop serrés à l'écran.

@@ -8,7 +8,7 @@ import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
   geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
-  hachureZone, hachureDeLaZone, tiretsContour,
+  hachureZone, hachureDeLaZone, tiretsContour, ancreEtiquette,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
@@ -285,7 +285,7 @@ export function dessinerObjet(d, o) {
     if (o.afficherSurface) parties.push(texteSurface(o.points));
     if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
     if (parties.length) {
-      const c = ecran(centreZone(o.points));
+      const c = ecran(ancreEtiquette(o)); // 0.320.5 : texte déplaçable par sa poignée
       plaque(ctx, parties.join(' · '), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
     }
   } else if (o.type === 'ligne') {
@@ -1186,7 +1186,9 @@ export function dessinerSymbolePose(d, o) {
   debut();
   dessinerPrimitives(ctx, s.primitives, e, d.mm, opts);
   // 0.294.1 : texte libre au centre d'un bloc (ex. « Bureaux » sur un conteneur), même taille que les autres textes de symboles
-  if (o.etiquette) texteDansSymbole(ctx, { x: 0, y: 0, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
+  // 0.320.5 : le texte se décale par sa poignée (o.decalEtiq, repère du bloc)
+  const [ex, ey] = o.decalEtiq ?? [0, 0];
+  if (o.etiquette) texteDansSymbole(ctx, { x: ex, y: ey, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
   ctx.restore();
 }
 

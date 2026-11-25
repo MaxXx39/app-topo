@@ -1167,3 +1167,41 @@ export function pointDeBase(coins, p, tolerance) {
   }
   return meilleur ?? p;
 }
+
+// ---------------------------------------------------------------- Texte d'une zone ou d'un bloc (0.320.5)
+// Le texte « surface / tas » d'une zone et le texte sur un bloc peuvent être déplacés par leur point d'accroche.
+// Le décalage `o.decalEtiq` [x, y] est en mètres, dans le repère du bloc (zone : repère du plan, rotation 0).
+
+/** Point de base du texte : centre de la zone, ou point du bloc. */
+export function baseEtiquette(o) {
+  return o.type === 'zone' ? centreZone(o.points) : [...o.point];
+}
+
+/** Vrai si l'objet affiche un texte qu'on peut déplacer (zone avec surface / tas / texte, bloc avec texte). */
+export function etiquettePresente(o) {
+  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && o.afficherHauteur));
+  return Boolean(estPose(o) && o.etiquette);
+}
+
+/** Point du plan (m) où se trouve le texte, décalage compris. */
+export function ancreEtiquette(o) {
+  const b = baseEtiquette(o);
+  const [x, y] = o.decalEtiq ?? [0, 0];
+  const r = ((o.type === 'zone' ? 0 : Number(o.rotation) || 0) * Math.PI) / 180;
+  return [b[0] + x * Math.cos(r) - y * Math.sin(r), b[1] + x * Math.sin(r) + y * Math.cos(r)];
+}
+
+/** Décalage (repère du bloc) pour que le texte soit au point `p`, le point de base étant `base`. */
+export function decalEtiquette(o, base, p) {
+  const dx = p[0] - base[0];
+  const dy = p[1] - base[1];
+  const r = ((o.type === 'zone' ? 0 : Number(o.rotation) || 0) * Math.PI) / 180;
+  return [dx * Math.cos(r) + dy * Math.sin(r), -dx * Math.sin(r) + dy * Math.cos(r)];
+}
+
+/** Le point p est-il sur la poignée du texte de l'objet ? */
+export function etiquetteSousLePoint(o, p, tolerance) {
+  if (!etiquettePresente(o)) return false;
+  const a = ancreEtiquette(o);
+  return Math.hypot(p[0] - a[0], p[1] - a[1]) <= tolerance * 1.3;
+}

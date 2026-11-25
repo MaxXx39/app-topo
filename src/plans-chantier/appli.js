@@ -14,7 +14,7 @@ import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js'
 import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroche.js';
 import {
   GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
-  deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne,
+  deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
   LARGEUR_FLECHE, OPACITE_ZONE, ECHELLE_PAPIER, epaisseurLigneMm, contourZoneMm, dimensionsFleche, coteDuPoint,
   decalerPolyligne, ligneLaPlusProche,
 } from '../topo/plan-chantier.js';
@@ -476,6 +476,12 @@ export function ouvrirPlansChantier({
             message('Élément verrouillé : « Déverrouiller » dans le bandeau pour le déplacer.', 2500);
             return false;
           }
+          // 0.320.5 : le texte d'une zone ou d'un bloc (surface, tas, texte) se prend par sa poignée
+          if (etiquetteSousLePoint(o, p, tol)) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'etiquette', base: baseEtiquette(o) };
+            return true;
+          }
           if (estPose(o)) {
             // Symbole : la poignée ronde = tourner ; ailleurs sur lui = le déplacer (son centre s'accroche).
             const sy = symboleDeLObjet(bib(), o);
@@ -526,6 +532,10 @@ export function ouvrirPlansChantier({
         deplacer: (de, dn, point) => {
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return;
+          if (etat.glisse?.type === 'etiquette') {
+            o.decalEtiq = decalEtiquette(o, etat.glisse.base, point);
+            return;
+          }
           if (etat.glisse?.type === 'rotation') {
             o.rotation = rotationVers(o, point);
             return majEtat();
