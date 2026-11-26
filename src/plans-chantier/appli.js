@@ -10,7 +10,7 @@
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
 import { habillerPage } from '../navigation/cadre-page.js';
-import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation } from '../topo/presentations.js';
+import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
@@ -33,6 +33,7 @@ import { CLE_PARKING } from '../topo/parking-dynamique.js';
 import { CLE_PORTAIL, GENRES_PORTAIL, PASSAGE_PORTAIL, reglagesPortail } from '../topo/portail-dynamique.js';
 import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
+import { ouvrirFenetrePhases } from './fenetre-phases.js';
 import { plansAvecCalques, gelIsolementChantier, reafficherCalquesChantier } from './gestion-calques.js';
 import { calqueSousLeDoigt } from '../topo/calque-sous-doigt.js';
 import { htmlPastilles, htmlMenuFond, htmlMenuPlan, htmlMenuPoints } from './pastilles.js';
@@ -45,7 +46,7 @@ import { ouvrirModelesGrues } from './modeles-grues.js';
 import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
+import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe, pointsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, segmentProcheAvecOrigine, segmentConstruction, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
@@ -166,7 +167,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    popupFeuille: null, menuPhases: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    popupFeuille: null, panneauReplie: false, menuPhases: false, presse: null, collage: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     coupe: { ouvert: false, ligne: null, cachees: new Set() }, // 0.311.0 : vue de côté (coupe) ; 0.312.0 : surfaces cachées, ligne de coupe tracée
     coupeProchaine: false, // le prochain segment de construction dessiné est une ligne de coupe
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
@@ -246,6 +247,10 @@ export function ouvrirPlansChantier({
   }
 
   function echap() {
+    if (etat.collage) { // 0.338.0 : Ctrl+V en attente : Échap annule le collage
+      etat.collage = false;
+      return message('Collage annulé.', 2000);
+    }
     if (etat.orienter) {
       etat.orienter = null;
       majTout();
@@ -288,6 +293,21 @@ export function ouvrirPlansChantier({
       return;
     }
     if (etat.ecran !== 'dessin') return;
+    if ((ev.ctrlKey || ev.metaKey) && !ev.target.matches('input, select, textarea')) { // 0.338.0 : copier / coller
+      if (ev.key.toLowerCase() === 'c' && etat.choisi) {
+        const o = plan().objets.find((x) => x.id === etat.choisi);
+        if (o && o.type !== 'cotation') { etat.presse = JSON.parse(JSON.stringify(o)); message('Copié : Ctrl+V puis cliquez où coller (Échap = annuler).', 3000, { ok: true }); }
+        return;
+      }
+      if (ev.key.toLowerCase() === 'v' && etat.presse) {
+        ev.preventDefault();
+        etat.collage = true;
+        etat.outil = 'choisir';
+        etat.saisie = null;
+        message('Cliquez où coller (Échap = annuler).', 3000);
+        return majConsigne();
+      }
+    }
     if (ev.key === 'F8') {
       ev.preventDefault();
       etat.ortho = !etat.ortho;
@@ -435,13 +455,10 @@ export function ouvrirPlansChantier({
     bandeDessin = `
       ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c], etat.accroches.has(c) ? 'actif' : '')).join(''))}
       ${groupe('Ortho', `${bt('data-action="ortho"', '<path d="M5 5V19H19"/><path d="M5 14H10V19"/>', 'Ortho (F8) : le dessin est aimanté aux directions N / S / E / O ou à celles du repère', etat.ortho ? 'actif' : '')}
-          <input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" class="champ-ortho" title="Angle du repère de l'Ortho en degrés (0 = Nord / Sud / Est / Ouest)" aria-label="Angle du repère de l'Ortho">
           ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
-          ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}`)}
-      ${groupe('Échelle', `<label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${echellePapier}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label>
-        <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>`)}
-      ${groupe('Affichage', `<label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
-        <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${plan()?.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4" aria-label="Texte des symboles en mm sur le papier"></label>`)}`;
+          ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}
+          <label class="champ-ortho-angle" title="Angle du repère de l'Ortho en degrés (0 = Nord / Sud / Est / Ouest)"><span>°</span><input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" class="champ-ortho" aria-label="Angle du repère de l'Ortho"></label>`)}
+      ${groupe('Texte', `<label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${plan()?.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4" aria-label="Texte des symboles en mm sur le papier"></label>`)}`;
     return `
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
         ${groupe('Tracer', OUTILS.filter(([c]) => ['zone', 'rectangle', 'rond', 'ligne', 'fleche', 'decaler'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-trace')}
@@ -458,12 +475,13 @@ export function ouvrirPlansChantier({
         <label>Angle <input type="text" inputmode="decimal" size="6" data-saisie="angle" placeholder="° (sens inverse, depuis l'Est)" autocomplete="off"></label>
         <button type="button" class="bouton-secondaire" data-action="saisie-ok">↵ Placer le point</button>
       </div>
-      <div class="travail-chantier ${etat.biblio.ouvert ? 'avec-biblio' : ''}">
+      <div class="travail-chantier ${etat.biblio.ouvert ? 'avec-biblio' : ''} ${etat.panneauReplie ? 'panneau-replie' : ''}">
         <aside class="carte-calage biblio-chantier" data-zone="biblio" ${etat.biblio.ouvert ? '' : 'hidden'}></aside>
         <div class="vue-calage vue-chantier avec-pastilles">
           <div class="toile-chantier" data-toile></div>
           <div class="plan-calques pastilles-chantier" data-zone="pastilles"></div>
           <div class="barre-calques-chantier" data-zone="barre-calques" hidden></div>
+          <button type="button" class="bouton-replier-panneau" data-action="replier-panneau" aria-expanded="${!etat.panneauReplie}" title="Replier ou déplier le panneau de droite">${etat.panneauReplie ? '◂' : '▸'}</button>
           <div class="coupe-chantier" data-zone="coupe" ${etat.coupe.ouvert ? '' : 'hidden'}></div>
           <div class="pied-vue etat-chantier" data-zone="etat"></div>
         </div>
@@ -859,8 +877,37 @@ export function ouvrirPlansChantier({
     return true;
   }
 
+  /** Copie (Ctrl+C) puis collage (Ctrl+V) dans le même plan : on clique où coller, le centre de la copie va là (0.338.0). */
+  function deplacerCopie(o, dx, dy) {
+    const dec = (q) => [q[0] + dx, q[1] + dy];
+    if (o.point) o.point = dec(o.point);
+    if (o.repere) o.repere = dec(o.repere);
+    if (o.points) o.points = o.points.map(dec);
+    return o;
+  }
+  function centreDe(o) {
+    const pts = pointsDe(o);
+    if (!pts.length) return null;
+    return [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
+  }
+  function collerA(p) {
+    const modele = etat.presse;
+    const c = centreDe(modele);
+    if (!c || !avantChangement()) return;
+    const copie = deplacerCopie(JSON.parse(JSON.stringify(modele)), p[0] - c[0], p[1] - c[1]);
+    delete copie.id;
+    copie.phase = plan().phaseActive;
+    const o = ajouterObjet(plan(), copie);
+    etat.collage = false;
+    etat.choisi = o.id;
+    etat.outil = 'choisir';
+    enregistrer();
+    majTout();
+  }
+
   async function toucher(p, tolerance, ev) {
     etat.glisse = null;
+    if (etat.collage) return collerA(p);
     if (etat.selCalques) return toucherSelectionCalques(p, tolerance);
     if (etat.outil === 'choisir' && etat.choisi && !ev?.shiftKey && !ev?.ctrlKey && ajouterPointCote(p, tolerance)) return;
     if (etat.outil === 'choisir' && etat.choisi && (ev?.shiftKey || ev?.ctrlKey) && supprimerSommet(p, tolerance)) return; // Maj / Ctrl + clic sur un carré = supprimer ce point
@@ -1134,7 +1181,12 @@ export function ouvrirPlansChantier({
         <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
         <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
       </div>
-      ${bouton('data-action="feuille-plans-reinit"', '<path d="M7 7H17L14 4M17 17H7L10 20"/>', 'Répliquer : la feuille reprend les plans, calques et fonds réglés dans Dessin', 'Répliquer')}
+      <span class="groupe-gabarit"><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
+          <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).map((g) => `<option value="${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</select></label>
+        ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit du projet', 'Gabarit +')}
+        ${bouton('data-action="gabarit-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le gabarit choisi (les présentations déjà créées restent)', 'Suppr. gab.')}</span>
+      <span class="reglages-entete"><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
+        <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4"></label></span>
       <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>`;
     return `
       <div class="groupe-ruban type-vue" role="group" aria-label="Vue"><span class="titre-groupe">Vue</span>
@@ -1753,6 +1805,21 @@ export function ouvrirPlansChantier({
       majPanneauFeuille();
       return dessinerApercu();
     }
+    if (b.dataset.action === 'gabarit-enregistrer') { // 0.338.0 : les réglages de cette feuille deviennent un gabarit du projet
+      const nom = await demanderTexte({ titre: 'Nom du gabarit', valeur: presentationActive(p)?.nom ?? 'Gabarit' });
+      if (!nom) return;
+      enregistrerGabarit(leProjet(), p, nom);
+      modifie();
+      message('Gabarit enregistré : il est disponible sur tous les plans du projet.', 3500, { ok: true });
+      return majBandeFeuille();
+    }
+    if (b.dataset.action === 'gabarit-supprimer') {
+      const id = page.querySelector('[data-gabarit="utiliser"]')?.value;
+      if (!id) return message('Choisissez d\'abord un gabarit dans la liste.', 3000);
+      supprimerGabarit(leProjet(), id);
+      modifie();
+      return majBandeFeuille();
+    }
     if (b.dataset.action === 'pres-nouvelle') {
       const nom = await demanderTexte({ titre: 'Nouvelle présentation', valeur: `Présentation ${presentationsDe(p).length + 1}` });
       if (nom === null || !avantChangement()) return;
@@ -2005,7 +2072,7 @@ export function ouvrirPlansChantier({
   /** Outils de l'onglet Dessin posés dans le bandeau du haut (sélection, annuler, tout voir) : libère le ruban. */
   function htmlOutilsDessinEntete() {
     const bt = (attrs, icone, titre, court) => `<button type="button" class="outil-ruban" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
-    return `${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
+    return `<span class="reglages-entete"><label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${plan()?.echelle ?? ECHELLE_PAPIER}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label></span>${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
       ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer', 'Effacer')}
       ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)', 'Annuler')}
       ${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir', 'Tout')}`;
@@ -2017,20 +2084,7 @@ export function ouvrirPlansChantier({
     if (!p) return '';
     return `<span class="phases-entete"><label class="champ-bande" title="Phase dans laquelle on dessine"><span>Phase</span>
       <select data-phase-select>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === p.phaseActive ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
-      <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button>
-      <div class="menu-phases" data-zone="menu-phases" ${etat.menuPhases ? '' : 'hidden'}>${etat.menuPhases ? htmlMenuPhases() : ''}</div></span>`;
-  }
-
-  function htmlMenuPhases() {
-    const p = plan();
-    return `<ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
-        <input type="checkbox" data-phase-visible="${ph.id}" ${ph.visible !== false ? 'checked' : ''} aria-label="Montrer ${echapper(ph.nom)}">
-        <input type="color" value="${ph.couleur}" data-phase-couleur="${ph.id}" aria-label="Couleur de ${echapper(ph.nom)}">
-        <button type="button" class="nom-phase" data-phase-active="${ph.id}" title="Dessiner dans cette phase">${echapper(ph.nom)}</button>
-        <button type="button" class="suppr-calage" data-phase-renommer="${ph.id}" aria-label="Renommer ${echapper(ph.nom)}">✎</button>
-        ${p.phases.length > 1 ? `<button type="button" class="suppr-calage" data-phase-suppr="${ph.id}" aria-label="Supprimer ${echapper(ph.nom)}">✕</button>` : ''}</li>`).join('')}</ul>
-      <button type="button" class="lien-calage" data-action="phase-ajouter">＋ Nouvelle phase</button>
-      <button type="button" class="bouton-secondaire" data-action="gestion-phases">Gestion des phases…</button>`;
+      <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button></span>`;
   }
 
   /** Redessine seulement la liste des phases du bandeau (nom, phase active, menu ouvert). */
@@ -2090,7 +2144,9 @@ export function ouvrirPlansChantier({
     if (!zone || !p) return;
     const f = p.fond;
     const pales = { fond: !(f.ortho || f.carte || f.cadastre || f.surfaces !== false), plan: !plansMontres().length, points: f.points === false };
-    zone.innerHTML = htmlPastilles({ ouvert: etat.menuPastille, pales, menus: etat.menuPastille ? { [etat.menuPastille]: menuPastille(etat.menuPastille) } : {} });
+    // 0.338.0 : « Répliquer » est à côté de Fond / Plan / Points dans Présentation (reprend les plans et fonds réglés dans Dessin)
+    const replique = etat.ecran === 'feuille' ? '<button type="button" class="puce" data-action="feuille-plans-reinit" title="La feuille reprend les plans, calques et fonds réglés dans Dessin">⇆ Répliquer</button>' : '';
+    zone.innerHTML = htmlPastilles({ ouvert: etat.menuPastille, pales, menus: etat.menuPastille ? { [etat.menuPastille]: menuPastille(etat.menuPastille) } : {}, extra: replique });
   }
 
   function rafraichirVue() {
@@ -2488,9 +2544,9 @@ export function ouvrirPlansChantier({
       ${choisi}
       ${ficheGrueHtml(o)}
       <button type="button" class="bouton-secondaire" data-action="modeles-grues">Modèles de grues…</button>
-      <h3>Éléments (${p.objets.length})</h3>
+      <details class="repli-elements" open><summary>Éléments (${p.objets.length})</summary>
       <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li class="ligne-element"><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
-        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button><button type="button" class="cadenas-liste ${x.verrou ? 'actif' : ''}" data-verrou-id="${x.id}" title="${x.verrou ? 'Verrouillé : toucher pour déverrouiller' : 'Toucher pour verrouiller'}" aria-label="Verrou">${icoCadenas(x.verrou)}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
+        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button><button type="button" class="cadenas-liste ${x.verrou ? 'actif' : ''}" data-verrou-id="${x.id}" title="${x.verrou ? 'Verrouillé : toucher pour déverrouiller' : 'Toucher pour verrouiller'}" aria-label="Verrou">${icoCadenas(x.verrou)}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul></details>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
     majBandeau(o, p, propreHtml, reglages);
@@ -2788,10 +2844,6 @@ export function ouvrirPlansChantier({
       etat.planDeplie = etat.planDeplie === deplier.dataset.pastilleDeplier ? null : deplier.dataset.pastilleDeplier;
       return majPastilles();
     }
-    if (etat.menuPhases && !ev.target.closest('.phases-entete')) { // un clic ailleurs ferme la liste des phases
-      etat.menuPhases = false;
-      majPhasesEntete();
-    }
     if (etat.menuPastille && !ev.target.closest('[data-zone="pastilles"]')) { // un clic ailleurs ferme le menu (et continue normalement)
       etat.menuPastille = null;
       majPastilles();
@@ -2853,6 +2905,22 @@ export function ouvrirPlansChantier({
       }
       modifie();
       return dessiner();
+    }
+    if (b.dataset.action === 'menu-phases') { // (avant le contrôle « dessin » : aussi utilisé dans Présentation) // 0.338.0 : fenêtre « Phases » (monter, descendre, dupliquer, supprimer…)
+      return ouvrirFenetrePhases({
+        plan, avantChangement, enregistrer,
+        rafraichir: () => { majPhasesEntete(); if (etat.ecran === 'feuille') majFeuille(); else majTout(); vue?.redessinerDessus(); },
+        ouvrirRegles: () => ouvrirGestionPhases({ plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessinerDessus(); } }),
+        supprimer: async (id) => {
+          const ph = plan().phases.find((x) => x.id === id);
+          const nb = plan().objets.filter((o) => o.phase === id).length;
+          const ok = await demanderChoix({ titre: `Supprimer « ${ph?.nom} » ?`, texte: nb ? `Ses ${nb} élément(s) seront supprimés aussi (↶ Annuler possible).` : '', boutons: [{ cle: 'oui', texte: 'Supprimer', principal: true }, { cle: '', texte: 'Annuler' }] });
+          if (ok !== 'oui' || !avantChangement()) return false;
+          retirerPhase(plan(), id);
+          if (!plan().objets.some((o) => o.id === etat.choisi)) etat.choisi = null;
+          return true;
+        },
+      });
     }
     if (!p || etat.ecran !== 'dessin') return;
     if (b.dataset.action === 'biblio') {
@@ -3013,6 +3081,7 @@ export function ouvrirPlansChantier({
     }
     if (b.dataset.action === 'ortho-repere') {
       etat.orthoRepere = !etat.orthoRepere;
+      if (etat.orthoRepere) etat.ortho = true; // 0.338.0 : Ortho reste allumé pendant le choix du repère
       majOutils();
       if (etat.orthoRepere) message('Cliquez une ligne du plan ou du dessin : son angle devient le repère de l\'Ortho.', 4000);
       return;
@@ -3048,9 +3117,12 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'gestion-phases') {
       return ouvrirGestionPhases({ plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessinerDessus(); } });
     }
-    if (b.dataset.action === 'menu-phases') {
-      etat.menuPhases = !etat.menuPhases;
-      return majEnteteOutils();
+    if (b.dataset.action === 'replier-panneau') { // 0.338.0 : le panneau de droite se replie pour laisser la place au plan
+      etat.panneauReplie = !etat.panneauReplie;
+      page.querySelector('.travail-chantier')?.classList.toggle('panneau-replie', etat.panneauReplie);
+      b.textContent = etat.panneauReplie ? '◂' : '▸';
+      b.setAttribute('aria-expanded', String(!etat.panneauReplie));
+      return vue?.redessiner();
     }
     if (b.dataset.action === 'phase-ajouter') {
       if (!avantChangement()) return;
@@ -3202,14 +3274,22 @@ export function ouvrirPlansChantier({
       if (c.checked) delete p.rendu3d;
       else p.rendu3d = false;
       enregistrer();
-      return vue?.redessinerDessus();
+      return etat.ecran === 'feuille' ? majFeuille() : vue?.redessinerDessus();
     }
     if (c.dataset.champ === 'tailleTexteMm') {
       const v = nombreDe(c);
       if (v === null || !avantChangement()) return majPanneau();
       p.tailleTexteMm = v;
       enregistrer();
-      return vue?.redessinerDessus();
+      return etat.ecran === 'feuille' ? majFeuille() : vue?.redessinerDessus();
+    }
+    if (c.dataset.gabarit !== undefined) { // 0.338.0 : créer une présentation à partir du gabarit choisi
+      const g = gabaritsDe(leProjet()).find((x) => x.id === c.value);
+      if (!g || !avantChangement()) return majBandeFeuille();
+      utiliserGabarit(plan(), g);
+      enregistrer();
+      message(`Présentation « ${g.nom} » créée sur ce plan à partir du gabarit.`, 3500, { ok: true });
+      return majFeuille();
     }
     if (c.dataset.phaseSelect !== undefined) {
       p.phaseActive = c.value;

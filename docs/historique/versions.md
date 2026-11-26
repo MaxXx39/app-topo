@@ -1,6 +1,18 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.337.0 — Plans de chantier : corrections après l'essai du 26.11 (phases, bandeau, Ortho, menus comme Lever, éléments de la feuille)
+Lire seulement la section utile : `grep -n '^## 0.338.0 — Plans de chantier : suite de l'essai du 26.11 (Ortho, phases, copier-coller, gabarits, bandeau)
+- **Ortho** : Repère garde Ortho allumé ; l'angle (°) est à côté de Repère.
+- **Échelle et Effet 3D** passent dans le bandeau du haut (Dessin) ; **Effet 3D + Texte (mm)** dans le bandeau de Présentation. Texte (mm) reste dans la bande du bas en Dessin.
+- **Répliquer** est à côté de Fond / Plan / Points (Présentation), retiré du bandeau.
+- **Phases** : ⚙ ouvre une fenêtre (`plans-chantier/fenetre-phases.js`) : couleur, nom, Voir, Choisir, ▲ ▼, dupliquer (avec ses éléments, `topo/phases-chantier.js`), supprimer (avec confirmation), ajouter ; « Règles de vue entre phases… » ouvre l'ancien tableau. **Le ⚙ ne répondait pas dans Présentation** : cause = les actions du bandeau étaient filtrées au mode Dessin ; corrigé.
+- **Copier / coller** (Ctrl+C puis Ctrl+V, même plan) : Ctrl+V puis un clic = le centre de la copie va là ; Échap annule. Dans la phase active.
+- **Bandeau du haut réduit** quand rien n'est choisi (hauteur suit le contenu).
+- **Panneau de droite** : la liste Éléments se replie (▸ / ▾) ; un bouton ▸ / ◂ replie tout le panneau.
+- **Gabarits** : « Gabarit + » enregistre les réglages de la feuille comme gabarit DU PROJET (`projet.gabaritsPresentation`, `topo/presentations.js`) ; la liste « Gabarit » crée une présentation sur le plan courant ; « Suppr. gab. » supprime le gabarit choisi.
+- Tests : `phases-chantier.test.js` (3), `gabarits-presentation.test.js` (2). Essayé en Playwright : Ortho/Repère, fenêtre Phases (Dessin et Présentation), enregistrer un gabarit, replier le panneau.
+- **Pas essayé** : Ctrl+C / Ctrl+V à l'écran, choix d'un gabarit dans la liste, dupliquer / monter / descendre une phase à l'écran.
+
+## 0.337.0 — Plans de chantier : corrections après l'essai du 26.11 (phases, bandeau, Ortho, menus comme Lever, éléments de la feuille)
 - **Réponses** : phases = liste + ⚙ dans le bandeau ; menus Fond / Plan « exactement comme Lever » (tous les boutons) ; styles proposés acceptés (flèche nord 4, échelle 4, légende) ; bandeau plus mince **dans Plans de chantier seulement**.
 - **Phases** : liste « Phase » + ⚙ (menu : montrer, couleur, nom, ✕, ＋, « Gestion des phases… ») dans le bandeau de Dessin et de Présentation ; le bloc Phases du panneau de droite est retiré.
 - **Bandeau** plus mince (padding réduit) ; Présentation : Format / Sens / Échelle + présentations + Répliquer + PDF sur UNE ligne (nom du plan caché dans Présentation) ; zoom retiré de la bande du bas (molette gardée) ; bande du bas en groupes titrés et colorés : Vue (Déplacer le plan, Recentrer, Replacer), Rotation, Détails ; position du cartouche dans le popup Cartouche.

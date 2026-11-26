@@ -16,8 +16,8 @@ export const PASTILLES = [
  * Pastilles + menu ouvert. ouvert : 'fond' | 'plan' | 'points' | null ; pales : { fond, plan, points } (vrai = tout est caché) ;
  * menus : { fond, plan, points } = HTML du contenu de chaque menu.
  */
-export function htmlPastilles({ ouvert, pales, menus }) {
-  return `<div class="plan-puces">${PASTILLES.map(([cle, texte, d]) => `<button type="button" class="puce ${pales[cle] ? 'pale' : ''} ${ouvert === cle ? 'ouvert' : ''}" data-pastille="${cle}" aria-expanded="${ouvert === cle}" title="Appui long : tout montrer / tout cacher">${icone(d)}${texte}</button>`).join('')}</div>
+export function htmlPastilles({ ouvert, pales, menus, extra = '' }) {
+  return `<div class="plan-puces">${PASTILLES.map(([cle, texte, d]) => `<button type="button" class="puce ${pales[cle] ? 'pale' : ''} ${ouvert === cle ? 'ouvert' : ''}" data-pastille="${cle}" aria-expanded="${ouvert === cle}" title="Appui long : tout montrer / tout cacher">${icone(d)}${texte}</button>`).join('')}${extra}</div>
     ${ouvert ? `<div class="menu-plans-dxf menu-pastille" data-menu-pastille="${ouvert}">${menus[ouvert] ?? ''}</div>` : ''}`;
 }
 

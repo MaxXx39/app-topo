@@ -82,3 +82,31 @@ export function supprimerPresentation(plan, id) {
   plan.presentations = presentationsDe(plan).filter((x) => x.id !== id);
   if (plan.presentationActive === id) delete plan.presentationActive;
 }
+
+// Gabarits (0.338.0, demande du 26.11) : une présentation « modèle » gardée dans le PROJET (projet.gabaritsPresentation),
+// qu'on crée d'un clic sur un autre plan de chantier du même projet. Un gabarit = { id, nom, feuille, echelle }.
+export const gabaritsDe = (projet) => (Array.isArray(projet?.gabaritsPresentation) ? projet.gabaritsPresentation : []);
+
+/** Enregistre les réglages de la feuille du plan (échelle comprise) comme gabarit du projet, sous un nom libre. */
+export function enregistrerGabarit(projet, plan, nom) {
+  const base = String(nom ?? '').trim().slice(0, 60) || 'Gabarit';
+  const pris = new Set(gabaritsDe(projet).map((g) => g.nom.toLowerCase()));
+  let n = base;
+  for (let i = 2; pris.has(n.toLowerCase()); i++) n = `${base} (${i})`;
+  const g = { id: `gab-${Date.now().toString(36)}-${gabaritsDe(projet).length + 1}`, nom: n, feuille: copie(plan.feuille ?? {}), echelle: plan.echelle };
+  projet.gabaritsPresentation = [...gabaritsDe(projet), g];
+  return g;
+}
+
+/** Crée sur le plan une présentation à partir du gabarit (copie indépendante, qui devient la présentation choisie). */
+export function utiliserGabarit(plan, gabarit) {
+  const p = creerPresentation(plan, gabarit.nom);
+  plan.feuille = copie(gabarit.feuille ?? {});
+  if (gabarit.echelle) plan.echelle = gabarit.echelle;
+  return p;
+}
+
+/** Supprime un gabarit du projet (les présentations déjà créées avec lui restent). */
+export function supprimerGabarit(projet, id) {
+  projet.gabaritsPresentation = gabaritsDe(projet).filter((g) => g.id !== id);
+}
