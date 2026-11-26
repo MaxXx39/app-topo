@@ -40,7 +40,7 @@ import { ouvrirModelesGrues } from './modeles-grues.js';
 import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
+import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { plansDeLaFeuille, reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
@@ -533,7 +533,21 @@ export function ouvrirPlansChantier({
             etat.glisse = { type: 'recourber', numero: arcPris.numero };
             return true;
           }
+          // 0.328.0 : la poignée ronde au milieu de la ligne de cote : glisser = éloigner / rapprocher la ligne de cote.
+          const hc = poigneeDecalageCote(o);
+          if (hc && Math.hypot(p[0] - hc[0], p[1] - hc[1]) <= tol * 1.4) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'decalage-cote' };
+            return true;
+          }
           let i = sommetSousLePoint(o, p, tol);
+          // 0.328.0 : angle d'un RECTANGLE, ou point nord / ouest / sud d'un ROND : on déplace toute la forme en la prenant par ce point
+          // (le point pris suit la souris et s'accroche, comme pour un symbole).
+          if (i >= 0 && (estRectangle(o) || (o.cercle && i >= 2))) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'coin', ref: [...poigneesDe(o)[i]] };
+            return true;
+          }
           // 0.299.0 : le petit « + » au milieu d'un côté : glisser = un nouveau point qui suit la souris.
           const m = i < 0 ? milieuSousLePoint(o, p, tol) : -1;
           if (m >= 0) {
@@ -560,6 +574,15 @@ export function ouvrirPlansChantier({
           if (etat.glisse?.type === 'rotation') {
             o.rotation = rotationVers(o, point);
             return majEtat();
+          }
+          if (etat.glisse?.type === 'decalage-cote') {
+            o.decalage = decalageCoteDepuis(o, point);
+            return;
+          }
+          if (etat.glisse?.type === 'coin') {
+            deplacerObjet(o, point[0] - etat.glisse.ref[0], point[1] - etat.glisse.ref[1]);
+            etat.glisse.ref = [...point];
+            return;
           }
           if (estPose(o)) {
             // Le point saisi suit la souris (et s'accroche) : comme « Déplacer » d'AutoCAD avec un point de base.

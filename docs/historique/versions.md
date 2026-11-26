@@ -1,6 +1,13 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.327.1 — Bande du bas de Plans de chantier : les boutons ne répondaient pas (retour du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.328.0 — Plans de chantier : déplacer par un angle (rectangle, rond), cote en « hauteur » (demande du 26.11)
+- **Réponses de l'utilisateur** : rectangle / rond = **déplacer en saisissant un angle** (la forme garde sa taille) ; cote « en hauteur » = **éloigner / rapprocher la ligne de cote**.
+- **Rectangle** (`estRectangle` de `topo/plan-chantier.js` : zone de 4 points aux angles droits à 1° près) : prendre un **angle** déplace TOUT le rectangle, l'angle pris suit la souris et s'accroche (`etat.glisse.type === 'coin'`, `plans-chantier/appli.js`). **Avant, glisser un angle déformait le rectangle ; ce n'est plus possible** (agrandir un rectangle : pas encore, à proposer : poignées au milieu des côtés).
+- **Rond** : `poigneesDe` = centre (déplacer), bord est (rayon), **+ nord, ouest, sud** (déplacer en prenant ce point, avec accroche).
+- **Cote de longueur** : poignée ronde (orange) **au quart de la ligne de cote**, visible quand la cote est choisie ; la glisser change `decalage` (distance signée, arrondie au cm, de chaque côté ; `poigneeDecalageCote`, `decalageCoteDepuis`) ; les deux points mesurés ne bougent pas. Pas pour la cote d'angle (son rayon n'a pas de poignée).
+- Tests `plan-chantier-poignees.test.js` (5) ; essayé en Playwright (rectangle déplacé par un angle, rond par son point nord, cote tirée de 60 à 160 px).
+
+## 0.327.1 — Bande du bas de Plans de chantier : les boutons ne répondaient pas (retour du 26.11)
 - **Cause** : `body.bande-vide .bande-appli { pointer-events: none }` (règle de la bande des autres applis, pour que seul le bouton ☰ soit touchable) s'appliquait aussi à la zone d'outils de la bande des applis plein écran : `elementFromPoint` rendait le `<dialog>`. **Correction** : `pointer-events: auto` sur `.bande-appli.bande-page` et `.zone-bande-page` (style.css, fin du fichier). Essayé (Playwright) : accroche Milieu, Ortho, échelle (« 1:500 » devient « 500 »), Effet 3D, Texte (mm). **Leçon : tout essai d'une nouvelle zone doit CLIQUER dessus, pas seulement la photographier.**
 
 ## 0.327.0 — Roue des favoris dans les applis plein écran, bande du bas de Plans de chantier, logos Natalini / Ronchi, liste de Calage sur une ligne (demande du 26.11)

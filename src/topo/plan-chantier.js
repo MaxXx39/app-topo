@@ -1138,8 +1138,54 @@ export function rectangleTroisPoints(a, b, c) {
 
 /** Poignées d'un élément (carrés à glisser) : le centre et un point du bord pour un rond, sinon ses points. */
 export function poigneesDe(o) {
-  if (o?.cercle) return [o.cercle.centre, [o.cercle.centre[0] + o.cercle.rayon, o.cercle.centre[1]]];
+  // Rond : 0 = centre (déplacer), 1 = bord Est (changer le rayon), 2 à 4 = nord / ouest / sud : déplacer le rond en prenant ce point
+  // (0.328.0 : le point pris suit la souris et s'accroche).
+  if (o?.cercle) {
+    const [cx, cy] = o.cercle.centre;
+    const r = o.cercle.rayon;
+    return [o.cercle.centre, [cx + r, cy], [cx, cy + r], [cx - r, cy], [cx, cy - r]];
+  }
   return pointsDe(o);
+}
+
+/** Vrai pour un rectangle : une zone de 4 points aux angles droits (à 1° près). Ses angles servent à le DÉPLACER (0.328.0). */
+export function estRectangle(o) {
+  if (!o || o.type !== 'zone' || o.cercle || (o.points ?? []).length !== 4 || (o.arcs ?? []).length) return false;
+  for (let i = 0; i < 4; i++) {
+    const a = o.points[i];
+    const b = o.points[(i + 1) % 4];
+    const c = o.points[(i + 2) % 4];
+    const u = [b[0] - a[0], b[1] - a[1]];
+    const v = [c[0] - b[0], c[1] - b[1]];
+    const lu = Math.hypot(...u);
+    const lv = Math.hypot(...v);
+    if (lu < 1e-6 || lv < 1e-6) return false;
+    if (Math.abs((u[0] * v[0] + u[1] * v[1]) / (lu * lv)) > Math.sin(Math.PI / 180)) return false;
+  }
+  return true;
+}
+
+/**
+ * Poignée de la distance de la ligne de cote (0.328.0) : au QUART de la ligne de cote (le texte est au milieu) d'une cotation de longueur, ou null.
+ * La glisser fait varier `decalage` (distance de la ligne de cote aux deux points mesurés, signée : de chaque côté).
+ */
+export function poigneeDecalageCote(o) {
+  if (!o || o.type !== 'cotation' || o.genre === 'angle') return null;
+  const [A, B] = o.points ?? [];
+  if (!A || !B || Math.hypot(B[0] - A[0], B[1] - A[1]) < 1e-6) return null;
+  const u = dirDe(A, B);
+  const dec = o.decalage ?? 1;
+  const t = 0.25;
+  return [A[0] + (B[0] - A[0]) * t - u[1] * dec, A[1] + (B[1] - A[1]) * t + u[0] * dec];
+}
+
+/** Nouvelle distance de la ligne de cote quand la poignée est amenée au point p (m, signée, arrondie au cm). */
+export function decalageCoteDepuis(o, p) {
+  const [A, B] = o.points;
+  const u = dirDe(A, B);
+  const milieu = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  const d = (p[0] - milieu[0]) * -u[1] + (p[1] - milieu[1]) * u[0];
+  return Math.round(d * 100) / 100;
 }
 
 /** Change le rayon d'un rond (et refait ses points). */
