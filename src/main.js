@@ -16,7 +16,7 @@ import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
 import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, changerCouleurSousDossierProjet, retirerSousDossierProjet, estDossierDuProjet, COULEURS_CHOIX, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
-import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
+import { dxfDuPdf, lireEchelle, PREFIXE_PDF, precisionPdf } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
 import { formaterNombre } from './topo/format.js';
@@ -2507,7 +2507,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         if (rendu.reduite) avertissements.push(`Page très grande : image réduite à ${rendu.dpi} dpi (${image.pixels.largeur} × ${image.pixels.hauteur} pixels).`);
         avertissements.push(`Image de ${taille} (envoyée avec le projet sur Drive).`);
       } else {
-        const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
+        const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom, { precision: precisionPdf(echelle) });
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
         if (contenu.images > 0) avertissements.push(`${contenu.images} images du PDF non reprises (seuls les traits et les textes sont lus).`);

@@ -168,8 +168,11 @@ function couleurVraie(couleur) {
   return parseInt(couleur.slice(1), 16);
 }
 
-/** Nombre écrit avec 4 décimales au plus (le lecteur arrondit ensuite au millimètre). */
-const nb = (v) => String(Math.round(v * 10000) / 10000);
+/** Précision d'un plan PDF : sans échelle (feuille de 0,3 m) 6 décimales (0,001 mm de papier) ; avec échelle 4 décimales (0,1 mm sur le terrain). */
+export const precisionPdf = (echelle) => (echelle ? 1000 : 1_000_000);
+
+/** Nombre écrit avec "decimales" décimales au plus (le lecteur arrondit ensuite : voir precisionPdf). */
+const nbAvec = (decimales) => (v) => String(Math.round(v * 10 ** decimales) / 10 ** decimales);
 
 /** Texte d'un TEXT DXF : une seule ligne, sans caractères de contrôle. */
 const texteSurUneLigne = (t) => String(t).replace(/[\r\n\t]+/g, ' ').trim();
@@ -183,6 +186,7 @@ const texteSurUneLigne = (t) => String(t).replace(/[\r\n\t]+/g, ' ').trim();
  */
 export function dxfDuPdf({ traits = [], textes = [], calques = [] }, echelle = null) {
   const facteur = POINT_PDF_EN_M * (echelle ?? 1);
+  const nb = nbAvec(echelle ? 4 : 6); // 0.326.0 : plan à la taille de la feuille = beaucoup plus de décimales
   const m = (v) => nb(v * facteur);
 
   // Calques : ceux du PDF, puis ceux de départ s'ils servent ; couleur = premier trait du calque.

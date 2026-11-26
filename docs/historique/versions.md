@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.325.0 — Matériel : logos par catégorie (famille A simplifiée), case « Logos » du PDF (réponses du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.326.0 — Plan PDF sans échelle : lignes « bizarres » corrigées (PDF « Le Petit Poucet » du 26.11)
+- **Cause trouvée** (reproduite dans l'appli avec le vrai PDF, page 1 : 38 000 traits) : sans échelle, le plan est lu **à la taille de la feuille (0,3 m)** ; `lirePlanDxf` arrondit tout au **millimètre** (fait pour les plans MN95) : 1 mm = 3,4 points PDF, donc la voiture, les tirets et les courbes étaient écrasés en escaliers / zigzags. Les données lues du PDF étaient bonnes (vérifié : traits en SVG avant et après la conversion DXF).
+- **Correction** : `precisionPdf(echelle)` (`topo/pdf-dxf.js`) : sans échelle **0,001 mm de papier** (6 décimales écrites dans le DXF, `nbAvec`), avec échelle 1 mm comme avant ; `lirePlanDxf(…, { precision })` (`topo/dxf-plan.js`, 1000 par défaut = plans MN95 inchangés) ; appelé par l'import PDF (`main.js`) et Caler plan (`calage/pdf-calage.js`). **Les plans PDF déjà importés restent abîmés : les réimporter.** Tests `pdf-dxf-precision.test.js`. Essayé : même PDF, même zoom, avant / après.
+- Pas touché : PDF importés AVEC une échelle (1 mm réel suffit), Comparer des PDF (n'utilise pas ce chemin).
+
+## 0.325.0 — Matériel : logos par catégorie (famille A simplifiée), case « Logos » du PDF (réponses du 26.11)
 - **16 logos** très simples (cercles, rectangles, lignes : `materiel/logos.js`, mêmes primitives pour l'écran SVG et le PDF jsPDF). Un logo se range sur la **catégorie** (`categorie.logo`, `definirLogoCategorie`) : onglet Catégories, bouton carré devant chaque nom → fenêtre de choix (4 × 4, « Aucun logo »). Affiché devant la désignation dans le **Parc** et devant le n° dans le **Planning**.
 - **PDF du mois** : case « **Logos** » à côté du bouton (gardée sur ce PC : `topo-materiel-logos-pdf`), logo dessiné devant le n° interne (`pdfDuMois(…, { logos })`). **Excel : pas de logos** (réponse « PDF » de l'utilisateur). Vérifié en vrai PDF (pdftoppm) et dans le navigateur (choix du logo). La fenêtre de choix est ajoutée DANS la page (un `<dialog>` modal cache tout ce qui est dehors).
 - Tests `materiel-logos.test.js`.
