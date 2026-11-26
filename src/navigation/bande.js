@@ -53,6 +53,7 @@ export function creerNavigation(nav, actions) {
   let derniereSignature = '';
   let minuterie = null;
   let appuiLongFait = false;
+  let rouePage = null; // contexte de la roue quand elle vient d'une appli plein écran
   let dernierProjet = ''; // nom du projet montré dans l'encadré de la page
   // Déplacement d'une tuile (appui long) : { tuile, minuterie, x, y, actif }.
   let deplacement = null;
@@ -119,9 +120,19 @@ export function creerNavigation(nav, actions) {
   }, { passive: false });
   roue.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('[data-appli]');
+    const contexte = rouePage;
     fermerRoue();
-    if (bouton) actions.ouvrirAppli(bouton.dataset.appli);
+    rouePage = null;
+    if (!bouton) return;
+    // Depuis une appli plein écran : on la ferme d'abord (son « retour » ouvre le menu), puis on ouvre l'application choisie.
+    if (contexte?.quitter) {
+      contexte.quitter();
+      if (pageOuverte) fermerPage();
+    }
+    actions.ouvrirAppli(bouton.dataset.appli);
   });
+  // 0.327.0 : appui long sur le bouton « ☰ Nom » d'une appli plein écran (Calage, Matériel…) = la même roue des favoris.
+  document.addEventListener('roue-favoris', (evenement) => ouvrirRoue(evenement.detail ?? null));
   // Toucher ailleurs que la bande : elle se replie.
   document.addEventListener('pointerdown', (evenement) => {
     if (deroulee && !nav.contains(evenement.target)) {
@@ -466,7 +477,12 @@ export function creerNavigation(nav, actions) {
     requestAnimationFrame(majBords); // la page peut ne pas encore avoir sa largeur finale
   }
 
-  function ouvrirRoue() {
+  /**
+   * Ouvre la roue des favoris. contexte (0.327.0, applis plein écran) : { bouton (point de départ), hote (la page ouverte : une fenêtre
+   * modale cache tout ce qui est hors d'elle), quitter() (ferme la page avant d'ouvrir l'application choisie) }.
+   */
+  function ouvrirRoue(contexte = null) {
+    rouePage = contexte;
     const disponibles = sansMasquees(actions.applis(), lireMasquees());
     const favoris = lireFavoris().map((cle) => disponibles.find((a) => a.cle === cle)).filter(Boolean);
     if (favoris.length === 0) {
@@ -475,7 +491,7 @@ export function creerNavigation(nav, actions) {
     }
     // Les bulles sont posées en arc de cercle autour du bouton : de la verticale (au-dessus) vers la droite,
     // en s'arrêtant à 15° au-dessus de l'horizontale pour ne pas tomber sur la bande.
-    const bouton = nav.querySelector('[data-nav="appli"]').getBoundingClientRect();
+    const bouton = (contexte?.bouton ?? nav.querySelector('[data-nav="appli"]')).getBoundingClientRect();
     const telephone = document.body.classList.contains('mode-telephone');
     const rayon = telephone ? 150 : 200;
     const x0 = bouton.left + bouton.width / 2;
@@ -488,12 +504,14 @@ export function creerNavigation(nav, actions) {
       return `<button type="button" class="bulle-favori" data-appli="${a.cle}" style="left: ${x}px; top: ${y}px; --couleur-appli: ${a.couleur}; --texte-appli: ${a.texte}">
         ${svg(a.icone)}<span>${echapper(actions.titre?.(a) ?? a.titre)}</span></button>`;
     }).join('');
+    if (contexte?.hote) contexte.hote.append(roue);
     roue.hidden = false;
   }
 
   function fermerRoue() {
     roue.hidden = true;
     roue.innerHTML = '';
+    if (roue.parentNode !== document.body) document.body.append(roue); // revient hors de la page plein écran
   }
 
   /** Redessine la bande si quelque chose a changé (appelé souvent : comparaison d'une signature). */

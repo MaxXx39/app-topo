@@ -192,15 +192,14 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       const [texte, classe] = VERDICTS[c.verdict] ?? ['?', 'p-sans'];
       const indices = indicesDuGroupe(tousPlans(), p);
       return `<tr>
-        <td><strong>${echapper(p.nom)}</strong><br><span class="aide-calage">${echapper(c.fichier ?? '')}</span></td>
-        <td>${estDejaCale(p) ? `<span class="aide-calage">déjà calé (sans référence)</span>${c.verifieAvec ? `<br><span class="aide-calage">vérifié sur ${echapper(c.verifieAvec)}</span>` : ''}` : echapper(c.referenceNom ?? '')}</td>
+        <td class="nom-ligne-calage" title="${echapper(c.fichier ?? '')}"><strong>${echapper(p.nom)}</strong></td>
+        <td${c.verifieAvec ? ` title="vérifié sur ${echapper(c.verifieAvec)}"` : ''}>${estDejaCale(p) ? '<span class="aide-calage">déjà calé (sans référence)</span>' : echapper(c.referenceNom ?? '')}</td>
         <td class="chiffre">${c.similitude.echelle.toPrecision(6).replace(/\.?0+$/, '')}</td>
         <td class="chiffre">${nombre(c.similitude.rotationDeg, 4)}°</td>
-        <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}${p.controle ? `<br><span class="aide-calage">Points : ${echapper(resumeControlePlan(p.controle))}</span>` : ''}</td>
+        <td title="${echapper([c.verifieLe ? `vérifié le ${dateCourte(c.verifieLe)}` : '', p.controle ? `Points : ${resumeControlePlan(p.controle)}` : ''].filter(Boolean).join(' · '))}"><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? ' <span class="aide-calage">✓</span>' : ''}</td>
         <td><strong>${echapper(c.indice ?? '')}</strong>${indices.length > 1 ? ` <span class="aide-calage">(${indices.length} indices)</span>` : ''}${c.indices?.at(-1)?.changements ? ` <span class="aide-calage" title="Objets ajoutés / supprimés depuis l'indice d'avant">+${c.indices.at(-1).changements.ajoutes} / −${c.indices.at(-1).changements.supprimes}</span>` : ''}${c.methode === 'automatique' ? ' <span class="aide-calage">· auto</span>' : ''}</td>
         <td>${dateCourte(c.le)}</td>
-        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-modifier-plan="${echapper(p.id)}" title="Nom, indice, dossier">Modifier…</button>${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button><button type="button" class="bouton-secondaire petit" data-renettoyer="${echapper(p.id)}" title="Revoir les calques, les objets enlevés, la zone… (le plan reçu d'origine est gardé)">Nettoyage…</button>`}
-          <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}" title="Contre un autre plan du projet">Vérifier</button>${controlerPlan ? `<button type="button" class="bouton-secondaire petit" data-controler="${echapper(p.id)}" title="Un point du plan contre un point levé (vert ≤ 2 mm, orange ≤ 15 mm)">Contrôler (points)</button>` : ''}</td>
+        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit bouton-menu-plan" data-menu-plan="${echapper(p.id)}" title="Modifier, nouvel indice, nettoyage, vérifier…" aria-label="Actions du plan ${echapper(p.nom)}">⋮</button></td>
       </tr>${indices.length > 1 && !simple ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
     // 0.316.0 : les plans de référence du projet (MN95 ou locaux, pas calés par Topo) sont listés aussi.
@@ -1364,6 +1363,32 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     return recette;
   }
 
+  /** Menu « ⋮ » d'une ligne de la liste (0.327.0) : toutes les actions du plan dans une fenêtre, la ligne reste sur UNE ligne. */
+  async function menuDuPlan(planId) {
+    const plan = projet.plansDxf.find((p) => p.id === planId);
+    if (!plan?.calage) return;
+    const boutons = [
+      { cle: 'modifier', texte: 'Modifier…', detail: 'Nom, indice, dossier' },
+      ...(simple ? [] : [
+        { cle: 'indice', texte: 'Nouvel indice…', detail: 'Même référence, nouveau fichier' },
+        { cle: 'nettoyage', texte: 'Nettoyage…', detail: 'Revoir les calques, les objets enlevés, la zone' },
+      ]),
+      { cle: 'verifier', texte: 'Vérifier', detail: 'Contre un autre plan du projet' },
+      ...(controlerPlan ? [{ cle: 'controler', texte: 'Contrôler (points)', detail: 'Un point du plan contre un point levé' }] : []),
+      { cle: 'annuler', texte: 'Fermer' },
+    ];
+    const choix = await demanderChoix({ titre: plan.nom, texte: `Indice ${plan.calage.indice ?? '?'} · ${plan.calage.fichier ?? ''}`, boutons });
+    if (choix === 'modifier') modifierPlanListe(planId);
+    else if (choix === 'indice') commencerIndice(planId);
+    else if (choix === 'nettoyage') renettoyer(planId);
+    else if (choix === 'verifier') verifier(planId);
+    else if (choix === 'controler') {
+      // Contrôle avec les points levés (0.309.0) : celui de la page Plans (barre sur le plan de l'appli).
+      fermer({ sansRetour: true });
+      controlerPlan?.(planId);
+    }
+  }
+
   /**
    * 0.321.0 : modifier le nettoyage d'un plan déjà calé. Le plan reçu d'origine est gardé dans le plan enregistré
    * (`contenu.original`) : on rouvre l'étape Nettoyer avec la recette enregistrée (calage inchangé), puis on remplace le plan.
@@ -1618,6 +1643,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     else if (action === 'choisir-dwg') choisirDwg();
     else if (action === 'choisir-dwg-ref') choisirDwg({ reference: true });
     else if (action === 'finir-axe') finirAxe();
+    else if (cible.dataset.menuPlan) menuDuPlan(cible.dataset.menuPlan);
     else if (cible.dataset.modifierPlan) modifierPlanListe(cible.dataset.modifierPlan);
     else if (cible.dataset.indiceDe) commencerIndice(cible.dataset.indiceDe);
     else if (cible.dataset.renettoyer) renettoyer(cible.dataset.renettoyer);
