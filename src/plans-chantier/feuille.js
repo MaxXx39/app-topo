@@ -6,6 +6,7 @@ import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { versEcran, versTerrain } from '../plan/vue.js';
 import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
+import { repereDuDetail } from '../topo/details-feuille.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
@@ -47,7 +48,7 @@ export function preparerPage(donnees, page, pxParMm) {
   const objets = objetsDeLaPage(plan, page);
   const nomSymbole = (cle) => bib.find((s) => s.cle === cle)?.nom ?? String(cle).replace(/^[a-z]+:/, '');
   const legende = r.legende ? elementsLegende(objets, nomSymbole) : [];
-  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, { coin: r.cartouche, positions: r.positions, situation: r.situation });
+  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, { coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details });
   const centre = r.centre ?? donnees.centre ?? [2500000, 1118000];
   const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre, r.rotation);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';
@@ -68,37 +69,11 @@ export function preparerPage(donnees, page, pxParMm) {
 }
 
 /**
- * Dessine une page dans ctx (pixels, 1 mm = pxParMm px). avecTextes : écrire aussi les textes (aperçu) ; sinon ils sont
- * seulement rangés dans prep.textes (le PDF les écrit en vrai texte). logo : image chargée ou null.
+ * Fond swisstopo, plans du projet, surfaces et points levés d'une vue (le cadre du plan, ou un cadre de détail), dans ctx déjà
+ * placé à l'angle du cadre. fond : { ortho, carte, cadastre, paleur } ; plansPage : plans à montrer.
  */
-export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, logo = null, quandTuile = null } = {}) {
-  const { plan, bib } = donnees;
-  const { mise, vue, legende } = prep;
-  const s = pxParMm;
-  const mm = (v) => v * s;
-  prep.textes = [];
-  const texte = (t, x, y, taille, { gras = false, couleur = '#1b2b36', align = 'left' } = {}) => {
-    prep.textes.push({ texte: t, x, y, taille, gras, couleur, align });
-    if (!avecTextes) return;
-    ctx.fillStyle = couleur;
-    ctx.font = `${gras ? 700 : 400} ${(taille * 0.3528 * s).toFixed(2)}px Helvetica, Arial, sans-serif`;
-    ctx.textAlign = align;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(t, mm(x), mm(y));
-  };
-  ctx.save();
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, mm(mise.page.largeur), mm(mise.page.hauteur));
-
-  // --- Le plan, dans son cadre.
-  const c = mise.cadre;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(mm(c.x), mm(c.y), mm(c.l), mm(c.h));
-  ctx.clip();
-  ctx.translate(mm(c.x), mm(c.y));
-  dessinerFondSwisstopo(ctx, vue, plan.fond, 1, quandTuile);
-  const plansPage = prep.plans ?? donnees.plans;
+function dessinerContenuDuPlan(ctx, vue, plan, donnees, plansPage, s, fond, quandTuile) {
+  dessinerFondSwisstopo(ctx, vue, fond, 1, quandTuile);
   if (plansPage.length) {
     const toile = document.createElement('canvas');
     dessinerPlansDxf(toile, plansPage, vue, 1);
@@ -147,9 +122,55 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
       ctx.restore();
     }
   }
+}
+
+/**
+ * Dessine une page dans ctx (pixels, 1 mm = pxParMm px). avecTextes : écrire aussi les textes (aperçu) ; sinon ils sont
+ * seulement rangés dans prep.textes (le PDF les écrit en vrai texte). logo : image chargée ou null.
+ */
+export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, logo = null, quandTuile = null } = {}) {
+  const { plan, bib } = donnees;
+  const { mise, vue, legende } = prep;
+  const s = pxParMm;
+  const mm = (v) => v * s;
+  prep.textes = [];
+  const texte = (t, x, y, taille, { gras = false, couleur = '#1b2b36', align = 'left' } = {}) => {
+    prep.textes.push({ texte: t, x, y, taille, gras, couleur, align });
+    if (!avecTextes) return;
+    ctx.fillStyle = couleur;
+    ctx.font = `${gras ? 700 : 400} ${(taille * 0.3528 * s).toFixed(2)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t, mm(x), mm(y));
+  };
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, mm(mise.page.largeur), mm(mise.page.hauteur));
+
+  // --- Le plan, dans son cadre.
+  const c = mise.cadre;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(mm(c.x), mm(c.y), mm(c.l), mm(c.h));
+  ctx.clip();
+  ctx.translate(mm(c.x), mm(c.y));
+  dessinerContenuDuPlan(ctx, vue, plan, donnees, prep.plans ?? donnees.plans, s, plan.fond, quandTuile);
   const d = { ctx, vue, pc: plan, bib, mm: s };
   dessinerObjets(d, prep.objets);
+  // 0.333.0 : repère (rectangle ou cercle + lettre) de chaque cadre de détail sur le plan principal
+  for (const det of prep.r.details) {
+    const B = mise.boites[`det:${det.id}`];
+    if (!B || !det.repere) continue;
+    const rep = repereDuDetail(det, B, prep.r.rotation);
+    if (rep) dessinerRepereDetail(ctx, rep, vue, s, mise.k, det.bord.couleur);
+  }
   ctx.restore();
+
+  // --- Cadres de détail (par-dessus le plan, sous le cartouche).
+  for (const det of prep.r.details) {
+    const B = mise.boites[`det:${det.id}`];
+    if (B && det.centre) dessinerDetail(ctx, donnees, prep, s, det, B, texte, quandTuile);
+  }
 
   // --- Cadre, nord, barre d'échelle.
   ctx.strokeStyle = '#1b2b36';
@@ -233,6 +254,87 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   for (const t of textesCartouche(K, mise.k, prep.champs)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
   ctx.restore();
   return prep;
+}
+
+/** Repère d'un détail sur le plan principal : contour en tirets + lettre. ctx est placé à l'angle du cadre du plan. */
+function dessinerRepereDetail(ctx, rep, vue, s, k, couleur) {
+  ctx.save();
+  ctx.strokeStyle = couleur;
+  ctx.fillStyle = couleur;
+  ctx.lineWidth = Math.max(1, 0.35 * s);
+  ctx.setLineDash([2 * s, 1.2 * s]);
+  let ancre;
+  ctx.beginPath();
+  if (rep.forme === 'rond') {
+    const c = versEcran(rep.centre[0], rep.centre[1], vue);
+    const r = rep.rayon * vue.echelle;
+    ctx.arc(c.x, c.y, r, 0, 2 * Math.PI);
+    ancre = { x: c.x + r * 0.71, y: c.y - r * 0.71 };
+  } else {
+    const q = rep.coins.map(([e, n]) => versEcran(e, n, vue));
+    q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ancre = q[1];
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const t = 7 * k * s;
+  ctx.beginPath();
+  ctx.arc(ancre.x, ancre.y, t * 0.62, 0, 2 * Math.PI);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = couleur;
+  ctx.font = `700 ${(t * 0.8).toFixed(1)}px Helvetica, Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(rep.lettre, ancre.x, ancre.y + t * 0.04);
+  ctx.restore();
+}
+
+/** Un cadre de détail : un autre endroit du plan, à sa propre échelle, dans la boîte B (mm), avec titre et bord. */
+function dessinerDetail(ctx, donnees, prep, s, det, B, texte, quandTuile) {
+  const { plan, bib } = donnees;
+  const { mise } = prep;
+  const mm = (v) => v * s;
+  const rond = det.forme === 'rond';
+  const vueD = { echelle: (s * 1000) / det.echelle, estCentre: det.centre[0], nordCentre: det.centre[1], largeur: mm(B.l), hauteur: mm(B.h), rotation: prep.r.rotation };
+  const trace = () => {
+    ctx.beginPath();
+    if (rond) ctx.arc(mm(B.x + B.l / 2), mm(B.y + B.h / 2), mm(Math.min(B.l, B.h) / 2), 0, 2 * Math.PI);
+    else ctx.rect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
+  };
+  ctx.save();
+  trace();
+  ctx.clip();
+  if (det.fond !== 'aucun') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
+  }
+  ctx.translate(mm(B.x), mm(B.y));
+  const fond = det.fond === 'aucun' ? {} : { ortho: det.fond === 'photo', carte: det.fond === 'carte', cadastre: Boolean(plan.fond?.cadastre), paleur: plan.fond?.paleur };
+  const plansDet = det.plans ? (donnees.plansTous ?? donnees.plans).filter((x) => det.plans.includes(x.id)) : (prep.plans ?? donnees.plans);
+  dessinerContenuDuPlan(ctx, vueD, plan, donnees, plansDet, s, fond, quandTuile);
+  // Les éléments dessinés, à l'échelle du détail (les épaisseurs et textes en mm de papier restent ceux du papier).
+  dessinerObjets({ ctx, vue: vueD, pc: { ...plan, echelle: det.echelle }, bib, mm: s }, prep.objets);
+  ctx.restore();
+  // Bord
+  ctx.save();
+  ctx.strokeStyle = det.bord.couleur;
+  ctx.lineWidth = Math.max(1, det.bord.epaisseur * s);
+  if (det.bord.trait === 'tirets') ctx.setLineDash([3 * s, 1.6 * s]);
+  trace();
+  ctx.stroke();
+  ctx.restore();
+  // Titre : bande blanche en haut du cadre (sous le cercle pour un rond)
+  const titre = `${det.titre || det.lettre} · 1:${det.echelle}`;
+  const tx = rond ? B.x + B.l / 2 : B.x + 2 * mise.k;
+  const ty = rond ? B.y + B.h + 4 * mise.k : B.y + 4.2 * mise.k;
+  if (!rond) {
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.fillRect(mm(B.x), mm(B.y), mm(Math.min(B.l, (titre.length * 3.1 + 6) * mise.k)), mm(6.6 * mise.k));
+  }
+  texte(titre, tx, ty, 6.5 * mise.k, { gras: true, align: rond ? 'center' : 'left' });
 }
 
 /** Vue de situation : carte nationale autour du plan, rectangle rouge = zone du plan, nord, échelle. */

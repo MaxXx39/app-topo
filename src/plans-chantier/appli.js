@@ -16,6 +16,7 @@ import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
 import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroche.js';
 import { deplacer, versTerrain } from '../plan/vue.js';
+import { MAX_DETAILS, FONDS_DETAIL, COULEURS_BORD, ECHELLES_DETAIL, nouveauDetail, redimensionnerBoite, poigneesDeBoite, poigneeSousLePoint } from '../topo/details-feuille.js';
 import {
   GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
   deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
@@ -1119,6 +1120,11 @@ export function ouvrirPlansChantier({
         ${bouton(`data-action="feuille-pivoter" aria-pressed="${etat.feuilleMode === 'pivoter'}"`, '<path d="M20 12A8 8 0 1 1 15 4.6M20 4V9H15"/>', 'Pivoter à la main : glissez sur la feuille (crans de 5°)', 'Pivoter').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'pivoter' ? ' actif' : ''}"`)}
         ${bouton('data-action="feuille-nord-haut"', '<path d="M12 4V16M8 8L12 4L16 8M6 20H18"/>', 'Nord en haut (rotation 0°)', 'Nord en haut', !r.rotation)}
       </div>
+      <div class="groupe-ruban" role="group" aria-label="Cadres de détail">
+        ${bouton(`data-action="feuille-detail-nouveau" aria-pressed="${etat.feuilleMode === 'detail-nouveau'}"`, '<rect x="3" y="5" width="12" height="10" rx="1"/><rect x="11" y="11" width="10" height="8" rx="1" fill="#ffffff"/><path d="M17 3V7M15 5H19"/>', `Ajouter un cadre de détail (${MAX_DETAILS} au plus) : cliquez ensuite sur le plan, à l'endroit à montrer`, 'Détail', r.details.length >= MAX_DETAILS).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-nouveau' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-detail-centre" aria-pressed="${etat.feuilleMode === 'detail-centre'}"`, '<circle cx="12" cy="12" r="3"/><path d="M12 3V7M12 17V21M3 12H7M17 12H21"/>', 'Changer l\'endroit montré par le cadre de détail choisi : cliquez sur le plan', 'Lieu', !etat.detailChoisi).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-centre' ? ' actif' : ''}"`)}
+        ${bouton('data-action="feuille-detail-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le cadre de détail choisi', 'Suppr. détail', !etat.detailChoisi)}
+      </div>
       <div class="groupe-ruban" role="group" aria-label="Sortie">
         ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer le plan sur les éléments', 'Recentrer')}
         ${bouton('data-action="feuille-positions-reinit"', '<path d="M5 12A7 7 0 1 1 8 17.5M5 12V7M5 12H10"/>', 'Remettre le nord, la barre d\'échelle et la situation à leur place de départ', 'Replacer')}
@@ -1161,7 +1167,45 @@ export function ouvrirPlansChantier({
     coupe: coupePourFeuille,
     plan: plan(), plans: plansFeuille(), plansPar: (idPhase) => plansFeuille(idPhase), points: pointsMontres(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
     bib: bib(), projet: leProjet(), auteur: auteur(), centre: centreDeDepart(plan(), plansFond()),
+    plansTous: plansAvecCalques(plans(), plan()?.fond), // 0.333.0 : pour les cadres de détail (plans au choix)
   });
+
+  /** Modifie la liste des cadres de détail de la feuille (copies complétées) : fn(liste). */
+  function modifierDetails(fn) {
+    const p = plan();
+    const liste = reglagesFeuille(p).details.map((d) => ({ ...d, bord: { ...d.bord } }));
+    fn(liste);
+    p.feuille = { ...(p.feuille ?? {}), details: liste };
+  }
+  const detailChoisi = () => reglagesFeuille(plan()).details.find((d) => d.id === etat.detailChoisi) ?? null;
+  /** Cadre de détail sous le point (mm), le dernier dessiné (le plus haut) d'abord. */
+  const detailSous = ([x, y]) => {
+    const bs = feuille.mise?.boites ?? {};
+    return [...reglagesFeuille(plan()).details].reverse().find((d) => {
+      const b = bs[`det:${d.id}`];
+      return b && x >= b.x && x <= b.x + b.l && y >= b.y && y <= b.y + b.h;
+    }) ?? null;
+  };
+  /** Accroche d'une valeur (x ou y, mm) au cadre et aux bords des autres éléments, à « tolerance » mm près. */
+  const accrocherValeur = (v, axe, sauf, tolerance) => {
+    const mise = feuille.mise;
+    const ancres = axe === 'x' ? [mise.cadre.x, mise.cadre.x + mise.cadre.l] : [mise.cadre.y, mise.cadre.y + mise.cadre.h];
+    for (const o of [...mise.fixes, ...Object.entries(mise.boites).filter(([n, b]) => n !== sauf && b).map(([, b]) => b)]) {
+      if (axe === 'x') ancres.push(o.x, o.x + o.l, o.x + o.l / 2); else ancres.push(o.y, o.y + o.h, o.y + o.h / 2);
+    }
+    return ancres.reduce((m, a) => (Math.abs(a - v) < Math.abs(m - v) && Math.abs(a - v) <= tolerance ? a : m), v);
+  };
+  /** Enregistre la boîte d'un cadre de détail (place et taille en fractions : suit un changement de format). */
+  function ecrireBoiteDetail(id, boite) {
+    const mise = feuille.mise;
+    modifierDetails((liste) => {
+      const d = liste.find((x) => x.id === id);
+      if (!d) return;
+      d.pos = positionDeBoite(mise, boite);
+      d.fw = Math.round((boite.l / mise.cadre.l) * 10000) / 10000;
+      d.fh = Math.round((boite.h / mise.cadre.h) * 10000) / 10000;
+    });
+  }
 
   function monterFeuille() {
     const toile = page.querySelector('[data-feuille]');
@@ -1191,7 +1235,38 @@ export function ouvrirPlansChantier({
       const mode = etat.feuilleMode ?? 'vue';
       // 0.331.0 : par défaut, glisser = déplacer la VUE (le plan ne bouge pas sur la feuille) ; les boutons de la bande changent le mode.
       if (mode === 'plan') {
+        // dans un cadre de détail : on décale le CONTENU de ce détail ; ailleurs : le plan principal
+        const det = detailSous(enMm(ev));
+        const B = det && feuille.mise.boites[`det:${det.id}`];
+        if (det && det.centre && B) {
+          const vueD = { echelle: (feuille.pxParMm * 1000) / det.echelle, estCentre: det.centre[0], nordCentre: det.centre[1], largeur: B.l * feuille.pxParMm, hauteur: B.h * feuille.pxParMm, rotation: reglagesFeuille(plan()).rotation };
+          etat.detailChoisi = det.id;
+          feuille.geste = { type: 'detail-contenu', id: det.id, x: ev.clientX, y: ev.clientY, vue0: vueD, change: false };
+          return;
+        }
         feuille.geste = { type: 'plan', x: ev.clientX, y: ev.clientY, vue0: { ...feuille.vue }, change: false };
+        return;
+      }
+      if (mode === 'detail-nouveau' || mode === 'detail-centre') {
+        const mm = enMm(ev);
+        const mise = feuille.mise;
+        if (mm[0] < mise.cadre.x || mm[0] > mise.cadre.x + mise.cadre.l || mm[1] < mise.cadre.y || mm[1] > mise.cadre.y + mise.cadre.h || detailSous(mm)) {
+          message('Cliquez sur le plan principal (pas dans un cadre de détail).', 3000);
+          return;
+        }
+        const t = versTerrain((mm[0] - mise.cadre.x) * feuille.pxParMm, (mm[1] - mise.cadre.y) * feuille.pxParMm, feuille.vue);
+        if (!avantChangement()) return;
+        if (mode === 'detail-nouveau') {
+          const nouveau = nouveauDetail(reglagesFeuille(plan()).details, [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100], plan().echelle ?? ECHELLE_PAPIER);
+          if (!nouveau) { message(`${MAX_DETAILS} cadres de détail au plus.`, 3000); return; }
+          modifierDetails((liste) => liste.push(nouveau));
+          etat.detailChoisi = nouveau.id;
+        } else {
+          modifierDetails((liste) => { const d = liste.find((x) => x.id === etat.detailChoisi); if (d) d.centre = [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100]; });
+        }
+        etat.feuilleMode = 'vue';
+        enregistrer();
+        majFeuille();
         return;
       }
       if (mode === 'pivoter') {
@@ -1208,7 +1283,24 @@ export function ouvrirPlansChantier({
         feuille.geste = null;
         return;
       }
-      const nom = elementSous(enMm(ev));
+      // Cadres de détail : poignée du cadre choisi = changer sa taille ; sur un cadre = le choisir et le déplacer
+      const mm = enMm(ev);
+      const tolMm = 10 / feuille.pxParMm;
+      const choisi = detailChoisi();
+      const Bc = choisi && feuille.mise.boites[`det:${choisi.id}`];
+      const poignee = Bc ? poigneeSousLePoint(Bc, mm, tolMm) : null;
+      if (poignee) {
+        feuille.geste = { type: 'detail-taille', id: choisi.id, poignee, rond: choisi.forme === 'rond', x: ev.clientX, y: ev.clientY, boite: { ...Bc }, change: false };
+        return;
+      }
+      const det = detailSous(mm);
+      if (det) {
+        if (etat.detailChoisi !== det.id) { etat.detailChoisi = det.id; majFeuille(); }
+        feuille.geste = { type: 'detail-deplacer', id: det.id, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[`det:${det.id}`] }, change: false };
+        return;
+      }
+      if (etat.detailChoisi) { etat.detailChoisi = null; majFeuille(); }
+      const nom = elementSous(mm);
       if (nom) {
         feuille.geste = { type: 'element', nom, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[nom] }, change: false };
         return;
@@ -1252,6 +1344,34 @@ export function ouvrirPlansChantier({
         imageApercu = requestAnimationFrame(() => dessinerApercu());
         return;
       }
+      if (g.type === 'detail-taille' || g.type === 'detail-deplacer') {
+        const mise = feuille.mise;
+        const mmPx = 1 / (feuille.pxParMm || 1);
+        const tol = 8 * mmPx;
+        let b;
+        if (g.type === 'detail-taille') {
+          b = redimensionnerBoite(g.boite, g.poignee, dx * mmPx, dy * mmPx, 25 * mise.k, g.rond, (v, axe) => accrocherValeur(v, axe, `det:${g.id}`, tol));
+        } else {
+          b = { ...g.boite, x: g.boite.x + dx * mmPx, y: g.boite.y + dy * mmPx };
+          const autres = [...mise.fixes, ...Object.entries(mise.boites).filter(([n, v]) => n !== `det:${g.id}` && v).map(([, v]) => v)];
+          b = accrocherBoite(b, autres, mise.cadre, tol);
+        }
+        b.l = Math.min(b.l, mise.cadre.l);
+        b.h = Math.min(b.h, mise.cadre.h);
+        b.x = Math.min(mise.cadre.x + mise.cadre.l - b.l, Math.max(mise.cadre.x, b.x));
+        b.y = Math.min(mise.cadre.y + mise.cadre.h - b.h, Math.max(mise.cadre.y, b.y));
+        ecrireBoiteDetail(g.id, b);
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      if (g.type === 'detail-contenu') {
+        const v = deplacer(g.vue0, dx, dy);
+        modifierDetails((liste) => { const d = liste.find((x) => x.id === g.id); if (d) d.centre = [Math.round(v.estCentre * 100) / 100, Math.round(v.nordCentre * 100) / 100]; });
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
       if (g.type === 'pivot') {
         const delta = ((Math.atan2(ev.clientY - g.cy, ev.clientX - g.cx) - g.a0) * 180) / Math.PI; // sens des aiguilles = positif
         plan().feuille = { ...(plan().feuille ?? {}), rotation: rotationDeFeuille(Math.round((g.r0 - delta) / 5) * 5) };
@@ -1269,6 +1389,7 @@ export function ouvrirPlansChantier({
       if (g?.change) enregistrer();
       if (feuille) feuille.geste = null;
       if (g?.change && g.type === 'pivot') majBandeFeuille(); // la valeur de la rotation s'affiche
+      if (g?.change && g.type.startsWith('detail')) majPanneauFeuille();
     };
     canvas.addEventListener('pointerup', fin);
     canvas.addEventListener('pointercancel', fin);
@@ -1373,7 +1494,26 @@ export function ouvrirPlansChantier({
     }
     c.width = hors.width;
     c.height = hors.height;
-    c.getContext('2d').drawImage(hors, 0, 0);
+    const cc = c.getContext('2d');
+    cc.drawImage(hors, 0, 0);
+    // 0.333.0 : le cadre de détail choisi montre ses 8 poignées (pas imprimées : dessinées seulement sur l'aperçu)
+    const choisiD = reglagesFeuille(plan()).details.find((d) => d.id === etat.detailChoisi);
+    const BD = choisiD && prep?.mise?.boites?.[`det:${choisiD.id}`];
+    if (BD) {
+      const k = pxParMm * densite;
+      cc.save();
+      cc.strokeStyle = '#2563eb';
+      cc.fillStyle = '#ffffff';
+      cc.lineWidth = Math.max(1.5, densite * 1.5);
+      cc.setLineDash([6 * densite, 4 * densite]);
+      cc.strokeRect(BD.x * k, BD.y * k, BD.l * k, BD.h * k);
+      cc.setLineDash([]);
+      for (const q of poigneesDeBoite(BD)) {
+        cc.fillRect(q.x * k - 5 * densite, q.y * k - 5 * densite, 10 * densite, 10 * densite);
+        cc.strokeRect(q.x * k - 5 * densite, q.y * k - 5 * densite, 10 * densite, 10 * densite);
+      }
+      cc.restore();
+    }
     const etatZone = page.querySelector('[data-zone="etat-feuille"]');
     if (etatZone) {
       etatZone.innerHTML = `${pages.length > 1 ? `<button type="button" class="bouton-secondaire" data-page-feuille="-1" ${feuille.page ? '' : 'disabled'}>◀</button>
@@ -1381,6 +1521,27 @@ export function ouvrirPlansChantier({
         <button type="button" class="bouton-secondaire" data-page-feuille="1" ${feuille.page < pages.length - 1 ? '' : 'disabled'}>▶</button>` : '<span>1 page</span>'}
         <span>${prep.objets.length} élément(s) · légende : ${prep.legende.length}</span>`;
     }
+  }
+
+  /** Panneau des cadres de détail : liste, puis les réglages de celui qui est choisi. */
+  function htmlPanneauDetails(r, p) {
+    const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
+    if (!r.details.length) return `<p class="aide-calage">Aucun. « Détail » (bande du bas) puis un clic sur le plan : un cadre montre cet endroit à sa propre échelle (${MAX_DETAILS} au plus).</p>`;
+    const d = r.details.find((x) => x.id === etat.detailChoisi);
+    const liste = r.details.map((x) => `<button type="button" class="bouton-secondaire petit ${x.id === etat.detailChoisi ? 'actif' : ''}" data-detail-choisir="${echapper(x.id)}">${echapper(x.lettre)} · ${echapper(x.titre)}</button>`).join(' ');
+    if (!d) return `<p class="aide-calage">Touchez un cadre sur la feuille (ou ici) pour le régler.</p><div class="actions-chantier">${liste}</div>`;
+    return `<div class="actions-chantier">${liste}</div>
+      <label class="champ-calage"><span>Titre</span><input type="text" maxlength="60" value="${echapper(d.titre)}" data-detail="titre"></label>
+      <label class="champ-calage"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-detail" value="${d.echelle}" data-detail="echelle" size="6" autocomplete="off"></label>
+      <datalist id="echelles-detail">${ECHELLES_DETAIL.map((x) => `<option value="${x}"></option>`).join('')}</datalist>
+      <label class="champ-calage"><span>Forme</span><select data-detail="forme">${options([['rectangle', 'Rectangle'], ['rond', 'Rond (loupe)']], d.forme)}</select></label>
+      <label class="champ-calage"><span>Fond</span><select data-detail="fond">${options(FONDS_DETAIL, d.fond)}</select></label>
+      <label class="champ-calage"><span>Bord : épaisseur (mm)</span><input type="number" min="0.1" max="3" step="0.1" value="${d.bord.epaisseur}" data-detail="epaisseur"></label>
+      <label class="champ-calage"><span>Bord : couleur</span><select data-detail="couleur">${options(COULEURS_BORD, d.bord.couleur)}</select></label>
+      <label class="champ-calage"><span>Bord : trait</span><select data-detail="trait">${options([['continu', 'Continu'], ['tirets', 'Tirets']], d.bord.trait)}</select></label>
+      <label class="case-chantier"><input type="checkbox" data-detail="repere" ${d.repere ? 'checked' : ''}> Repère « ${echapper(d.lettre)} » sur le plan principal</label>
+      <button type="button" class="lien-calage" data-action="detail-plans">Plans montrés dans ce cadre…</button>${d.plans ? ' <button type="button" class="lien-calage" data-action="detail-plans-comme">comme la feuille</button>' : ''}
+      <p class="aide-calage">Glisser le cadre = le déplacer ; ses poignées = changer sa taille (accroches) ; mode « Déplacer le plan » dans le cadre = décaler son contenu.</p>`;
   }
 
   function majPanneauFeuille() {
@@ -1412,6 +1573,8 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-fond="cadastre" ${p.fond.cadastre ? 'checked' : ''}> Cadastre</label>
       <label class="case-chantier"><input type="checkbox" data-fond="surfaces" ${p.fond.surfaces !== false ? 'checked' : ''}> Surfaces du projet</label>
       <label class="case-chantier"><input type="checkbox" data-fond="points" ${p.fond.points !== false ? 'checked' : ''}> Points levés</label>
+      <h3>Cadres de détail</h3>
+      ${htmlPanneauDetails(r, p)}
       <h3>Cartouche</h3>
       <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(leProjet().cartouche, leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
@@ -1507,12 +1670,40 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'feuille-zoom-plus') return zoomerFeuille(1.25);
     if (b.dataset.action === 'feuille-zoom-moins') return zoomerFeuille(0.8);
     if (b.dataset.action === 'feuille-zoom-ajuster') return zoomerFeuille(0);
-    const modes = { 'feuille-deplacer-plan': ['plan', 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.'], 'feuille-aligner-h': ['aligner-h', 'Aligner : cliquez une ligne du plan, elle deviendra horizontale.'], 'feuille-aligner-v': ['aligner-v', 'Aligner : cliquez une ligne du plan, elle deviendra verticale.'], 'feuille-pivoter': ['pivoter', 'Pivoter : glissez autour du centre de la feuille (crans de 5°).'] };
+    const modes = { 'feuille-deplacer-plan': ['plan', 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.'], 'feuille-aligner-h': ['aligner-h', 'Aligner : cliquez une ligne du plan, elle deviendra horizontale.'], 'feuille-aligner-v': ['aligner-v', 'Aligner : cliquez une ligne du plan, elle deviendra verticale.'], 'feuille-pivoter': ['pivoter', 'Pivoter : glissez autour du centre de la feuille (crans de 5°).'],
+      'feuille-detail-nouveau': ['detail-nouveau', 'Cliquez sur le plan, à l\'endroit que le cadre de détail doit montrer.'], 'feuille-detail-centre': ['detail-centre', 'Cliquez sur le plan : le cadre de détail choisi montrera cet endroit.'] };
     if (modes[b.dataset.action]) {
       const [mode, texte] = modes[b.dataset.action];
       etat.feuilleMode = etat.feuilleMode === mode ? 'vue' : mode;
       message(etat.feuilleMode === 'vue' ? 'Glisser déplace maintenant la vue ; le plan reste en place.' : texte, 3500);
       return majBandeFeuille();
+    }
+    if (b.dataset.action === 'feuille-detail-supprimer') {
+      if (!etat.detailChoisi || !avantChangement()) return;
+      modifierDetails((liste) => { const i = liste.findIndex((x) => x.id === etat.detailChoisi); if (i >= 0) liste.splice(i, 1); });
+      etat.detailChoisi = null;
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.detailChoisir) {
+      etat.detailChoisi = b.dataset.detailChoisir === etat.detailChoisi ? null : b.dataset.detailChoisir;
+      return majFeuille();
+    }
+    if (b.dataset.action === 'detail-plans') {
+      const d = detailChoisi();
+      if (!d) return;
+      const tous = plans();
+      const coches = await demanderCases({ titre: `Plans montrés dans le cadre « ${d.titre} »`, options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: d.plans ? d.plans.includes(x.id) : plansFeuille().some((y) => y.id === x.id) })) });
+      if (!coches || !avantChangement()) return;
+      modifierDetails((liste) => { liste.find((x) => x.id === d.id).plans = coches; });
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'detail-plans-comme') {
+      if (!detailChoisi() || !avantChangement()) return;
+      modifierDetails((liste) => { liste.find((x) => x.id === etat.detailChoisi).plans = null; });
+      enregistrer();
+      return majFeuille();
     }
     if (b.dataset.action === 'feuille-nord-haut') {
       if (!avantChangement()) return;
@@ -1633,6 +1824,22 @@ export function ouvrirPlansChantier({
       if (etat.reglageEnCours) enregistrer();
       etat.reglageEnCours = false;
       return;
+    }
+    if (c.dataset.detail) {
+      const champ = c.dataset.detail;
+      if (!detailChoisi() || !avantChangement()) return majPanneauFeuille();
+      const v = c.type === 'checkbox' ? c.checked : c.value;
+      modifierDetails((liste) => {
+        const d = liste.find((x) => x.id === etat.detailChoisi);
+        if (!d) return;
+        if (champ === 'echelle') { const n = Number(String(v).replace(/^\s*1\s*:\s*/, '').replace(',', '.')); if (Number.isFinite(n) && n >= 1 && n <= 10000) d.echelle = n; }
+        else if (champ === 'epaisseur') { const n = Number(String(v).replace(',', '.')); if (Number.isFinite(n)) d.bord.epaisseur = Math.min(3, Math.max(0.1, n)); }
+        else if (champ === 'couleur' || champ === 'trait') d.bord[champ] = v;
+        else if (champ === 'forme') { d.forme = v === 'rond' ? 'rond' : 'rectangle'; if (d.forme === 'rond') { const t = Math.min(d.fw * feuille.mise.cadre.l, d.fh * feuille.mise.cadre.h); d.fw = t / feuille.mise.cadre.l; d.fh = t / feuille.mise.cadre.h; } }
+        else d[champ] = v;
+      });
+      enregistrer();
+      return majFeuille();
     }
     if (c.dataset.presentation === 'choisir') {
       if (!avantChangement()) return majBandeFeuille();

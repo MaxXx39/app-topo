@@ -3,6 +3,7 @@
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
 import { modeleDe } from './grue-modele.js';
+import { detailsDe } from './details-feuille.js';
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
 import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
@@ -14,7 +15,7 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), logo: f.logo ?? 'perrin',
+    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
 }
 
@@ -80,7 +81,7 @@ const seRecouvrent = (a, b, marge = 0) => a.x < b.x + b.l + marge && b.x < a.x +
  * situation dans son coin (`opts.situation.coin`), nord en haut à gauche, barre d'échelle en bas à gauche, ou le coin libre suivant.
  */
 export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignesLegende = 0, opts = {}) {
-  const { coin = 'bd', positions = {}, situation = null } = opts;
+  let { coin = 'bd', positions = {}, situation = null, details = [] } = opts;
   const page = tailleFeuille(format, orientation);
   const k = Math.max(page.largeur, page.hauteur) / 420;
   const marge = Math.max(7, 10 * Math.sqrt(k));
@@ -109,10 +110,20 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
     barre: { l: maxBarre + 14 * k, h: 9 * k },
     situation: situation?.actif ? { l: situation.taille * k, h: situation.taille * k } : null,
   };
+  // Cadres de détail (0.333.0) : taille = fractions du cadre ; un rond est un carré.
+  const nomsDetails = [];
+  for (const d of details) {
+    const nom = `det:${d.id}`;
+    const l = d.fw * cadre.l;
+    const h = d.fh * cadre.h;
+    tailles[nom] = d.forme === 'rond' ? { l: Math.min(l, h), h: Math.min(l, h) } : { l, h };
+    nomsDetails.push(nom);
+    if (d.pos) positions = { ...positions, [nom]: d.pos };
+  }
   const occupes = [cartouche, ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
   const dansCoin = (nom, c) => {
     const { l, h } = tailles[nom];
-    const m = (nom === 'situation' ? 3 : nom === 'nord' ? 1 : 4) * k;
+    const m = (nom === 'situation' || nom.startsWith('det:') ? 3 : nom === 'nord' ? 1 : 4) * k;
     // c : coin ('hg', 'hd', 'bg', 'bd') ou milieu d'un bord ('hm' en haut, 'bm' en bas)
     const x = c.endsWith('m') ? cadre.x + (cadre.l - l) / 2 : c.endsWith('g') ? cadre.x + m : cadre.x + cadre.l - l - m;
     return { x, y: c.startsWith('h') ? cadre.y + m : cadre.y + cadre.h - h - m, l, h };
@@ -140,7 +151,8 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   };
   const boites = {};
   const preferes = { situation: [situation?.coin ?? 'hd', 'hd', 'hg', 'bd', 'bg'], nord: ['hg', 'hd', 'bg', 'bd'], barre: ['bg', 'bd', 'hg', 'hd'] };
-  for (const nom of ['situation', 'nord', 'barre']) {
+  nomsDetails.forEach((nom, i) => { preferes[nom] = i ? ['hg', 'hd', 'bd', 'bg'] : ['hd', 'hg', 'bd', 'bg']; });
+  for (const nom of [...nomsDetails, 'situation', 'nord', 'barre']) {
     if (!tailles[nom]) continue;
     let b = positions[nom] ? dePosition(nom, positions[nom]) : null;
     if (!b) b = placeLibre(nom);
@@ -151,7 +163,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   return {
     page, k, cadre, cartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
     // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
-    boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null }, fixes: occupes,
+    boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null, ...Object.fromEntries(nomsDetails.map((n) => [n, boites[n]])) }, fixes: occupes,
   };
 }
 
