@@ -320,7 +320,7 @@ export function sourcesDesPlans(plans, position, rayon) {
     // Plan caché (œil fermé) : on n'y accroche rien.
     if (!plan.contenu || plan.visible === false) continue;
     const { est: e0, nord: n0 } = plan.origine;
-    const visible = (objet) => plan.calques[objet.c]?.visible !== false && !plan.calques[objet.c]?.gele; // 0.335.0 : un calque gelé reste affiché mais n'accroche plus
+    const visible = (objet) => plan.calques[objet.c]?.visible !== false;
     // Zone touchée, dans le repère du plan.
     const x = position.est - e0;
     const y = position.nord - n0;

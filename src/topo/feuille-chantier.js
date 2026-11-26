@@ -9,10 +9,27 @@ import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECH
 
 export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a2', 'A2'], ['a1', 'A1']];
 
+// 0.337.0 : cartouche, nord, échelle et légende se règlent chacun dans une petite fenêtre.
+export const STYLES_NORD = [['boussole', 'Boussole (cercle)'], ['simple', 'Flèche simple'], ['rose', 'Rose des vents'], ['pleine', 'Flèche pleine']];
+export const STYLES_BARRE = [['alternee', 'Barre alternée noir / blanc'], ['simple', 'Barre simple graduée'], ['chiffres', 'Ligne avec chiffres'], ['texte', 'Texte seul (1:200)']];
+export const COLONNES_LEGENDE = [['auto', 'Automatique'], ['1', '1 colonne'], ['2', '2 colonnes']];
+const borne = (v, mini, maxi, defaut) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && String(v ?? '').trim() !== '' ? Math.min(maxi, Math.max(mini, n)) : defaut; };
+const couleurDe = (v, defaut) => (/^#[0-9a-f]{6}$/i.test(String(v ?? '')) ? v : defaut);
+/** Réglages du nord, de l'échelle (barre) et de la légende : valeurs de départ et bornes (jamais une valeur absurde). */
+export function reglagesElements(f = {}) {
+  return {
+    cartoucheActif: f.cartoucheActif !== false,
+    nordStyle: STYLES_NORD.some(([c]) => c === f.nordStyle) ? f.nordStyle : 'boussole', nordTaille: borne(f.nordTaille, 50, 250, 100), nordCouleur: couleurDe(f.nordCouleur, '#1b2b36'),
+    barreStyle: STYLES_BARRE.some(([c]) => c === f.barreStyle) ? f.barreStyle : 'alternee', barreTaille: borne(f.barreTaille, 50, 250, 100), barreLongueur: borne(f.barreLongueur, 0, 5000, 0), barreCouleur: couleurDe(f.barreCouleur, '#1b2b36'),
+    legendeTaille: borne(f.legendeTaille, 60, 200, 100), legendeColonnes: COLONNES_LEGENDE.some(([c]) => c === f.legendeColonnes) ? f.legendeColonnes : 'auto',
+  };
+}
+
 /** Réglages de la feuille d'un plan, complétés par ceux de départ. */
 export function reglagesFeuille(plan) {
   const f = plan.feuille ?? {};
   return {
+    ...reglagesElements(f),
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
     plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
@@ -82,17 +99,18 @@ const seRecouvrent = (a, b, marge = 0) => a.x < b.x + b.l + marge && b.x < a.x +
  */
 export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignesLegende = 0, opts = {}) {
   let { coin = 'bd', positions = {}, situation = null, details = [] } = opts;
+  const { cartoucheActif = true, nordTaille = 100, barreTaille = 100, legendeTaille = 100, legendeColonnes = 'auto' } = opts;
   const page = tailleFeuille(format, orientation);
   const k = Math.max(page.largeur, page.hauteur) / 420;
   const marge = Math.max(7, 10 * Math.sqrt(k));
   const cadre = { x: marge, y: marge, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge };
   const lc = Math.min(cadre.l * 0.45, 135 * k);
-  const hc = 36 * k;
+  const hc = cartoucheActif ? 36 * k : 0; // sans cartouche : la légende prend sa place
   const enBas = coin.startsWith('b');
   const aDroite = coin.endsWith('d');
   const cartouche = { x: aDroite ? cadre.x + cadre.l - lc : cadre.x, y: enBas ? cadre.y + cadre.h - hc : cadre.y, l: lc, h: hc };
-  const ligne = 6 * k; // hauteur d'une ligne de la légende
-  const colonnes = lignesLegende > 8 ? 2 : 1;
+  const ligne = 6 * k * (legendeTaille / 100); // hauteur d'une ligne de la légende
+  const colonnes = legendeColonnes === '1' ? 1 : legendeColonnes === '2' ? 2 : lignesLegende > 8 ? 2 : 1;
   const nLignes = Math.ceil(lignesLegende / colonnes);
   const hl = lignesLegende ? Math.min(cadre.h - hc - 10 * k, 9 * k + nLignes * ligne) : 0;
   const legende = { x: cartouche.x, y: enBas ? cartouche.y - hl : cartouche.y + hc, l: lc, h: hl, ligne, colonnes };
@@ -104,10 +122,10 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const planning = { x: px, y: cartouche.y, l: Math.max(0, pFin - px), h: cartouche.h };
 
   // Tailles des éléments déplaçables (boîtes en mm).
-  const tNord = 12 * k;
+  const tNord = 12 * k * (nordTaille / 100);
   const tailles = {
     nord: { l: 1.7 * tNord, h: 2.1 * tNord },
-    barre: { l: maxBarre + 14 * k, h: 9 * k },
+    barre: { l: maxBarre + 14 * k, h: 9 * k * (barreTaille / 100) },
     situation: situation?.actif ? { l: situation.taille * k, h: situation.taille * k } : null,
   };
   // Cadres de détail (0.333.0) : taille = fractions du cadre ; un rond est un carré.
@@ -159,7 +177,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
     boites[nom] = b;
   }
   const nord = boites.nord ? { x: boites.nord.x + 0.85 * tNord, y: boites.nord.y + 1.25 * tNord, t: tNord } : { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: tNord };
-  const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k, max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
+  const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k * (barreTaille / 100), max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
   return {
     page, k, cadre, cartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
     // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
@@ -276,7 +294,16 @@ export function centreDeDepart(plan, plans = []) {
 }
 
 /** Barre d'échelle (m et mm de papier) pour une échelle et une longueur maxi (mm). */
-export const barreDeLaFeuille = (echelle, maxMm) => barreEchellePapier(echelle, maxMm);
+export function barreDeLaFeuille(echelle, maxMm, longueurM = 0) {
+  if (longueurM > 0) { // longueur choisie (m), sans dépasser la place
+    const mm = (longueurM * 1000) / echelle;
+    return mm <= maxMm ? { metres: longueurM, mm } : barreEchellePapier(echelle, maxMm);
+  }
+  return barreEchellePapier(echelle, maxMm);
+}
+
+/** Options de mise en page tirées des réglages de la feuille (une seule source pour l'écran et le PDF). */
+export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
 
 /**
  * Textes du cartouche (mm de papier, y vers le bas ; taille en points) : affaire, titre du plan, phase, échelle, format,

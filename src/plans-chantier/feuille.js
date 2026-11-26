@@ -9,7 +9,7 @@ import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
 import { repereDuDetail } from '../topo/details-feuille.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
-  miseEnPageFeuille, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
+  miseEnPageFeuille, optionsMiseEnPage, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
   reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
@@ -48,7 +48,7 @@ export function preparerPage(donnees, page, pxParMm) {
   const objets = objetsDeLaPage(plan, page);
   const nomSymbole = (cle) => bib.find((s) => s.cle === cle)?.nom ?? String(cle).replace(/^[a-z]+:/, '');
   const legende = r.legende ? elementsLegende(objets, nomSymbole) : [];
-  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, { coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details });
+  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, optionsMiseEnPage(r));
   const centre = r.centre ?? donnees.centre ?? [2500000, 1118000];
   const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre, r.rotation);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';
@@ -176,24 +176,56 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   ctx.strokeStyle = '#1b2b36';
   ctx.lineWidth = Math.max(1, 0.5 * s);
   ctx.strokeRect(mm(c.x), mm(c.y), mm(c.l), mm(c.h));
-  if (prep.r.nord) dessinerNord(ctx, mise.nord, s, prep.r.rotation); // le nord tourne avec le plan (0.332.0)
+  if (prep.r.nord) dessinerNord(ctx, mise.nord, s, prep.r.rotation, prep.r.nordStyle, prep.r.nordCouleur); // le nord tourne avec le plan (0.332.0) ; style et couleur au choix (0.337.0)
   if (prep.r.situation.actif) dessinerSituation(ctx, d, prep, s, quandTuile, texte);
   if (prep.r.barre) {
-    const b = barreDeLaFeuille(plan.echelle ?? 200, mise.barre.max);
+    const R = prep.r;
+    const b = barreDeLaFeuille(plan.echelle ?? 200, mise.barre.max, R.barreLongueur);
     const x = mise.barre.x;
     const y = mise.barre.y;
-    const h = 1.6 * mise.k;
+    const f = R.barreTaille / 100;
+    const h = 1.6 * mise.k * f;
+    const tt = 6 * mise.k * f; // taille des chiffres
+    const coul = R.barreCouleur;
+    const largeur = R.barreStyle === 'texte' ? 40 * mise.k * f : b.mm + 14 * mise.k * f;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillRect(mm(x - 2 * mise.k), mm(y - 6 * mise.k), mm(b.mm + 14 * mise.k), mm(9 * mise.k));
-    for (let i = 0; i < 4; i++) {
-      ctx.fillStyle = i % 2 ? '#ffffff' : '#1b2b36';
-      ctx.fillRect(mm(x + (b.mm / 4) * i), mm(y), mm(b.mm / 4), mm(h));
-    }
-    ctx.strokeStyle = '#1b2b36';
+    ctx.fillRect(mm(x - 2 * mise.k), mm(y - 6 * mise.k * f), mm(largeur), mm(9 * mise.k * f));
+    ctx.strokeStyle = coul;
     ctx.lineWidth = Math.max(1, 0.2 * s);
-    ctx.strokeRect(mm(x), mm(y), mm(b.mm), mm(h));
-    texte('0', x, y - 2.2 * mise.k, 6 * mise.k, { align: 'center' });
-    texte(`${b.metres} m`, x + b.mm, y - 2.2 * mise.k, 6 * mise.k, { align: 'center' });
+    if (R.barreStyle === 'texte') {
+      texte(`1:${plan.echelle ?? 200}`, x, y, tt * 1.4, { gras: true, couleur: coul });
+    } else if (R.barreStyle === 'simple') { // ligne graduée tous les quarts
+      ctx.beginPath();
+      ctx.moveTo(mm(x), mm(y + h));
+      ctx.lineTo(mm(x + b.mm), mm(y + h));
+      for (let i = 0; i <= 4; i++) {
+        ctx.moveTo(mm(x + (b.mm / 4) * i), mm(y + h));
+        ctx.lineTo(mm(x + (b.mm / 4) * i), mm(y + h - (i % 2 ? 1 : 2) * mise.k * f));
+      }
+      ctx.stroke();
+      texte('0', x, y - 2.2 * mise.k * f, tt, { align: 'center', couleur: coul });
+      texte(`${b.metres} m`, x + b.mm, y - 2.2 * mise.k * f, tt, { align: 'center', couleur: coul });
+    } else if (R.barreStyle === 'chiffres') { // ligne + chiffres 0, ½, 1
+      ctx.beginPath();
+      ctx.moveTo(mm(x), mm(y + h * 0.5));
+      ctx.lineTo(mm(x + b.mm), mm(y + h * 0.5));
+      ctx.stroke();
+      [0, 0.5, 1].forEach((u) => {
+        ctx.beginPath();
+        ctx.moveTo(mm(x + b.mm * u), mm(y));
+        ctx.lineTo(mm(x + b.mm * u), mm(y + h));
+        ctx.stroke();
+        texte(u === 0 ? '0' : `${Math.round(b.metres * u * 10) / 10}${u === 1 ? ' m' : ''}`, x + b.mm * u, y - 2.2 * mise.k * f, tt, { align: 'center', couleur: coul });
+      });
+    } else { // barre alternée (départ)
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = i % 2 ? '#ffffff' : coul;
+        ctx.fillRect(mm(x + (b.mm / 4) * i), mm(y), mm(b.mm / 4), mm(h));
+      }
+      ctx.strokeRect(mm(x), mm(y), mm(b.mm), mm(h));
+      texte('0', x, y - 2.2 * mise.k * f, tt, { align: 'center', couleur: coul });
+      texte(`${b.metres} m`, x + b.mm, y - 2.2 * mise.k * f, tt, { align: 'center', couleur: coul });
+    }
   }
 
   // --- Planning des phases (diagramme de Gantt) à gauche du cartouche.
@@ -221,7 +253,7 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   if (legende.length) {
     const L = mise.legende;
     boite(ctx, L, s);
-    texte('Légende', L.x + 3 * mise.k, L.y + 4.5 * mise.k, 8 * mise.k, { gras: true });
+    texte('Légende', L.x + 3 * mise.k, L.y + 4.5 * mise.k, 8 * mise.k * (prep.r.legendeTaille / 100), { gras: true });
     const larg = L.l / L.colonnes;
     const parColonne = Math.ceil(legende.length / L.colonnes);
     legende.forEach((el, i) => {
@@ -230,12 +262,13 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
       const x = L.x + col * larg + 3 * mise.k;
       const y = L.y + 9 * mise.k + (lig + 0.5) * L.ligne;
       dessinerEchantillon(ctx, d, el, { x: mm(x), y: mm(y), l: mm(14 * mise.k), h: mm(L.ligne * 0.75) });
-      texte(el.nom, x + 17 * mise.k, y, 6.5 * mise.k);
+      texte(el.nom, x + 17 * mise.k, y, 6.5 * mise.k * (prep.r.legendeTaille / 100));
     });
   }
 
-  // --- Cartouche : logo à gauche, textes à droite.
+  // --- Cartouche : logo à gauche, textes à droite (0.337.0 : facultatif).
   const K = mise.cartouche;
+  if (!prep.r.cartoucheActif) { ctx.restore(); return prep; }
   boite(ctx, K, s);
   ctx.strokeStyle = '#1b2b36';
   ctx.lineWidth = Math.max(1, 0.25 * s);
@@ -312,7 +345,7 @@ function dessinerDetail(ctx, donnees, prep, s, det, B, texte, quandTuile) {
     ctx.fillRect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
   }
   ctx.translate(mm(B.x), mm(B.y));
-  const fond = det.fond === 'aucun' ? {} : { ortho: det.fond === 'photo', carte: det.fond === 'carte', cadastre: Boolean(plan.fond?.cadastre), paleur: plan.fond?.paleur };
+  const fond = det.fond === 'aucun' ? {} : { ortho: det.fond === 'photo', carte: det.fond === 'carte', cadastre: Boolean(plan.fond?.cadastre), paleur: plan.fond?.paleur, paleurCarte: plan.fond?.paleurCarte };
   const plansDet = det.plans ? (donnees.plansTous ?? donnees.plans).filter((x) => det.plans.includes(x.id)) : (prep.plans ?? donnees.plans);
   dessinerContenuDuPlan(ctx, vueD, plan, donnees, plansDet, s, fond, quandTuile);
   // Les éléments dessinés, à l'échelle du détail (les épaisseurs et textes en mm de papier restent ceux du papier).
@@ -400,11 +433,63 @@ function boite(ctx, b, s) {
 }
 
 /** Flèche du nord (le plan est toujours nord en haut). */
-function dessinerNord(ctx, n, s, rotation = 0) {
+function dessinerNord(ctx, n, s, rotation = 0, style = 'boussole', couleur = '#1b2b36') {
   const x = n.x * s;
   const y = n.y * s;
   const t = n.t * s;
   ctx.save();
+  if (style !== 'boussole') {
+    if (rotation) {
+      ctx.translate(x, y);
+      ctx.rotate((-rotation * Math.PI) / 180);
+      ctx.translate(-x, -y);
+    }
+    ctx.strokeStyle = couleur;
+    ctx.fillStyle = couleur;
+    ctx.lineWidth = Math.max(1, 0.3 * s);
+    ctx.lineJoin = 'round';
+    const fleche = (large) => { // pointe vers le haut, de y + 0.55 t à y − 0.65 t
+      ctx.beginPath();
+      ctx.moveTo(x, y - t * 0.65);
+      ctx.lineTo(x + t * large, y + t * 0.35);
+      ctx.lineTo(x, y + t * 0.15);
+      ctx.lineTo(x - t * large, y + t * 0.35);
+      ctx.closePath();
+    };
+    if (style === 'simple') { // trait + pointe ouverte
+      ctx.beginPath();
+      ctx.moveTo(x, y + t * 0.55);
+      ctx.lineTo(x, y - t * 0.6);
+      ctx.moveTo(x - t * 0.2, y - t * 0.35);
+      ctx.lineTo(x, y - t * 0.62);
+      ctx.lineTo(x + t * 0.2, y - t * 0.35);
+      ctx.stroke();
+    } else if (style === 'pleine') { // grosse flèche pleine
+      fleche(0.3);
+      ctx.fill();
+    } else if (style === 'rose') { // 4 branches : N plein, les autres en trait
+      const branche = (dx, dy, plein) => {
+        const px = -dy;
+        const py = dx;
+        ctx.beginPath();
+        ctx.moveTo(x + dx * t * 0.62, y + dy * t * 0.62);
+        ctx.lineTo(x + px * t * 0.12, y + py * t * 0.12);
+        ctx.lineTo(x - px * t * 0.12, y - py * t * 0.12);
+        ctx.closePath();
+        if (plein) ctx.fill(); else ctx.stroke();
+      };
+      branche(0, -1, true);
+      branche(1, 0, false);
+      branche(0, 1, false);
+      branche(-1, 0, false);
+    }
+    ctx.font = `700 ${(t * 0.34).toFixed(1)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', x, y - t * (style === 'rose' ? 0.85 : 0.88));
+    ctx.restore();
+    return;
+  }
   if (rotation) {
     // Le plan montre en haut la direction « rotation » (azimut) : le nord est alors tourné de −rotation (sens des aiguilles).
     ctx.translate(x, y);

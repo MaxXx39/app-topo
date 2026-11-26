@@ -15226,3 +15226,48 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 .ruban-chantier .groupe-ruban[class*='type-'] { border-right: 0; margin: 0 2px; }
 dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330px; height: auto; max-height: 68vh; overflow-y: auto; margin: 0; padding: 12px 14px; background: var(--surface); color: var(--texte); border: 1px solid var(--bordure); border-radius: 12px; box-shadow: 0 8px 28px rgba(16, 24, 20, 0.28); z-index: 30; }
 .popup-feuille .entete-popup { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+
+/* 0.337.0 : bandeau du haut plus mince, phases, bande du bas de la Présentation rangée, plan jusqu'à la bande du bas */
+.page-chantier .entete-calage { padding: 3px 12px; gap: 4px 10px; border-bottom-width: 3px; }
+.page-chantier .entete-calage .retour-reglages { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+.page-chantier .etapes-calage button { padding: 4px 12px; }
+.page-chantier .nom-plan-chantier { padding: 2px 8px; font-size: 0.8rem; }
+.page-chantier .contenu-calage { padding: 6px 10px 4px; gap: 4px; }
+.page-chantier .contenu-calage.en-calage { padding-bottom: 2px; }
+.page-chantier .consigne-calage { font-size: 0.85rem; }
+.phases-entete { position: relative; display: inline-flex; align-items: center; gap: 6px; padding-right: 8px; border-right: 1px solid rgba(255, 255, 255, 0.25); }
+.phases-entete select { max-width: 130px; }
+.menu-phases { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; width: 300px; max-height: 60vh; overflow-y: auto; padding: 10px; background: var(--surface); color: var(--texte); border-radius: 10px; box-shadow: 0 8px 28px rgba(16, 24, 20, 0.3); display: flex; flex-direction: column; gap: 6px; }
+.menu-phases[hidden] { display: none; }
+.menu-phases .phases-chantier { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.menu-phases .phases-chantier li { display: flex; align-items: center; gap: 6px; }
+.menu-phases .nom-phase { flex: 1; text-align: left; }
+.bande-page .zone-bande-page .groupe-ruban .titre-groupe { align-self: center; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; writing-mode: vertical-rl; transform: rotate(180deg); color: #475569; }
+.bande-page .zone-bande-page .groupe-ruban.type-vue { background: #e2e8f0; border-radius: 8px; }
+.bande-page .zone-bande-page .groupe-ruban.type-rotation { background: #dbeafe; border-radius: 8px; }
+.bande-page .zone-bande-page .groupe-ruban.type-details { background: #ede9fe; border-radius: 8px; }
+.outils-entete .phases-entete .champ-bande > span, .outils-entete [data-presentation] { }
+.outils-entete .phases-entete .champ-bande > span:first-child { display: none; }
+.outils-entete .groupe-ruban[aria-label="Présentation"] .champ-bande > span { display: none; }
+.outils-entete .groupe-ruban[aria-label="Présentation"] .outil-ruban { min-width: 40px; }
+.outils-entete .groupe-ruban[aria-label="Présentation"] .outil-ruban span { display: none; }
+.outils-entete .groupe-ruban[aria-label="Présentation"] .outil-ruban { height: 40px; }
+.page-chantier .ruban-element:has(> .puce-element:only-child) { min-height: 0; }
+.ligne-element-feuille { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ligne-element-feuille .bouton-secondaire.petit { padding: 2px 8px; min-height: 0; }
+.page-chantier .entete-chantier:has([data-ecran="feuille"].actif) .nom-plan-chantier { display: none; }
+.outils-entete [data-action="feuille-plans-reinit"] span, .outils-entete [data-action="menu-phases"] span { display: none; }
+.outils-entete [data-action="feuille-plans-reinit"], .outils-entete [data-action="menu-phases"] { min-width: 40px; height: 40px; }
+.outils-entete .phases-entete select, .outils-entete [data-presentation] { max-width: 110px; }
+.outils-entete [data-feuille="echelle"] { width: 60px; }
+.outils-entete .groupe-ruban[aria-label="Feuille"] .champ-bande > span:not(:has(+ input[data-feuille="echelle"])) { display: none; }
+.outils-entete .groupe-ruban[aria-label="Feuille"] select { max-width: 92px; }
+/* 0.337.0 : menus Fond / Plan comme dans Lever ; barre « Geler / Isoler » */
+.pastilles-chantier .ligne-gel { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.pastilles-chantier .plan-menu { border-top: 1px solid #e2e8f0; padding: 4px 0; }
+.pastilles-chantier .reglette-transparence { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 2px 0 2px 22px; }
+.pastilles-chantier .reglette-transparence input { flex: 1; min-width: 80px; }
+.vue-chantier.avec-pastilles { position: relative; }
+.barre-calques-chantier { position: absolute; left: 10px; right: 10px; bottom: 36px; z-index: 7; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; background: var(--surface); border: 2px solid #ea580c; border-radius: 10px; box-shadow: 0 6px 20px rgba(16, 24, 20, 0.25); }
+.barre-calques-chantier[hidden] { display: none; }
+.barre-calques-chantier .noms-calques { flex: 1; min-width: 120px; color: #475569; }
