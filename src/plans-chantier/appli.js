@@ -2298,6 +2298,7 @@ export function ouvrirPlansChantier({
       if (!Number.isFinite(v) || v < 1 || v > 10000) { message('Échelle : un nombre entre 1 et 10000 (ex. 200 pour le 1:200).', 3500); return majBande(); }
       if (v === null || !avantChangement()) return majPanneau();
       p.echelle = v;
+      c.value = String(v); // « 1:500 » devient « 500 »
       enregistrer();
       return vue?.redessinerDessus();
     }

@@ -15183,3 +15183,5 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 .tableau-calage .actions-ligne-calage { width: 1%; text-align: right; }
 .bouton-menu-plan { min-width: 40px; font-size: 1.2rem; font-weight: 800; line-height: 1; }
 .tableau-calage td .aide-calage { white-space: nowrap; }
+/* 0.327.1 : `body.bande-vide .bande-appli { pointer-events: none }` rendait la zone d'outils de la bande des applis plein écran insensible au toucher. */
+.bande-appli.bande-page, .bande-page .zone-bande-page { pointer-events: auto; }
