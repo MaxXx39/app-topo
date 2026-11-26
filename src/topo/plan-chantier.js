@@ -236,6 +236,7 @@ export const objetsImprimables = (objets) => objets.filter((o) => o.type !== 'co
  */
 export function couleurObjet(plan, objet) {
   if (objet.rendu?.mode === 'couleur') return objet.rendu.couleur; // gestion des phases : couleur unique
+  if (objet.type === 'construction' && objet.couleur) return objet.couleur; // 0.334.0 : couleur choisie d'une ligne de construction (même en couleurs par phases)
   if (plan.couleurs === 'phases') return plan.phases.find((p) => p.id === objet.phase)?.couleur ?? '#1b2b36';
   if (objet.couleur) return objet.couleur; // couleur choisie pour cet élément (0.287.0)
   if (objet.type === 'zone') return materiauTas(objet.materiau)?.couleur ?? categorieZone(objet.categorie).couleur;
@@ -385,7 +386,7 @@ export function pointeDeFleche(a, b, longueurPointe = 2, largeurPointe = 1.6) {
 export function lignesPourAccroche(objets) {
   return objets
     .filter((o) => o.type !== 'texte' && (o.points?.length ?? 0) >= 2)
-    .map((o) => ({ points: (o.type === 'construction' ? segmentConstruction(o) : o.points).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone' }));
+    .map((o) => ({ points: (o.type === 'construction' ? segmentConstruction(o) : o.points).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone', ...(o.type === 'construction' ? { construction: o } : {}) }));
 }
 
 /**
@@ -405,6 +406,11 @@ export function segmentConstruction(o, prolongement = 5000) {
  * ou null (pour une parallèle en ligne de construction : on décale ce segment-là, pas toute la polyligne).
  */
 export function segmentLePlusProche(lignes, p, tolerance) {
+  return segmentProcheAvecOrigine(lignes, p, tolerance)?.seg ?? null;
+}
+
+/** Comme segmentLePlusProche, mais renvoie aussi la ligne touchée : { seg, construction } (construction = l'objet de construction, ou undefined). */
+export function segmentProcheAvecOrigine(lignes, p, tolerance) {
   let meilleur = null;
   for (const l of lignes) {
     const pts = l.points.map((q) => [q.est, q.nord]);
@@ -413,10 +419,10 @@ export function segmentLePlusProche(lignes, p, tolerance) {
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
       const d = distanceAuSegment(p, a, b);
-      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, seg: [a, b] };
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, seg: [a, b], construction: l.construction };
     }
   }
-  return meilleur?.seg ?? null;
+  return meilleur;
 }
 
 /** Point à la distance l (m) de p dans la direction angle (degrés, sens inverse des aiguilles depuis l'Est). */
@@ -647,16 +653,21 @@ export function decalerPolyligne(points, d) {
  * ({ points: [{ est, nord }], ferme }) : ses points [e, n] (refermés si la ligne est fermée), ou null.
  */
 export function ligneLaPlusProche(lignes, p, tolerance) {
+  return ligneProcheAvecOrigine(lignes, p, tolerance)?.pts ?? null;
+}
+
+/** Comme ligneLaPlusProche, mais renvoie aussi la construction touchée : { pts, construction }. */
+export function ligneProcheAvecOrigine(lignes, p, tolerance) {
   let meilleur = null;
   for (const l of lignes) {
     const pts = l.points.map((q) => [q.est, q.nord]);
     const n = l.ferme ? pts.length : pts.length - 1;
     for (let i = 0; i < n; i++) {
       const d = distanceAuSegment(p, pts[i], pts[(i + 1) % pts.length]);
-      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, pts: l.ferme ? [...pts, pts[0]] : pts };
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, pts: l.ferme ? [...pts, pts[0]] : pts, construction: l.construction };
     }
   }
-  return meilleur?.pts ?? null;
+  return meilleur;
 }
 
 /** Copie profonde du plan (pour « Annuler »). */
