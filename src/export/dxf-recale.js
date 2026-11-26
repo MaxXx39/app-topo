@@ -90,15 +90,15 @@ export function aciLePlusProche(hex) {
 /**
  * Noms de calques du fichier (R12 : 31 caractères au plus, sans accent ni caractère spécial). Un nom trop long garde son
  * début (8 caractères) et sa fin (22 caractères), où se trouve ce qui distingue les calques ; deux calques ne reçoivent
- * jamais le même nom (« ~2 », « ~3 »…).
+ * jamais le même nom (« _2 », « _3 »…). Jamais de « ~ » : AutoCAD refuse la table (0.320.15).
  */
 export function nomsDeCalques(calques) {
   const pris = new Set();
   return calques.map((c) => {
     let nom = nomDeCalque(c.nom);
-    if (nom.length > 31) nom = `${nom.slice(0, 8)}~${nom.slice(-22)}`;
+    if (nom.length > 31) nom = `${nom.slice(0, 8)}_${nom.slice(-22)}`;
     let essai = nom;
-    for (let k = 2; pris.has(essai.toUpperCase()); k++) essai = `${nom.slice(0, 31 - `~${k}`.length)}~${k}`;
+    for (let k = 2; pris.has(essai.toUpperCase()); k++) essai = `${nom.slice(0, 31 - `_${k}`.length)}_${k}`;
     pris.add(essai.toUpperCase());
     return essai;
   });

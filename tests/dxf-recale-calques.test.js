@@ -10,6 +10,7 @@ describe('noms de calques exportés (0.320.1)', () => {
     const noms = nomsDeCalques(calques);
     expect(new Set(noms.map((n) => n.toUpperCase())).size).toBe(5);
     expect(noms.every((n) => n.length <= 31)).toBe(true);
+    expect(noms.every((n) => /^[A-Z0-9_$-]+$/.test(n))).toBe(true); // pas de « ~ » (AutoCAD refuse)
     expect(noms[0]).toMatch(/MURS$/);
     expect(noms[1]).toMatch(/AXES$/);
   });
