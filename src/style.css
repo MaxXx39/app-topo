@@ -15101,3 +15101,25 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 /* 0.320.13 (photo du 25.11, CC180) : sous Windows le fond de la cible est blanc, mais le texte restait blanc (loin du point) :
    anneaux, axes et distances invisibles entre 2 m et 20 cm. Texte foncé sauf pour les couleurs de distance (vert clair / orange). */
 body.appli-windows.vue-implantation .cible-haut:not(.vert-clair):not(.jaune-orange) { color: #1f2937; }
+
+/* 0.321.0 : cadre commun des applis plein écran (nom du projet en haut, bouton Applications en bas à gauche) */
+dialog.page-materiel[open], dialog.page-calage[open], dialog.page-comparateur[open],
+dialog.page-chantier[open], dialog.page-plateformes[open] { padding-bottom: 0; }
+.bandeau-projet-page {
+  order: -2; flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  min-height: 34px; padding: 4px 16px; background: #1b2b36; color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+.projet-page-nom { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bande-bas-page {
+  order: 99; flex: 0 0 auto; display: flex; align-items: stretch; justify-content: flex-start;
+  height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+  background: var(--sombre, #1b2b36); border-top: 3px solid var(--couleur-appli-page, #1b2b36);
+}
+.bouton-appli-page {
+  display: inline-flex; align-items: center; gap: 10px; min-width: 140px; padding: 0 18px;
+  border: 0; border-right: 1px solid rgba(255, 255, 255, 0.2); background: var(--couleur-appli-page, #1b2b36);
+  color: #ffffff; font: inherit; font-weight: 700; cursor: pointer;
+}
+.grille-appli-page { display: grid; grid-template-columns: repeat(2, 7px); gap: 3px; }
+.grille-appli-page i { width: 7px; height: 7px; border-radius: 2px; background: #ffffff; }
