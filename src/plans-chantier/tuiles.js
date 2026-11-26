@@ -88,6 +88,10 @@ function dessinerFondDroit(ctx, vue, fond, densite = 1, quandPrete = null) {
       const c = t.cote * vue.echelle;
       ctx.drawImage(lu.image, Math.floor(x), Math.floor(y), Math.ceil(c) + 1, Math.ceil(c) + 1);
     }
+    if (nom === 'carte' && (fond.paleurCarte ?? 0) > 0) { // 0.337.0 : transparence de la carte nationale (voile blanc, comme la photo)
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(95, fond.paleurCarte) / 100})`;
+      ctx.fillRect(0, 0, vue.largeur, vue.hauteur);
+    }
     if (nom === 'satellite' && (fond.paleur ?? PALEUR_ORTHO) > 0) {
       // Photo pâlie : un voile blanc par-dessus, le plan se lit mieux.
       ctx.fillStyle = `rgba(255,255,255,${Math.min(95, fond.paleur ?? PALEUR_ORTHO) / 100})`;

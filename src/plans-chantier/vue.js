@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, saisie, accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -167,6 +167,24 @@ export function creerVueChantier(conteneur, options) {
         ctx.globalAlpha = 0.6;
         dessinerObjet(d, { ...fantome, point: curseur, phase: pc.phaseActive });
         ctx.globalAlpha = 1;
+      }
+    }
+    // 0.337.0 : éléments de plan choisis pour « Geler / Isoler » : montrés en orange (formes en MN95)
+    const formes = selection();
+    if (formes.length) {
+      ctx.strokeStyle = ORANGE;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([]);
+      for (const forme of formes) {
+        ctx.beginPath();
+        if (forme.type === 'trait') {
+          forme.pts.forEach((q, i) => { const e = versEcran(q.est, q.nord, vue); if (i) ctx.lineTo(e.x, e.y); else ctx.moveTo(e.x, e.y); });
+          if (forme.ferme) ctx.closePath();
+        } else {
+          const e = versEcran(forme.est, forme.nord, vue);
+          ctx.arc(e.x, e.y, forme.type === 'cercle' ? Math.max(3, forme.r * vue.echelle) : 9, 0, 2 * Math.PI);
+        }
+        ctx.stroke();
       }
     }
     dessinerSaisie(ctx, pc);

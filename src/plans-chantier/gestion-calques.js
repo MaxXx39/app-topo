@@ -6,15 +6,56 @@ import { echapper } from '../outils/echapper.js';
 const memoire = new Map();
 export function plansAvecCalques(plans, fond) {
   return plans.map((p) => {
-    const reglages = fond?.calques?.[p.id];
-    if (!reglages || !p.calques?.length) return p;
-    const signature = JSON.stringify(reglages);
+    const reglages = p.calques?.length ? fond?.calques?.[p.id] : null;
+    const generaux = fond?.reglagesPlans?.[p.id]; // 0.337.0 : transparence et couleur propres à ce plan de chantier
+    if (!reglages && !generaux) return p;
+    const signature = JSON.stringify([reglages, generaux]);
     const vu = memoire.get(p.id);
     if (vu && vu.origine === p && vu.signature === signature) return vu.copie;
-    const copie = Object.assign(Object.create(p), { calques: p.calques.map((c, i) => ({ ...c, ...(reglages[i] ?? {}) })) }); // Object.create : garde ce qu'un plan recalé hérite
+    const champs = {};
+    if (reglages) champs.calques = p.calques.map((c, i) => ({ ...c, ...(reglages[i] ?? {}) }));
+    if (generaux?.transparence !== undefined) champs.transparence = generaux.transparence;
+    if (generaux?.couleur) champs.couleur = generaux.couleur;
+    const copie = Object.assign(Object.create(p), champs); // Object.create : garde ce qu'un plan recalé hérite
     memoire.set(p.id, { origine: p, signature, copie });
     return copie;
   });
+}
+
+/**
+ * « Geler » / « Isoler » (comme dans Lever) sur les plans d'un plan de chantier : plans = plans avec les réglages déjà appliqués
+ * (plansAvecCalques), choisis = éléments touchés ({ planId, calque }), mode = 'geler' (cache leurs calques) ou 'isoler'
+ * (ne garde que leurs calques). Écrit dans fond.calques[idPlan][n°].visible ; renvoie le nombre de calques cachés.
+ */
+export function gelIsolementChantier(plans, fond, choisis, mode) {
+  const gardes = new Set(choisis.map((e) => `${e.planId}|${e.calque}`));
+  let caches = 0;
+  for (const plan of plans) {
+    (plan.calques ?? []).forEach((calque, i) => {
+      const choisi = gardes.has(`${plan.id}|${i}`);
+      if ((mode === 'geler' ? choisi : !choisi) && calque.visible !== false) {
+        fond.calques ??= {};
+        fond.calques[plan.id] ??= {};
+        fond.calques[plan.id][i] = { ...(fond.calques[plan.id][i] ?? {}), visible: false };
+        caches += 1;
+      }
+    });
+  }
+  return caches;
+}
+
+/** « Tout réafficher » : tous les calques cachés de ce plan de chantier redeviennent visibles. Renvoie leur nombre. */
+export function reafficherCalquesChantier(fond) {
+  let remis = 0;
+  for (const reglagesPlan of Object.values(fond?.calques ?? {})) {
+    for (const r of Object.values(reglagesPlan)) {
+      if (r.visible === false) {
+        r.visible = true;
+        remis += 1;
+      }
+    }
+  }
+  return remis;
 }
 
 /**
