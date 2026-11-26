@@ -28,7 +28,8 @@ describe('rond', () => {
     const o = rond();
     expect(o.points).toHaveLength(72);
     expect(o.points[0]).toEqual([105, 200]);
-    expect(poigneesDe(o)).toEqual([[100, 200], [105, 200]]);
+    expect(poigneesDe(o).slice(0, 2)).toEqual([[100, 200], [105, 200]]); // centre, bord ; + nord, ouest, sud (0.328.0 : prises pour déplacer)
+    expect(poigneesDe(o)).toHaveLength(5);
     expect(milieuxDesCotes(o)).toEqual([]);
     expect(sommetSousLePoint(o, [105.1, 200], 0.5)).toBe(1);
   });

@@ -3,6 +3,7 @@
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
 import { modeleDe } from './grue-modele.js';
+import { detailsDe } from './details-feuille.js';
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
 import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
@@ -14,13 +15,22 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
+/** Nom du chantier du cartouche : celui tapé, sinon « affaire - désignation » du projet (0.329.0). */
+export const nomChantierCartouche = (cartouche, nomProjet, tape = '') => String(tape || '').trim()
+  || [cartouche?.affaire || nomProjet, cartouche?.lieu ?? cartouche?.designation].map((x) => String(x ?? '').trim()).filter(Boolean).join(' - ');
+
 /** Vue de situation (0.293.0) : petit cadre carte nationale dans un coin, zone du plan en rouge. */
-export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60, auto: Boolean(s.auto) });
+export const situationDe = (s = {}) => ({
+  actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60, auto: Boolean(s.auto),
+  // 0.329.0 : transparence de la carte (0 à 90 %, fond blanc gardé : la carte s'efface vers le blanc pour faire ressortir le rectangle)
+  // et épaisseur du trait du rectangle rouge (mm sur le papier).
+  transparence: Math.min(90, Math.max(0, Number(s.transparence) || 0)), epaisseur: Math.min(3, Math.max(0.2, Number(s.epaisseur) || 0.5)),
+});
 
 /**
  * Échelle de la carte de situation : celle tapée, ou en automatique (0.295.1) celle qui donne à la zone du plan (rectangle
@@ -38,6 +48,7 @@ export function echelleDeSituation(plan, mise, sit) {
  * Au-dessus du cartouche et de la légende, il vaut mieux choisir un coin du haut.
  */
 export function cadreSituation(mise, situation) {
+  if (mise.situation) return mise.situation; // 0.331.0 : placée par miseEnPageFeuille (coin libre ou place choisie)
   const t = situation.taille * mise.k;
   const m = 3 * mise.k;
   const c = mise.cadre;
@@ -56,29 +67,139 @@ export function etendueDuCadre(plan, cadre, centre) {
   return { estMin: centre[0] - l / 2, estMax: centre[0] + l / 2, nordMin: centre[1] - h / 2, nordMax: centre[1] + h / 2 };
 }
 
+export const COINS_CARTOUCHE = [['bd', 'Bas droite'], ['bg', 'Bas gauche'], ['hd', 'Haut droite'], ['hg', 'Haut gauche']];
+
+/** Rectangles { x, y, l, h } qui se touchent ou se recouvrent (à « marge » mm près) ? */
+const seRecouvrent = (a, b, marge = 0) => a.x < b.x + b.l + marge && b.x < a.x + a.l + marge && a.y < b.y + b.h + marge && b.y < a.y + a.h + marge;
+
 /**
- * Cadres de la feuille (mm) : page, cadre du plan (toute la feuille moins la marge), cartouche en bas à droite, légende
- * au-dessus du cartouche, nord en haut à gauche, barre d'échelle en bas à gauche. k = taille des éléments (A3 = 1).
+ * Cadres de la feuille (mm) : page, cadre du plan (toute la feuille moins la marge), cartouche dans un des 4 coins (0.331.0 :
+ * `opts.coin`, bas droite au départ), légende collée au cartouche (du côté du plan), nord, barre d'échelle et vue de situation.
+ * k = taille des éléments (A3 = 1).
+ * Nord, barre d'échelle et situation : à la place demandée (`opts.positions[nom] = { fx, fy }`, fractions 0 à 1 de la place libre dans le
+ * cadre : on les glisse sur la feuille), sinon dans un coin libre (jamais sur le cartouche, la légende ni un autre élément) :
+ * situation dans son coin (`opts.situation.coin`), nord en haut à gauche, barre d'échelle en bas à gauche, ou le coin libre suivant.
  */
-export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignesLegende = 0) {
+export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignesLegende = 0, opts = {}) {
+  let { coin = 'bd', positions = {}, situation = null, details = [] } = opts;
   const page = tailleFeuille(format, orientation);
   const k = Math.max(page.largeur, page.hauteur) / 420;
   const marge = Math.max(7, 10 * Math.sqrt(k));
   const cadre = { x: marge, y: marge, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge };
   const lc = Math.min(cadre.l * 0.45, 135 * k);
   const hc = 36 * k;
-  const cartouche = { x: cadre.x + cadre.l - lc, y: cadre.y + cadre.h - hc, l: lc, h: hc };
+  const enBas = coin.startsWith('b');
+  const aDroite = coin.endsWith('d');
+  const cartouche = { x: aDroite ? cadre.x + cadre.l - lc : cadre.x, y: enBas ? cadre.y + cadre.h - hc : cadre.y, l: lc, h: hc };
   const ligne = 6 * k; // hauteur d'une ligne de la légende
   const colonnes = lignesLegende > 8 ? 2 : 1;
   const nLignes = Math.ceil(lignesLegende / colonnes);
   const hl = lignesLegende ? Math.min(cadre.h - hc - 10 * k, 9 * k + nLignes * ligne) : 0;
-  const legende = { x: cartouche.x, y: cartouche.y - hl, l: lc, h: hl, ligne, colonnes };
-  const nord = { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: 12 * k };
-  const barre = { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: Math.min(70 * k, cadre.l * 0.25) };
-  // Planning des phases (0.294.1) : à gauche du cartouche, après la barre d'échelle.
-  const px = cadre.x + 6 * k + barre.max + 8 * k;
-  const planning = { x: px, y: cartouche.y, l: Math.max(0, cartouche.x - px - 4 * k), h: cartouche.h };
-  return { page, k, cadre, cartouche, legende, nord, barre, planning };
+  const legende = { x: cartouche.x, y: enBas ? cartouche.y - hl : cartouche.y + hc, l: lc, h: hl, ligne, colonnes };
+  const maxBarre = Math.min(70 * k, cadre.l * 0.25);
+  // Planning des phases (0.294.1) : dans la rangée du cartouche, à côté de lui (après la barre d'échelle si elle est en bas).
+  const reserve = enBas ? maxBarre + 21 * k : 6 * k; // la barre d'échelle (bas gauche) reste devant lui
+  const px = aDroite ? cadre.x + reserve : cartouche.x + lc + 4 * k;
+  const pFin = aDroite ? cartouche.x - 4 * k : cadre.x + cadre.l - (enBas ? reserve : 6 * k);
+  const planning = { x: px, y: cartouche.y, l: Math.max(0, pFin - px), h: cartouche.h };
+
+  // Tailles des éléments déplaçables (boîtes en mm).
+  const tNord = 12 * k;
+  const tailles = {
+    nord: { l: 1.7 * tNord, h: 2.1 * tNord },
+    barre: { l: maxBarre + 14 * k, h: 9 * k },
+    situation: situation?.actif ? { l: situation.taille * k, h: situation.taille * k } : null,
+  };
+  // Cadres de détail (0.333.0) : taille = fractions du cadre ; un rond est un carré.
+  const nomsDetails = [];
+  for (const d of details) {
+    const nom = `det:${d.id}`;
+    const l = d.fw * cadre.l;
+    const h = d.fh * cadre.h;
+    tailles[nom] = d.forme === 'rond' ? { l: Math.min(l, h), h: Math.min(l, h) } : { l, h };
+    nomsDetails.push(nom);
+    if (d.pos) positions = { ...positions, [nom]: d.pos };
+  }
+  const occupes = [cartouche, ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
+  const dansCoin = (nom, c) => {
+    const { l, h } = tailles[nom];
+    const m = (nom === 'situation' || nom.startsWith('det:') ? 3 : nom === 'nord' ? 1 : 4) * k;
+    // c : coin ('hg', 'hd', 'bg', 'bd') ou milieu d'un bord ('hm' en haut, 'bm' en bas)
+    const x = c.endsWith('m') ? cadre.x + (cadre.l - l) / 2 : c.endsWith('g') ? cadre.x + m : cadre.x + cadre.l - l - m;
+    return { x, y: c.startsWith('h') ? cadre.y + m : cadre.y + cadre.h - h - m, l, h };
+  };
+  const libre = (b) => ![...occupes, ...Object.values(boites)].some((o) => seRecouvrent(b, o, 2 * k));
+  /** Première place libre : les coins préférés, puis les milieux des bords, puis un balayage de la feuille. */
+  const placeLibre = (nom) => {
+    const { l, h } = tailles[nom];
+    const coins = [...preferes[nom], 'hm', 'bm'].map((c) => dansCoin(nom, c));
+    const trouve = coins.find(libre);
+    if (trouve) return trouve;
+    for (let fy = 0; fy <= 1.001; fy += 0.05) {
+      for (let fx = 0; fx <= 1.001; fx += 0.05) {
+        const b = { x: cadre.x + fx * Math.max(0, cadre.l - l), y: cadre.y + fy * Math.max(0, cadre.h - h), l, h };
+        if (libre(b)) return b;
+      }
+    }
+    return coins[0];
+  };
+  const dePosition = (nom, pos) => {
+    const { l, h } = tailles[nom];
+    const fx = Math.min(1, Math.max(0, Number(pos.fx) || 0));
+    const fy = Math.min(1, Math.max(0, Number(pos.fy) || 0));
+    return { x: cadre.x + fx * Math.max(0, cadre.l - l), y: cadre.y + fy * Math.max(0, cadre.h - h), l, h };
+  };
+  const boites = {};
+  const preferes = { situation: [situation?.coin ?? 'hd', 'hd', 'hg', 'bd', 'bg'], nord: ['hg', 'hd', 'bg', 'bd'], barre: ['bg', 'bd', 'hg', 'hd'] };
+  nomsDetails.forEach((nom, i) => { preferes[nom] = i ? ['hg', 'hd', 'bd', 'bg'] : ['hd', 'hg', 'bd', 'bg']; });
+  for (const nom of [...nomsDetails, 'situation', 'nord', 'barre']) {
+    if (!tailles[nom]) continue;
+    let b = positions[nom] ? dePosition(nom, positions[nom]) : null;
+    if (!b) b = placeLibre(nom);
+    boites[nom] = b;
+  }
+  const nord = boites.nord ? { x: boites.nord.x + 0.85 * tNord, y: boites.nord.y + 1.25 * tNord, t: tNord } : { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: tNord };
+  const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k, max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
+  return {
+    page, k, cadre, cartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
+    // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
+    boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null, ...Object.fromEntries(nomsDetails.map((n) => [n, boites[n]])) }, fixes: occupes,
+  };
+}
+
+/** Place { fx, fy } (fractions) qui met la boîte { x, y, l, h } là où elle est, dans le cadre. */
+export function positionDeBoite(mise, boite) {
+  const { cadre } = mise;
+  return {
+    fx: Math.round(Math.min(1, Math.max(0, (boite.x - cadre.x) / Math.max(1e-6, cadre.l - boite.l))) * 10000) / 10000,
+    fy: Math.round(Math.min(1, Math.max(0, (boite.y - cadre.y) / Math.max(1e-6, cadre.h - boite.h))) * 10000) / 10000,
+  };
+}
+
+/**
+ * Accroche d'une boîte qu'on glisse (0.331.0, « comme un bloc ») : ses bords se collent au cadre, aux bords et aux milieux
+ * des autres éléments (cartouche, légende, planning, les autres boîtes) à « tolerance » mm près. Renvoie la boîte corrigée.
+ */
+export function accrocherBoite(boite, autres, cadre, tolerance) {
+  const xs = [cadre.x, cadre.x + cadre.l, cadre.x + cadre.l / 2];
+  const ys = [cadre.y, cadre.y + cadre.h, cadre.y + cadre.h / 2];
+  for (const o of autres) {
+    xs.push(o.x, o.x + o.l, o.x + o.l / 2);
+    ys.push(o.y, o.y + o.h, o.y + o.h / 2);
+  }
+  const meilleur = (valeurs, ancres) => {
+    let d = tolerance;
+    let delta = 0;
+    for (const v of valeurs) {
+      for (const a of ancres) {
+        if (Math.abs(a - v) < Math.abs(d)) { d = a - v; delta = a - v; }
+      }
+    }
+    return delta;
+  };
+  const dx = meilleur([boite.x, boite.x + boite.l, boite.x + boite.l / 2], xs);
+  const dy = meilleur([boite.y, boite.y + boite.h, boite.y + boite.h / 2], ys);
+  return { ...boite, x: boite.x + dx, y: boite.y + dy };
 }
 
 /** Pages à faire : une par phase (avec les phases « sur toutes les pages »), ou une seule (phases visibles). */
@@ -123,9 +244,27 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
  * Vue du cadre du plan (pour dessiner) : px par m, centre, taille en px. pxParMm : définition du dessin (px / mm de
  * papier). Le centre est celui de la feuille (feuille.centre), sinon le milieu des éléments, sinon des plans.
  */
-export function vueDuCadre(plan, cadre, pxParMm, centre) {
+export function vueDuCadre(plan, cadre, pxParMm, centre, rotation = 0) {
   const echelle = plan.echelle ?? ECHELLE_PAPIER;
-  return { echelle: (pxParMm * 1000) / echelle, estCentre: centre[0], nordCentre: centre[1], largeur: cadre.l * pxParMm, hauteur: cadre.h * pxParMm, rotation: 0 };
+  return { echelle: (pxParMm * 1000) / echelle, estCentre: centre[0], nordCentre: centre[1], largeur: cadre.l * pxParMm, hauteur: cadre.h * pxParMm, rotation };
+}
+
+/** Rotation de la feuille (°) ramenée à −180…180 ; arrondie au centième. */
+export const rotationDeFeuille = (v) => {
+  const n = Number(String(v ?? 0).replace(',', '.'));
+  if (!Number.isFinite(n)) return 0;
+  return Math.round((((n + 180) % 360 + 360) % 360 - 180) * 100) / 100;
+};
+
+/**
+ * Rotation de la feuille (0.332.0) qui met une ligne du plan à l'HORIZONTALE (ou à la VERTICALE) : « angle » = angle de la ligne
+ * sur le terrain (°, depuis l'Est, sens inverse des aiguilles, comme `angleDeLaLigne`). La rotation est la direction du terrain
+ * montrée en haut de la feuille (azimut, voir plan/vue.js) ; on garde le plan « à l'endroit » (de −90° à 90°).
+ */
+export function rotationPourAligner(angle, vertical = false) {
+  const base = vertical ? 90 - angle : -angle;
+  const r = ((((base + 90) % 180) + 180) % 180) - 90;
+  return Math.round(r * 100) / 100;
 }
 
 /** Centre de départ de la feuille : milieu des éléments du plan (ou des plans du projet, ou null). */
@@ -150,7 +289,7 @@ export function textesCartouche(cartouche, k, champs) {
   const t = (texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: String(texte ?? ''), x, y: yy, taille: taille * k, gras, couleur });
   const xm = x0 + (cartouche.x + cartouche.l - x0) / 2;
   return [
-    t(champs.affaire, x0, y(0.15), 8, true),
+    t(champs.affaire, x0, y(0.15), 8, true), // 0.329.0 : « affaire - désignation » (modifiable), sur une seule ligne
     t(champs.projet, x0, y(0.27), 6.5),
     t(champs.titre, x0, y(0.41), 9.5, true),
     t(`Indice ${champs.indice}`, x0, y(0.54), 8, true), // 0.297.0 : l'indice sous le numéro et le nom du plan

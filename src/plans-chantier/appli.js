@@ -10,10 +10,13 @@
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
 import { habillerPage } from '../navigation/cadre-page.js';
+import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
 import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroche.js';
+import { deplacer, versTerrain } from '../plan/vue.js';
+import { MAX_DETAILS, FONDS_DETAIL, COULEURS_BORD, ECHELLES_DETAIL, nouveauDetail, redimensionnerBoite, poigneesDeBoite, poigneeSousLePoint } from '../topo/details-feuille.js';
 import {
   GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
   deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
@@ -40,9 +43,9 @@ import { ouvrirModelesGrues } from './modeles-grues.js';
 import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
+import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { plansDeLaFeuille, reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -219,6 +222,7 @@ export function ouvrirPlansChantier({
   }
   function enregistrer() {
     plan().modifieLe = new Date().toISOString();
+    synchroniserPresentation(plan()); // 0.330.0 : la présentation choisie reprend les réglages de la feuille (toute seule)
     modifie();
   }
   function annuler() {
@@ -533,7 +537,21 @@ export function ouvrirPlansChantier({
             etat.glisse = { type: 'recourber', numero: arcPris.numero };
             return true;
           }
+          // 0.328.0 : la poignée ronde au milieu de la ligne de cote : glisser = éloigner / rapprocher la ligne de cote.
+          const hc = poigneeDecalageCote(o);
+          if (hc && Math.hypot(p[0] - hc[0], p[1] - hc[1]) <= tol * 1.4) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'decalage-cote' };
+            return true;
+          }
           let i = sommetSousLePoint(o, p, tol);
+          // 0.328.0 : angle d'un RECTANGLE, ou point nord / ouest / sud d'un ROND : on déplace toute la forme en la prenant par ce point
+          // (le point pris suit la souris et s'accroche, comme pour un symbole).
+          if (i >= 0 && (estRectangle(o) || (o.cercle && i >= 2))) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'coin', ref: [...poigneesDe(o)[i]] };
+            return true;
+          }
           // 0.299.0 : le petit « + » au milieu d'un côté : glisser = un nouveau point qui suit la souris.
           const m = i < 0 ? milieuSousLePoint(o, p, tol) : -1;
           if (m >= 0) {
@@ -560,6 +578,15 @@ export function ouvrirPlansChantier({
           if (etat.glisse?.type === 'rotation') {
             o.rotation = rotationVers(o, point);
             return majEtat();
+          }
+          if (etat.glisse?.type === 'decalage-cote') {
+            o.decalage = decalageCoteDepuis(o, point);
+            return;
+          }
+          if (etat.glisse?.type === 'coin') {
+            deplacerObjet(o, point[0] - etat.glisse.ref[0], point[1] - etat.glisse.ref[1]);
+            etat.glisse.ref = [...point];
+            return;
           }
           if (estPose(o)) {
             // Le point saisi suit la souris (et s'accroche) : comme « Déplacer » d'AutoCAD avec un point de base.
@@ -1054,9 +1081,68 @@ export function ouvrirPlansChantier({
 
   let feuille = null; // { canvas, page (rang), observateur }
 
-  function htmlFeuille() {
+  /** Bande du bas de l'onglet Feuille (0.330.0) : présentations (liste, enregistrer, dupliquer, renommer, supprimer), format, orientation, échelle, PDF. */
+  function htmlBandeFeuille() {
+    const p = plan();
+    if (!p) return '';
+    const r = reglagesFeuille(p);
+    const liste = presentationsDe(p);
+    const active = presentationActive(p);
+    const options = (l, v) => l.map(([c, t]) => `<option value="${c}" ${c === v ? 'selected' : ''}>${t}</option>`).join('');
+    const bouton = (attrs, icone, titre, court, desactive = false) => `<button type="button" class="outil-ruban" ${attrs} ${desactive ? 'disabled' : ''} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
     return `
-      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. L'échelle est celle du plan (1:${plan().echelle ?? ECHELLE_PAPIER}).</p>
+      <div class="groupe-ruban" role="group" aria-label="Présentation">
+        <label class="champ-bande" title="Présentation : les réglages de la feuille gardés sous un nom (se mettent à jour toutes seules)"><span>Présentation</span>
+          <select data-presentation="choisir" aria-label="Présentation"><option value="">— réglages libres —</option>${liste.map((x) => `<option value="${echapper(x.id)}" ${x.id === active?.id ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>
+        ${bouton('data-action="pres-nouvelle"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages actuels comme nouvelle présentation', 'Enreg.')}
+        ${bouton('data-action="pres-dupliquer"', '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M4 16V5A1 1 0 0 1 5 4H16"/>', 'Dupliquer la présentation choisie', 'Dupliquer', !active)}
+        ${bouton('data-action="pres-renommer"', '<path d="M4 20H8L19 9L15 5L4 16Z"/>', 'Renommer la présentation choisie', 'Renommer', !active)}
+        ${bouton('data-action="pres-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer la présentation choisie', 'Supprimer', !active)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Feuille">
+        <label class="champ-bande"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
+        <label class="champ-bande"><span>Sens</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
+        <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
+        <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
+        <label class="champ-bande" title="Coin du cartouche (la légende le suit ; nord, barre d'échelle et situation se replacent pour ne pas le recouvrir)"><span>Cartouche</span><select data-feuille="cartouche">${options(COINS_CARTOUCHE, r.cartouche)}</select></label>
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Aperçu">
+        ${bouton('data-action="feuille-zoom-moins"', '<circle cx="11" cy="11" r="6"/><path d="M8 11H14M16 16L20 20"/>', 'Zoom arrière sur l\'aperçu (molette aussi)', 'Zoom −')}
+        <span class="valeur-zoom" title="Zoom de l'aperçu (ne change pas ce qui est imprimé)">${Math.round((etat.feuilleZoom ?? 1) * 100)} %</span>
+        ${bouton('data-action="feuille-zoom-plus"', '<circle cx="11" cy="11" r="6"/><path d="M8 11H14M11 8V14M16 16L20 20"/>', 'Zoom avant sur l\'aperçu (molette aussi)', 'Zoom +')}
+        ${bouton('data-action="feuille-zoom-ajuster"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Toute la feuille dans la vue', 'Ajuster')}
+        ${bouton(`data-action="feuille-deplacer-plan" aria-pressed="${etat.feuilleMode === 'plan'}"`, '<path d="M12 3V21M3 12H21M12 3L9.5 6M12 3L14.5 6M12 21L9.5 18M12 21L14.5 18M3 12L6 9.5M3 12L6 14.5M21 12L18 9.5M21 12L18 14.5"/>', 'Déplacer le plan sur la feuille (sinon glisser déplace seulement la vue ; nord, barre d\'échelle et situation se glissent directement)', 'Déplacer le plan', false).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'plan' ? ' actif' : ''}"`)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Rotation">
+        <label class="champ-bande" title="Rotation du plan sur la feuille, en degrés (le nord tourne avec lui)"><span>Rotation °</span><input type="text" inputmode="decimal" value="${r.rotation}" data-feuille="rotation" size="5" autocomplete="off"></label>
+        ${bouton(`data-action="feuille-aligner-h" aria-pressed="${etat.feuilleMode === 'aligner-h'}"`, '<path d="M3 12H21M3 8V16M21 8V16"/>', 'Aligner : cliquez une ligne du plan, elle devient horizontale', 'Aligner ―').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'aligner-h' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-aligner-v" aria-pressed="${etat.feuilleMode === 'aligner-v'}"`, '<path d="M12 3V21M8 3H16M8 21H16"/>', 'Aligner : cliquez une ligne du plan, elle devient verticale', 'Aligner |').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'aligner-v' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-pivoter" aria-pressed="${etat.feuilleMode === 'pivoter'}"`, '<path d="M20 12A8 8 0 1 1 15 4.6M20 4V9H15"/>', 'Pivoter à la main : glissez sur la feuille (crans de 5°)', 'Pivoter').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'pivoter' ? ' actif' : ''}"`)}
+        ${bouton('data-action="feuille-nord-haut"', '<path d="M12 4V16M8 8L12 4L16 8M6 20H18"/>', 'Nord en haut (rotation 0°)', 'Nord en haut', !r.rotation)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Cadres de détail">
+        ${bouton(`data-action="feuille-detail-nouveau" aria-pressed="${etat.feuilleMode === 'detail-nouveau'}"`, '<rect x="3" y="5" width="12" height="10" rx="1"/><rect x="11" y="11" width="10" height="8" rx="1" fill="#ffffff"/><path d="M17 3V7M15 5H19"/>', `Ajouter un cadre de détail (${MAX_DETAILS} au plus) : cliquez ensuite sur le plan, à l'endroit à montrer`, 'Détail', r.details.length >= MAX_DETAILS).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-nouveau' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-detail-centre" aria-pressed="${etat.feuilleMode === 'detail-centre'}"`, '<circle cx="12" cy="12" r="3"/><path d="M12 3V7M12 17V21M3 12H7M17 12H21"/>', 'Changer l\'endroit montré par le cadre de détail choisi : cliquez sur le plan', 'Lieu', !etat.detailChoisi).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-centre' ? ' actif' : ''}"`)}
+        ${bouton('data-action="feuille-detail-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le cadre de détail choisi', 'Suppr. détail', !etat.detailChoisi)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Sortie">
+        ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer le plan sur les éléments', 'Recentrer')}
+        ${bouton('data-action="feuille-positions-reinit"', '<path d="M5 12A7 7 0 1 1 8 17.5M5 12V7M5 12H10"/>', 'Remettre le nord, la barre d\'échelle et la situation à leur place de départ', 'Replacer')}
+        <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>
+      </div>`;
+  }
+
+  /** Remet la bande du bas de l'onglet Feuille à jour (liste des présentations, valeurs). */
+  function majBandeFeuille() {
+    if (etat.ecran !== 'feuille') return;
+    bandeDessin = htmlBandeFeuille();
+    page.majBandePage?.();
+  }
+
+  function htmlFeuille() {
+    bandeDessin = htmlBandeFeuille();
+    return `
+      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. Présentation, format, échelle et PDF : bande du bas.</p>
       <div class="travail-chantier">
         <div class="vue-calage vue-feuille">
           <div class="toile-feuille" data-feuille><canvas></canvas></div>
@@ -1081,7 +1167,45 @@ export function ouvrirPlansChantier({
     coupe: coupePourFeuille,
     plan: plan(), plans: plansFeuille(), plansPar: (idPhase) => plansFeuille(idPhase), points: pointsMontres(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
     bib: bib(), projet: leProjet(), auteur: auteur(), centre: centreDeDepart(plan(), plansFond()),
+    plansTous: plansAvecCalques(plans(), plan()?.fond), // 0.333.0 : pour les cadres de détail (plans au choix)
   });
+
+  /** Modifie la liste des cadres de détail de la feuille (copies complétées) : fn(liste). */
+  function modifierDetails(fn) {
+    const p = plan();
+    const liste = reglagesFeuille(p).details.map((d) => ({ ...d, bord: { ...d.bord } }));
+    fn(liste);
+    p.feuille = { ...(p.feuille ?? {}), details: liste };
+  }
+  const detailChoisi = () => reglagesFeuille(plan()).details.find((d) => d.id === etat.detailChoisi) ?? null;
+  /** Cadre de détail sous le point (mm), le dernier dessiné (le plus haut) d'abord. */
+  const detailSous = ([x, y]) => {
+    const bs = feuille.mise?.boites ?? {};
+    return [...reglagesFeuille(plan()).details].reverse().find((d) => {
+      const b = bs[`det:${d.id}`];
+      return b && x >= b.x && x <= b.x + b.l && y >= b.y && y <= b.y + b.h;
+    }) ?? null;
+  };
+  /** Accroche d'une valeur (x ou y, mm) au cadre et aux bords des autres éléments, à « tolerance » mm près. */
+  const accrocherValeur = (v, axe, sauf, tolerance) => {
+    const mise = feuille.mise;
+    const ancres = axe === 'x' ? [mise.cadre.x, mise.cadre.x + mise.cadre.l] : [mise.cadre.y, mise.cadre.y + mise.cadre.h];
+    for (const o of [...mise.fixes, ...Object.entries(mise.boites).filter(([n, b]) => n !== sauf && b).map(([, b]) => b)]) {
+      if (axe === 'x') ancres.push(o.x, o.x + o.l, o.x + o.l / 2); else ancres.push(o.y, o.y + o.h, o.y + o.h / 2);
+    }
+    return ancres.reduce((m, a) => (Math.abs(a - v) < Math.abs(m - v) && Math.abs(a - v) <= tolerance ? a : m), v);
+  };
+  /** Enregistre la boîte d'un cadre de détail (place et taille en fractions : suit un changement de format). */
+  function ecrireBoiteDetail(id, boite) {
+    const mise = feuille.mise;
+    modifierDetails((liste) => {
+      const d = liste.find((x) => x.id === id);
+      if (!d) return;
+      d.pos = positionDeBoite(mise, boite);
+      d.fw = Math.round((boite.l / mise.cadre.l) * 10000) / 10000;
+      d.fh = Math.round((boite.h / mise.cadre.h) * 10000) / 10000;
+    });
+  }
 
   function monterFeuille() {
     const toile = page.querySelector('[data-feuille]');
@@ -1089,17 +1213,114 @@ export function ouvrirPlansChantier({
     feuille = { canvas, page: 0, geste: null };
     feuille.observateur = new ResizeObserver(() => dessinerApercu());
     feuille.observateur.observe(toile);
+
+    /** Point (mm de papier) sous le doigt. */
+    const enMm = (ev) => {
+      const r = canvas.getBoundingClientRect();
+      return [((ev.clientX - r.left) / r.width) * feuille.mise.page.largeur, ((ev.clientY - r.top) / r.height) * feuille.mise.page.hauteur];
+    };
+    /** Élément déplaçable (nord, barre d'échelle, situation) sous le point, ou null. */
+    const elementSous = ([x, y]) => {
+      const bs = feuille.mise?.boites ?? {};
+      for (const nom of ['situation', 'nord', 'barre']) {
+        const b = bs[nom];
+        if (b && x >= b.x && x <= b.x + b.l && y >= b.y && y <= b.y + b.h) return nom;
+      }
+      return null;
+    };
+
     canvas.addEventListener('pointerdown', (ev) => {
-      if (!plan()) return;
+      if (!plan() || !feuille.mise) return;
       canvas.setPointerCapture(ev.pointerId);
-      const r = reglagesFeuille(plan());
-      feuille.geste = { x: ev.clientX, y: ev.clientY, centre: r.centre ?? donneesFeuille().centre ?? [0, 0], change: false };
+      const mode = etat.feuilleMode ?? 'vue';
+      // 0.331.0 : par défaut, glisser = déplacer la VUE (le plan ne bouge pas sur la feuille) ; les boutons de la bande changent le mode.
+      if (mode === 'plan') {
+        // dans un cadre de détail : on décale le CONTENU de ce détail ; ailleurs : le plan principal
+        const det = detailSous(enMm(ev));
+        const B = det && feuille.mise.boites[`det:${det.id}`];
+        if (det && det.centre && B) {
+          const vueD = { echelle: (feuille.pxParMm * 1000) / det.echelle, estCentre: det.centre[0], nordCentre: det.centre[1], largeur: B.l * feuille.pxParMm, hauteur: B.h * feuille.pxParMm, rotation: reglagesFeuille(plan()).rotation };
+          etat.detailChoisi = det.id;
+          feuille.geste = { type: 'detail-contenu', id: det.id, x: ev.clientX, y: ev.clientY, vue0: vueD, change: false };
+          return;
+        }
+        feuille.geste = { type: 'plan', x: ev.clientX, y: ev.clientY, vue0: { ...feuille.vue }, change: false };
+        return;
+      }
+      if (mode === 'detail-nouveau' || mode === 'detail-centre') {
+        const mm = enMm(ev);
+        const mise = feuille.mise;
+        if (mm[0] < mise.cadre.x || mm[0] > mise.cadre.x + mise.cadre.l || mm[1] < mise.cadre.y || mm[1] > mise.cadre.y + mise.cadre.h || detailSous(mm)) {
+          message('Cliquez sur le plan principal (pas dans un cadre de détail).', 3000);
+          return;
+        }
+        const t = versTerrain((mm[0] - mise.cadre.x) * feuille.pxParMm, (mm[1] - mise.cadre.y) * feuille.pxParMm, feuille.vue);
+        if (!avantChangement()) return;
+        if (mode === 'detail-nouveau') {
+          const nouveau = nouveauDetail(reglagesFeuille(plan()).details, [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100], plan().echelle ?? ECHELLE_PAPIER);
+          if (!nouveau) { message(`${MAX_DETAILS} cadres de détail au plus.`, 3000); return; }
+          modifierDetails((liste) => liste.push(nouveau));
+          etat.detailChoisi = nouveau.id;
+        } else {
+          modifierDetails((liste) => { const d = liste.find((x) => x.id === etat.detailChoisi); if (d) d.centre = [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100]; });
+        }
+        etat.feuilleMode = 'vue';
+        enregistrer();
+        majFeuille();
+        return;
+      }
+      if (mode === 'pivoter') {
+        // 0.332.0 : on tourne le plan autour du centre du cadre ; la rotation suit le doigt par crans de 5°.
+        const r = canvas.getBoundingClientRect();
+        const c = feuille.mise.cadre;
+        const cx = r.left + ((c.x + c.l / 2) / feuille.mise.page.largeur) * r.width;
+        const cy = r.top + ((c.y + c.h / 2) / feuille.mise.page.hauteur) * r.height;
+        feuille.geste = { type: 'pivot', cx, cy, a0: Math.atan2(ev.clientY - cy, ev.clientX - cx), r0: reglagesFeuille(plan()).rotation, change: false, x: ev.clientX, y: ev.clientY };
+        return;
+      }
+      if (mode.startsWith('aligner')) {
+        aligner(enMm(ev), mode === 'aligner-v');
+        feuille.geste = null;
+        return;
+      }
+      // Cadres de détail : poignée du cadre choisi = changer sa taille ; sur un cadre = le choisir et le déplacer
+      const mm = enMm(ev);
+      const tolMm = 10 / feuille.pxParMm;
+      const choisi = detailChoisi();
+      const Bc = choisi && feuille.mise.boites[`det:${choisi.id}`];
+      const poignee = Bc ? poigneeSousLePoint(Bc, mm, tolMm) : null;
+      if (poignee) {
+        feuille.geste = { type: 'detail-taille', id: choisi.id, poignee, rond: choisi.forme === 'rond', x: ev.clientX, y: ev.clientY, boite: { ...Bc }, change: false };
+        return;
+      }
+      const det = detailSous(mm);
+      if (det) {
+        if (etat.detailChoisi !== det.id) { etat.detailChoisi = det.id; majFeuille(); }
+        feuille.geste = { type: 'detail-deplacer', id: det.id, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[`det:${det.id}`] }, change: false };
+        return;
+      }
+      if (etat.detailChoisi) { etat.detailChoisi = null; majFeuille(); }
+      const nom = elementSous(mm);
+      if (nom) {
+        feuille.geste = { type: 'element', nom, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[nom] }, change: false };
+        return;
+      }
+      feuille.geste = { type: 'vue', x: ev.clientX, y: ev.clientY, sx: toile.scrollLeft, sy: toile.scrollTop, change: false };
     });
     canvas.addEventListener('pointermove', (ev) => {
       const g = feuille?.geste;
-      if (!g) return;
+      if (!g) {
+        const mode = etat.feuilleMode ?? 'vue';
+        canvas.style.cursor = mode.startsWith('aligner') ? 'crosshair' : mode === 'pivoter' ? 'alias' : mode === 'vue' && feuille.mise && elementSous(enMm(ev)) ? 'move' : '';
+        return;
+      }
       const dx = ev.clientX - g.x;
       const dy = ev.clientY - g.y;
+      if (g.type === 'vue') {
+        toile.scrollLeft = g.sx - dx;
+        toile.scrollTop = g.sy - dy;
+        return;
+      }
       if (!g.change && Math.hypot(dx, dy) < 4) return;
       if (!g.change) {
         if (!avantChangement()) {
@@ -1108,18 +1329,114 @@ export function ouvrirPlansChantier({
         }
         g.change = true;
       }
-      // px d'aperçu → mm de papier → m sur le terrain.
-      const m = (plan().echelle ?? ECHELLE_PAPIER) / 1000 / (feuille.pxParMm || 1);
-      plan().feuille = { ...(plan().feuille ?? {}), centre: [g.centre[0] - dx * m, g.centre[1] + dy * m] };
+      if (g.type === 'element') {
+        // px d'aperçu → mm de papier ; la boîte s'accroche au cadre et aux autres éléments (comme un bloc).
+        const mise = feuille.mise;
+        const mmPx = 1 / (feuille.pxParMm || 1);
+        let b = { ...g.boite, x: g.boite.x + dx * mmPx, y: g.boite.y + dy * mmPx };
+        const autres = [...mise.fixes, ...Object.entries(mise.boites).filter(([n, v]) => n !== g.nom && v).map(([, v]) => v)];
+        b = accrocherBoite(b, autres, mise.cadre, 8 * mmPx);
+        b.x = Math.min(mise.cadre.x + mise.cadre.l - b.l, Math.max(mise.cadre.x, b.x));
+        b.y = Math.min(mise.cadre.y + mise.cadre.h - b.h, Math.max(mise.cadre.y, b.y));
+        const f = plan().feuille ?? {};
+        plan().feuille = { ...f, positions: { ...(f.positions ?? {}), [g.nom]: positionDeBoite(mise, b) } };
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      if (g.type === 'detail-taille' || g.type === 'detail-deplacer') {
+        const mise = feuille.mise;
+        const mmPx = 1 / (feuille.pxParMm || 1);
+        const tol = 8 * mmPx;
+        let b;
+        if (g.type === 'detail-taille') {
+          b = redimensionnerBoite(g.boite, g.poignee, dx * mmPx, dy * mmPx, 25 * mise.k, g.rond, (v, axe) => accrocherValeur(v, axe, `det:${g.id}`, tol));
+        } else {
+          b = { ...g.boite, x: g.boite.x + dx * mmPx, y: g.boite.y + dy * mmPx };
+          const autres = [...mise.fixes, ...Object.entries(mise.boites).filter(([n, v]) => n !== `det:${g.id}` && v).map(([, v]) => v)];
+          b = accrocherBoite(b, autres, mise.cadre, tol);
+        }
+        b.l = Math.min(b.l, mise.cadre.l);
+        b.h = Math.min(b.h, mise.cadre.h);
+        b.x = Math.min(mise.cadre.x + mise.cadre.l - b.l, Math.max(mise.cadre.x, b.x));
+        b.y = Math.min(mise.cadre.y + mise.cadre.h - b.h, Math.max(mise.cadre.y, b.y));
+        ecrireBoiteDetail(g.id, b);
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      if (g.type === 'detail-contenu') {
+        const v = deplacer(g.vue0, dx, dy);
+        modifierDetails((liste) => { const d = liste.find((x) => x.id === g.id); if (d) d.centre = [Math.round(v.estCentre * 100) / 100, Math.round(v.nordCentre * 100) / 100]; });
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      if (g.type === 'pivot') {
+        const delta = ((Math.atan2(ev.clientY - g.cy, ev.clientX - g.cx) - g.a0) * 180) / Math.PI; // sens des aiguilles = positif
+        plan().feuille = { ...(plan().feuille ?? {}), rotation: rotationDeFeuille(Math.round((g.r0 - delta) / 5) * 5) };
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      // glisser le plan : la vue du cadre se décale (la rotation est prise en compte)
+      const v = deplacer(g.vue0, dx, dy);
+      plan().feuille = { ...(plan().feuille ?? {}), centre: [v.estCentre, v.nordCentre] };
       dessinerApercu();
     });
     const fin = () => {
-      if (feuille?.geste?.change) enregistrer();
+      const g = feuille?.geste;
+      if (g?.change) enregistrer();
       if (feuille) feuille.geste = null;
+      if (g?.change && g.type === 'pivot') majBandeFeuille(); // la valeur de la rotation s'affiche
+      if (g?.change && g.type.startsWith('detail')) majPanneauFeuille();
     };
     canvas.addEventListener('pointerup', fin);
     canvas.addEventListener('pointercancel', fin);
+    // Molette = zoom de l'aperçu autour du pointeur.
+    toile.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      zoomerFeuille(ev.deltaY < 0 ? 1.2 : 1 / 1.2, ev.clientX, ev.clientY);
+    }, { passive: false });
     majFeuille();
+  }
+
+  /** Aligner (0.332.0) : le clic sur une ligne du plan (ou d'un élément dessiné) la rend horizontale (ou verticale) sur la feuille. */
+  function aligner([x, y], vertical) {
+    const mise = feuille.mise;
+    const vue = feuille.vue;
+    const t = versTerrain((x - mise.cadre.x) * feuille.pxParMm, (y - mise.cadre.y) * feuille.pxParMm, vue);
+    const tolerance = 10 / vue.echelle;
+    const autres = plan().objets;
+    const lignes = [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(autres), ...sourcesDesPlans(plansFond(), { est: t.est, nord: t.nord }, tolerance).lignes];
+    const angle = angleDeLaLigne(lignes, [t.est, t.nord], tolerance, 0);
+    if (angle === null) return message('Aucune ligne ici : cliquez sur une ligne du plan ou un élément dessiné.', 3500);
+    if (!avantChangement()) return;
+    plan().feuille = { ...(plan().feuille ?? {}), rotation: rotationPourAligner(angle, vertical) };
+    etat.feuilleMode = 'vue';
+    enregistrer();
+    message(`Plan tourné de ${rotationPourAligner(angle, vertical)}° : la ligne est ${vertical ? 'verticale' : 'horizontale'}.`, 4000, { ok: true });
+    majFeuille();
+  }
+
+  /** Zoom de l'aperçu de la feuille (ne change pas ce qui est imprimé) : facteur, autour d'un point de l'écran (sinon le centre). */
+  function zoomerFeuille(facteur, cx = null, cy = null) {
+    if (!feuille) return;
+    const toile = page.querySelector('[data-feuille]');
+    const c = feuille.canvas;
+    const t = toile.getBoundingClientRect();
+    const x = cx ?? t.left + t.width / 2;
+    const y = cy ?? t.top + t.height / 2;
+    const avant = c.getBoundingClientRect();
+    const rx = (x - avant.left) / Math.max(1, avant.width);
+    const ry = (y - avant.top) / Math.max(1, avant.height);
+    const nouveau = facteur === 0 ? 1 : (etat.feuilleZoom ?? 1) * facteur;
+    etat.feuilleZoom = Math.min(8, Math.max(1, Math.round(nouveau * 100) / 100));
+    dessinerApercu(); // règle tout de suite la taille de la toile
+    const apres = c.getBoundingClientRect();
+    toile.scrollLeft += apres.left + rx * apres.width - x;
+    toile.scrollTop += apres.top + ry * apres.height - y;
+    majBandeFeuille();
   }
 
   function majFeuille() {
@@ -1138,7 +1455,11 @@ export function ouvrirPlansChantier({
     const r = reglagesFeuille(plan());
     const mise = miseEnPageFeuille(r.format, r.orientation, 0);
     const densite = window.devicePixelRatio || 1;
-    const pxParMm = Math.min((toile.clientWidth - 16) / mise.page.largeur, (toile.clientHeight - 16) / mise.page.hauteur);
+    const ajuste = Math.min((toile.clientWidth - 16) / mise.page.largeur, (toile.clientHeight - 16) / mise.page.hauteur);
+    // 0.331.0 : zoom de l'aperçu (jamais au-delà d'environ 5000 px de côté : la toile reste dessinable)
+    const plafond = 5000 / (Math.max(mise.page.largeur, mise.page.hauteur) * ajuste * densite);
+    etat.feuilleZoom = Math.min(Math.max(1, etat.feuilleZoom ?? 1), Math.max(1, plafond), 8);
+    const pxParMm = ajuste * etat.feuilleZoom;
     feuille.pxParMm = pxParMm;
     const c = feuille.canvas;
     c.style.width = `${Math.round(mise.page.largeur * pxParMm)}px`;
@@ -1155,6 +1476,8 @@ export function ouvrirPlansChantier({
     try {
       const donnees = donneesFeuille();
       prep = preparerPage(donnees, pages[feuille.page], pxParMm);
+      feuille.mise = prep.mise; // pour le toucher (nord, barre d'échelle, situation)
+      feuille.vue = prep.vue;
       const logo = await chargerImage(adresseLogo(r.logo));
       if (!feuille || feuille.canvas !== c || feuille.numero !== numero) return; // un dessin plus récent a pris la suite
       dessinerPage(ctx, donnees, prep, pxParMm, {
@@ -1171,7 +1494,26 @@ export function ouvrirPlansChantier({
     }
     c.width = hors.width;
     c.height = hors.height;
-    c.getContext('2d').drawImage(hors, 0, 0);
+    const cc = c.getContext('2d');
+    cc.drawImage(hors, 0, 0);
+    // 0.333.0 : le cadre de détail choisi montre ses 8 poignées (pas imprimées : dessinées seulement sur l'aperçu)
+    const choisiD = reglagesFeuille(plan()).details.find((d) => d.id === etat.detailChoisi);
+    const BD = choisiD && prep?.mise?.boites?.[`det:${choisiD.id}`];
+    if (BD) {
+      const k = pxParMm * densite;
+      cc.save();
+      cc.strokeStyle = '#2563eb';
+      cc.fillStyle = '#ffffff';
+      cc.lineWidth = Math.max(1.5, densite * 1.5);
+      cc.setLineDash([6 * densite, 4 * densite]);
+      cc.strokeRect(BD.x * k, BD.y * k, BD.l * k, BD.h * k);
+      cc.setLineDash([]);
+      for (const q of poigneesDeBoite(BD)) {
+        cc.fillRect(q.x * k - 5 * densite, q.y * k - 5 * densite, 10 * densite, 10 * densite);
+        cc.strokeRect(q.x * k - 5 * densite, q.y * k - 5 * densite, 10 * densite, 10 * densite);
+      }
+      cc.restore();
+    }
     const etatZone = page.querySelector('[data-zone="etat-feuille"]');
     if (etatZone) {
       etatZone.innerHTML = `${pages.length > 1 ? `<button type="button" class="bouton-secondaire" data-page-feuille="-1" ${feuille.page ? '' : 'disabled'}>◀</button>
@@ -1181,6 +1523,27 @@ export function ouvrirPlansChantier({
     }
   }
 
+  /** Panneau des cadres de détail : liste, puis les réglages de celui qui est choisi. */
+  function htmlPanneauDetails(r, p) {
+    const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
+    if (!r.details.length) return `<p class="aide-calage">Aucun. « Détail » (bande du bas) puis un clic sur le plan : un cadre montre cet endroit à sa propre échelle (${MAX_DETAILS} au plus).</p>`;
+    const d = r.details.find((x) => x.id === etat.detailChoisi);
+    const liste = r.details.map((x) => `<button type="button" class="bouton-secondaire petit ${x.id === etat.detailChoisi ? 'actif' : ''}" data-detail-choisir="${echapper(x.id)}">${echapper(x.lettre)} · ${echapper(x.titre)}</button>`).join(' ');
+    if (!d) return `<p class="aide-calage">Touchez un cadre sur la feuille (ou ici) pour le régler.</p><div class="actions-chantier">${liste}</div>`;
+    return `<div class="actions-chantier">${liste}</div>
+      <label class="champ-calage"><span>Titre</span><input type="text" maxlength="60" value="${echapper(d.titre)}" data-detail="titre"></label>
+      <label class="champ-calage"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-detail" value="${d.echelle}" data-detail="echelle" size="6" autocomplete="off"></label>
+      <datalist id="echelles-detail">${ECHELLES_DETAIL.map((x) => `<option value="${x}"></option>`).join('')}</datalist>
+      <label class="champ-calage"><span>Forme</span><select data-detail="forme">${options([['rectangle', 'Rectangle'], ['rond', 'Rond (loupe)']], d.forme)}</select></label>
+      <label class="champ-calage"><span>Fond</span><select data-detail="fond">${options(FONDS_DETAIL, d.fond)}</select></label>
+      <label class="champ-calage"><span>Bord : épaisseur (mm)</span><input type="number" min="0.1" max="3" step="0.1" value="${d.bord.epaisseur}" data-detail="epaisseur"></label>
+      <label class="champ-calage"><span>Bord : couleur</span><select data-detail="couleur">${options(COULEURS_BORD, d.bord.couleur)}</select></label>
+      <label class="champ-calage"><span>Bord : trait</span><select data-detail="trait">${options([['continu', 'Continu'], ['tirets', 'Tirets']], d.bord.trait)}</select></label>
+      <label class="case-chantier"><input type="checkbox" data-detail="repere" ${d.repere ? 'checked' : ''}> Repère « ${echapper(d.lettre)} » sur le plan principal</label>
+      <button type="button" class="lien-calage" data-action="detail-plans">Plans montrés dans ce cadre…</button>${d.plans ? ' <button type="button" class="lien-calage" data-action="detail-plans-comme">comme la feuille</button>' : ''}
+      <p class="aide-calage">Glisser le cadre = le déplacer ; ses poignées = changer sa taille (accroches) ; mode « Déplacer le plan » dans le cadre = décaler son contenu.</p>`;
+  }
+
   function majPanneauFeuille() {
     const zone = page.querySelector('[data-zone="panneau-feuille"]');
     if (!zone) return;
@@ -1188,12 +1551,9 @@ export function ouvrirPlansChantier({
     const r = reglagesFeuille(p);
     const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
     const nomPdf = `${nomFichier()}.pdf`;
+    majBandeFeuille();
     zone.innerHTML = `
       <h3>Feuille ${bulle('feuilleChantier')}</h3>
-      <label class="champ-calage"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
-      <label class="champ-calage"><span>Orientation</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
-      <label class="champ-calage"><span>Échelle 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle"></label>
-      <button type="button" class="lien-calage" data-action="feuille-centrer">Recentrer sur les éléments</button>
       <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
@@ -1213,7 +1573,10 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-fond="cadastre" ${p.fond.cadastre ? 'checked' : ''}> Cadastre</label>
       <label class="case-chantier"><input type="checkbox" data-fond="surfaces" ${p.fond.surfaces !== false ? 'checked' : ''}> Surfaces du projet</label>
       <label class="case-chantier"><input type="checkbox" data-fond="points" ${p.fond.points !== false ? 'checked' : ''}> Points levés</label>
+      <h3>Cadres de détail</h3>
+      ${htmlPanneauDetails(r, p)}
       <h3>Cartouche</h3>
+      <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(leProjet().cartouche, leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
       <label class="champ-calage"><span>Date (vide = du jour)</span><input type="text" maxlength="20" value="${echapper(r.date)}" placeholder="${new Date().toLocaleDateString('fr-CH')}" data-feuille="date"></label>
@@ -1227,11 +1590,13 @@ export function ouvrirPlansChantier({
       ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
       <label class="case-chantier"><input type="checkbox" data-situation="auto" ${r.situation.auto ? 'checked' : ''}> Échelle automatique (la zone du plan reste bien visible)</label>
       ${r.situation.auto ? '' : `<label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>`}
-      <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>` : ''}
+      <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>
+      <label class="champ-calage" title="La carte s'efface vers le blanc (le plan dessous ne se voit jamais) : le rectangle rouge ressort"><span>Transparence de la carte : <b data-valeur-de="sit-transparence">${r.situation.transparence} %</b></span><input type="range" min="0" max="90" step="5" value="${r.situation.transparence}" data-situation="transparence"></label>
+      <label class="champ-calage"><span>Épaisseur du rectangle rouge (mm)</span><input type="number" min="0.2" max="3" step="0.1" value="${r.situation.epaisseur}" data-situation="epaisseur"></label>` : ''}
       <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
       ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}
       <h3>Enregistrer</h3>
-      <div class="actions-chantier"><button type="button" class="bouton" data-action="feuille-pdf">PDF</button><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div>
+      <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div><p class="aide-calage">Le PDF et le cadrage sont dans la bande du bas.</p>
       <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomPdf)}</span></p>`;
   }
 
@@ -1268,6 +1633,91 @@ export function ouvrirPlansChantier({
       enregistrer();
       majPanneauFeuille();
       return dessinerApercu();
+    }
+    if (b.dataset.action === 'pres-nouvelle') {
+      const nom = await demanderTexte({ titre: 'Nouvelle présentation', valeur: `Présentation ${presentationsDe(p).length + 1}` });
+      if (nom === null || !avantChangement()) return;
+      creerPresentation(p, nom);
+      enregistrer();
+      message(`Présentation « ${presentationActive(p).nom} » enregistrée : elle se met à jour toute seule.`, 4000, { ok: true });
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-dupliquer') {
+      if (!presentationActive(p) || !avantChangement()) return;
+      const c = dupliquerPresentation(p);
+      enregistrer();
+      message(`« ${c.nom} » créée et choisie : modifiez-la, l'originale reste comme elle était.`, 5000, { ok: true });
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-renommer') {
+      const a = presentationActive(p);
+      if (!a) return;
+      const nom = await demanderTexte({ titre: 'Renommer la présentation', valeur: a.nom });
+      if (nom === null || !avantChangement()) return;
+      renommerPresentation(p, a.id, nom);
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-supprimer') {
+      const a = presentationActive(p);
+      if (!a) return;
+      const choix = await demanderChoix({ titre: `Supprimer « ${a.nom} » ?`, texte: 'Les réglages actuels de la feuille restent comme ils sont ; seule la présentation enregistrée disparaît.', boutons: [{ cle: 'non', texte: 'Garder', principal: true }, { cle: 'oui', texte: 'Supprimer' }] });
+      if (choix !== 'oui' || !avantChangement()) return;
+      supprimerPresentation(p, a.id);
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'feuille-zoom-plus') return zoomerFeuille(1.25);
+    if (b.dataset.action === 'feuille-zoom-moins') return zoomerFeuille(0.8);
+    if (b.dataset.action === 'feuille-zoom-ajuster') return zoomerFeuille(0);
+    const modes = { 'feuille-deplacer-plan': ['plan', 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.'], 'feuille-aligner-h': ['aligner-h', 'Aligner : cliquez une ligne du plan, elle deviendra horizontale.'], 'feuille-aligner-v': ['aligner-v', 'Aligner : cliquez une ligne du plan, elle deviendra verticale.'], 'feuille-pivoter': ['pivoter', 'Pivoter : glissez autour du centre de la feuille (crans de 5°).'],
+      'feuille-detail-nouveau': ['detail-nouveau', 'Cliquez sur le plan, à l\'endroit que le cadre de détail doit montrer.'], 'feuille-detail-centre': ['detail-centre', 'Cliquez sur le plan : le cadre de détail choisi montrera cet endroit.'] };
+    if (modes[b.dataset.action]) {
+      const [mode, texte] = modes[b.dataset.action];
+      etat.feuilleMode = etat.feuilleMode === mode ? 'vue' : mode;
+      message(etat.feuilleMode === 'vue' ? 'Glisser déplace maintenant la vue ; le plan reste en place.' : texte, 3500);
+      return majBandeFeuille();
+    }
+    if (b.dataset.action === 'feuille-detail-supprimer') {
+      if (!etat.detailChoisi || !avantChangement()) return;
+      modifierDetails((liste) => { const i = liste.findIndex((x) => x.id === etat.detailChoisi); if (i >= 0) liste.splice(i, 1); });
+      etat.detailChoisi = null;
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.detailChoisir) {
+      etat.detailChoisi = b.dataset.detailChoisir === etat.detailChoisi ? null : b.dataset.detailChoisir;
+      return majFeuille();
+    }
+    if (b.dataset.action === 'detail-plans') {
+      const d = detailChoisi();
+      if (!d) return;
+      const tous = plans();
+      const coches = await demanderCases({ titre: `Plans montrés dans le cadre « ${d.titre} »`, options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: d.plans ? d.plans.includes(x.id) : plansFeuille().some((y) => y.id === x.id) })) });
+      if (!coches || !avantChangement()) return;
+      modifierDetails((liste) => { liste.find((x) => x.id === d.id).plans = coches; });
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'detail-plans-comme') {
+      if (!detailChoisi() || !avantChangement()) return;
+      modifierDetails((liste) => { liste.find((x) => x.id === etat.detailChoisi).plans = null; });
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'feuille-nord-haut') {
+      if (!avantChangement()) return;
+      p.feuille = { ...(p.feuille ?? {}), rotation: 0 };
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'feuille-positions-reinit') {
+      if (!avantChangement()) return;
+      const f = { ...(p.feuille ?? {}) };
+      delete f.positions;
+      p.feuille = f;
+      enregistrer();
+      return majFeuille();
     }
     if (b.dataset.action === 'feuille-logo') return choisirLogo(p);
     if (b.dataset.action === 'feuille-pdf') {
@@ -1375,6 +1825,30 @@ export function ouvrirPlansChantier({
       etat.reglageEnCours = false;
       return;
     }
+    if (c.dataset.detail) {
+      const champ = c.dataset.detail;
+      if (!detailChoisi() || !avantChangement()) return majPanneauFeuille();
+      const v = c.type === 'checkbox' ? c.checked : c.value;
+      modifierDetails((liste) => {
+        const d = liste.find((x) => x.id === etat.detailChoisi);
+        if (!d) return;
+        if (champ === 'echelle') { const n = Number(String(v).replace(/^\s*1\s*:\s*/, '').replace(',', '.')); if (Number.isFinite(n) && n >= 1 && n <= 10000) d.echelle = n; }
+        else if (champ === 'epaisseur') { const n = Number(String(v).replace(',', '.')); if (Number.isFinite(n)) d.bord.epaisseur = Math.min(3, Math.max(0.1, n)); }
+        else if (champ === 'couleur' || champ === 'trait') d.bord[champ] = v;
+        else if (champ === 'forme') { d.forme = v === 'rond' ? 'rond' : 'rectangle'; if (d.forme === 'rond') { const t = Math.min(d.fw * feuille.mise.cadre.l, d.fh * feuille.mise.cadre.h); d.fw = t / feuille.mise.cadre.l; d.fh = t / feuille.mise.cadre.h; } }
+        else d[champ] = v;
+      });
+      enregistrer();
+      return majFeuille();
+    }
+    if (c.dataset.presentation === 'choisir') {
+      if (!avantChangement()) return majBandeFeuille();
+      if (c.value) appliquerPresentation(p, c.value);
+      else quitterPresentation(p);
+      enregistrer();
+      majFeuille();
+      return vue?.redessiner();
+    }
     if (c.dataset.situation) {
       if (!avantChangement()) return majPanneauFeuille();
       const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? nombreDe(c) : c.value;
@@ -1392,8 +1866,8 @@ export function ouvrirPlansChantier({
     else if (c.dataset.fond) p.fond[cle] = c.checked;
     else if (c.dataset.feuilleCase) p.feuille = { ...(p.feuille ?? {}), [cle]: c.checked };
     else if (cle === 'echelle') {
-      const v = nombreDe(c);
-      if (v === null) return majPanneauFeuille();
+      const v = Number(String(c.value).replace(/^\s*1\s*:\s*/, '').replace(',', '.').trim());
+      if (!Number.isFinite(v) || v < 1 || v > 10000) { message('Échelle : un nombre entre 1 et 10000 (ex. 200 pour le 1:200).', 3500); return majPanneauFeuille(); }
       p.echelle = v;
     } else p.feuille = { ...(p.feuille ?? {}), [cle]: c.value.trim() };
     enregistrer();
@@ -2298,6 +2772,7 @@ export function ouvrirPlansChantier({
       if (!Number.isFinite(v) || v < 1 || v > 10000) { message('Échelle : un nombre entre 1 et 10000 (ex. 200 pour le 1:200).', 3500); return majBande(); }
       if (v === null || !avantChangement()) return majPanneau();
       p.echelle = v;
+      c.value = String(v); // « 1:500 » devient « 500 »
       enregistrer();
       return vue?.redessinerDessus();
     }

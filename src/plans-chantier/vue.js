@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf, surImageChargee } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs, etiquettePresente, ancreEtiquette } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneeDecalageCote, poigneesArcs, pointsDansArcs, etiquettePresente, ancreEtiquette } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { pointsDePrise } from '../topo/prise-bloc.js';
@@ -328,6 +328,20 @@ export function creerVueChantier(conteneur, options) {
       ctx.fillStyle = ORANGE;
       ctx.fill();
       ctx.fillStyle = '#ffffff';
+    }
+    // 0.328.0 : poignée ronde au milieu de la ligne de cote (la glisser = éloigner / rapprocher la ligne de cote)
+    const hc = poigneeDecalageCote(o);
+    if (hc) {
+      const q = ecran(hc);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 6, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(q.x, q.y - 3);
+      ctx.lineTo(q.x, q.y + 3);
+      ctx.strokeStyle = ORANGE;
+      ctx.stroke();
     }
     poigneeEtiquette(ctx, o); // 0.320.5 : poignée du texte de la zone (surface, tas, texte)
     // 0.299.0 : petit « + » au milieu de chaque côté (ligne, zone, flèche, piste) : clic ou glisser = ajouter un point.
