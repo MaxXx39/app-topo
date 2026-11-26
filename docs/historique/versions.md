@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.334.0 — Plans de chantier, lot 1 (demandes du 26.11 : petits correctifs)
+Lire seulement la section utile : `grep -n '^## 0.335.0 — Plans de chantier, lots 2 et 3 : pastilles Fond / Plan / Points + bandeau du haut utile (demandes du 26.11)
+- **Décisions de l'utilisateur** : pastilles sur le plan en haut à gauche comme dans les autres modules, gardées aussi dans Présentation ; Carte / Ortho / Cadastre dans la pastille Fond ; pas de version téléphone (l'appli n'est pas sur Android : site et Topo Bureau seulement).
+- **Pastilles** (`plans-chantier/pastilles.js`, mêmes classes que `plan.js`) : Fond (photo, carte, cadastre, surfaces), Plan (cases des plans pour la phase active, « choix propre à la phase », ▾ calques : case + couleur), Points (noms + une case par liste). Appui long sur une pastille = tout montrer / tout cacher ; appui long sur un calque = **geler** (`gele`, affiché mais plus d'accroche : `sourcesDesPlans`). Pastille pâle = tout caché. Dans Présentation : mêmes pastilles ; Plan = plans de la feuille (cases + opacité) + « Répliquer le dessin » ; Fond = photo pâlie.
+- **Retiré** : groupe « Fond » du ruban (plans, calques, points, carte, ortho, cadastre, surfaces), fenêtre « Calques des plans affichés » (code supprimé), blocs « Plans de la feuille » et « Fond » du panneau Présentation.
+- **Bandeau du haut** : onglets **Gestion / Dessin / Présentation** ; Dessin y met Choisir / Effacer / Annuler / Tout ; Présentation y met la présentation (liste, Enreg., Dupliquer, Renommer, Supprimer), **Répliquer** (= « Remettre comme à l'écran » : plans, opacités) et PDF. Le ruban du haut et la bande du bas sont plus libres.
+- Essayé en Playwright (Fond, appui long Points, Présentation). **Pas essayé** : menu Plan avec un vrai plan DXF à calques, geler un calque.
+- Reste (lot 4) : popups cartouche / situation / détail ; outils de Dessiner rangés par type avec couleurs.
+
+## 0.334.0 — Plans de chantier, lot 1 (demandes du 26.11 : petits correctifs)
 - **Décisions de l'utilisateur** : mode Intermédiaire demandé, mais Plans de chantier est déjà une appli Expert (rien à poser dans l'appli) ; mesure = affichage seulement (rien d'enregistré) ; traits de construction = couleurs au choix (pas de familles).
 - **Décaler une construction = une construction** : `segmentProcheAvecOrigine` / `ligneProcheAvecOrigine` (`topo/plan-chantier.js`) disent si la ligne touchée est une construction ; la copie garde trait et couleur (droite infinie ou segment comme l'original). Le bouton « ⇉ Décaler » existe aussi pour une construction choisie (pas pour une ligne de coupe).
 - **Couleur d'une construction** : liste de 7 couleurs (cyan par défaut) pour le nouvel outil et pour la ligne choisie (`couleur` de l'objet, `couleurObjet` la respecte même en « couleurs par phases »).

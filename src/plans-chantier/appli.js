@@ -33,7 +33,8 @@ import { CLE_PARKING } from '../topo/parking-dynamique.js';
 import { CLE_PORTAIL, GENRES_PORTAIL, PASSAGE_PORTAIL, reglagesPortail } from '../topo/portail-dynamique.js';
 import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
-import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
+import { plansAvecCalques } from './gestion-calques.js';
+import { htmlPastilles, htmlMenuFond, htmlMenuPlan, htmlMenuPoints } from './pastilles.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { reglagesGrue, ficheGrue, hauteursDe as hauteursGrue, hauteurChoisie as hauteurGrue, tourDe as tourGrue, flecheDe as flecheGrue, porteeMax as porteeGrue, RAYON_MIN as RAYON_MIN_GRUE, COULEUR_TEXTE } from '../topo/grue-fiche.js';
 import { tousLesModeles, modeleDe, definirModelesPerso } from '../topo/grue-modele.js';
@@ -141,6 +142,7 @@ export function ouvrirPlansChantier({
     return res;
   };
   let dernierMessagePrise = 0;
+  let enteteOutils = ''; // 0.335.0 : outils de l'onglet Présentation, posés dans le bandeau du haut
   let bandeDessin = ''; // 0.327.0 : outils posés dans la bande du bas (accroches, ortho, échelle, 3D, texte) : remplie par htmlDessin
   const page = document.createElement('dialog');
   page.className = 'page-chantier';
@@ -163,7 +165,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     coupe: { ouvert: false, ligne: null, cachees: new Set() }, // 0.311.0 : vue de côté (coupe) ; 0.312.0 : surfaces cachées, ligne de coupe tracée
     coupeProchaine: false, // le prochain segment de construction dessiné est une ligne de coupe
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
@@ -342,13 +344,15 @@ export function ouvrirPlansChantier({
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <span class="aide-entete-chantier">${bulle('plansChantier')}</span>
         <nav class="etapes-calage" aria-label="Parties">
-          <button type="button" data-ecran="liste" class="${etat.ecran === 'liste' ? 'actif' : ''}">Plans</button>
-          <button type="button" data-ecran="dessin" class="${etat.ecran === 'dessin' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Dessiner</button>
-          <button type="button" data-ecran="feuille" class="${etat.ecran === 'feuille' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Feuille</button>
+          <button type="button" data-ecran="liste" class="${etat.ecran === 'liste' ? 'actif' : ''}">Gestion</button>
+          <button type="button" data-ecran="dessin" class="${etat.ecran === 'dessin' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Dessin</button>
+          <button type="button" data-ecran="feuille" class="${etat.ecran === 'feuille' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Présentation</button>
         </nav>
+        <div class="outils-entete" data-zone="outils-entete"></div>
         ${plan() && etat.ecran !== 'liste' ? `<span class="nom-plan-chantier">${echapper(plan().nom)}</span>` : ''}
       </header>
       <main class="contenu-calage ${etat.ecran !== 'liste' ? 'en-calage' : ''}">${etat.ecran === 'dessin' ? htmlDessin() : etat.ecran === 'feuille' ? htmlFeuille() : htmlListe()}</main>`;
+    majEnteteOutils();
     if (etat.ecran === 'dessin') monterVue();
     if (etat.ecran === 'feuille') monterFeuille();
   }
@@ -438,22 +442,11 @@ export function ouvrirPlansChantier({
         <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${plan()?.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4" aria-label="Texte des symboles en mm sur le papier"></label>`)}`;
     return `
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
-        ${groupe('Sélection', `${outil('choisir', ICONE_CHOISIR, 'Sélectionner')}
-          ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer')}
-          ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)')}`)}
         ${groupe('Dessin', OUTILS.map(([c, i, t]) => outil(c, i, t)).join(''))}
         ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles'))}
-        ${groupe('Fond', `${bt('data-action="fond-plans"', '<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>', 'Plans du projet dessous (par phase)')}
-          ${bt('data-action="fond-calques"', '<path d="M12 4L21 9L12 14L3 9Z"/><path d="M3 13L12 18L21 13"/>', 'Calques des plans affichés (masquer, couleur)')}
-          ${bt('data-action="fond-points"', '<circle cx="7" cy="8" r="1.7"/><circle cx="16" cy="7" r="1.7"/><circle cx="11" cy="16" r="1.7"/><circle cx="19" cy="15" r="1.7"/>', 'Points levés')}
-          ${bt('data-action="fond-carte"', '<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5L13.2 13.2L8.5 15.5L10.8 10.8Z"/>', 'Fond : carte nationale')}
-          ${bt('data-action="fond-ortho"', '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M8 7L9.5 5H14.5L16 7"/>', 'Fond : photo aérienne')}
-          ${bt('data-action="fond-cadastre"', '<path d="M4 4H20V20H4Z"/><path d="M4 12H20M12 4V20"/>', 'Fond : cadastre')}
-          ${bt('data-action="fond-surfaces"', '<path d="M3 18L9 8L14 13L21 5"/><path d="M3 18H21"/>', 'Fond : surfaces du projet')}`)}
         ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
         ${groupe('Coupe', `${bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne')}
           ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`)}
-        ${groupe('Zoom', `${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir')}`)}
       </div>
       <div class="ruban-element" data-zone="bandeau-element"></div>
       <p class="consigne-calage" data-zone="consigne"></p>
@@ -464,8 +457,9 @@ export function ouvrirPlansChantier({
       </div>
       <div class="travail-chantier ${etat.biblio.ouvert ? 'avec-biblio' : ''}">
         <aside class="carte-calage biblio-chantier" data-zone="biblio" ${etat.biblio.ouvert ? '' : 'hidden'}></aside>
-        <div class="vue-calage vue-chantier">
+        <div class="vue-calage vue-chantier avec-pastilles">
           <div class="toile-chantier" data-toile></div>
+          <div class="plan-calques pastilles-chantier" data-zone="pastilles"></div>
           <div class="coupe-chantier" data-zone="coupe" ${etat.coupe.ouvert ? '' : 'hidden'}></div>
           <div class="pied-vue etat-chantier" data-zone="etat"></div>
         </div>
@@ -1118,9 +1112,9 @@ export function ouvrirPlansChantier({
     const liste = presentationsDe(p);
     const active = presentationActive(p);
     const options = (l, v) => l.map(([c, t]) => `<option value="${c}" ${c === v ? 'selected' : ''}>${t}</option>`).join('');
+    const boutonRuban = null; // (les boutons de présentation sont maintenant dans le bandeau du haut)
     const bouton = (attrs, icone, titre, court, desactive = false) => `<button type="button" class="outil-ruban" ${attrs} ${desactive ? 'disabled' : ''} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
-    return `
-      <div class="groupe-ruban" role="group" aria-label="Présentation">
+    enteteOutils = `<div class="groupe-ruban" role="group" aria-label="Présentation">
         <label class="champ-bande" title="Présentation : les réglages de la feuille gardés sous un nom (se mettent à jour toutes seules)"><span>Présentation</span>
           <select data-presentation="choisir" aria-label="Présentation"><option value="">— réglages libres —</option>${liste.map((x) => `<option value="${echapper(x.id)}" ${x.id === active?.id ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>
         ${bouton('data-action="pres-nouvelle"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages actuels comme nouvelle présentation', 'Enreg.')}
@@ -1128,6 +1122,9 @@ export function ouvrirPlansChantier({
         ${bouton('data-action="pres-renommer"', '<path d="M4 20H8L19 9L15 5L4 16Z"/>', 'Renommer la présentation choisie', 'Renommer', !active)}
         ${bouton('data-action="pres-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer la présentation choisie', 'Supprimer', !active)}
       </div>
+      ${bouton('data-action="feuille-plans-reinit"', '<path d="M7 7H17L14 4M17 17H7L10 20"/>', 'Répliquer : la feuille reprend les plans, calques et fonds réglés dans Dessin', 'Répliquer')}
+      <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>`;
+    return `
       <div class="groupe-ruban" role="group" aria-label="Feuille">
         <label class="champ-bande"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
         <label class="champ-bande"><span>Sens</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
@@ -1157,7 +1154,6 @@ export function ouvrirPlansChantier({
       <div class="groupe-ruban" role="group" aria-label="Sortie">
         ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer le plan sur les éléments', 'Recentrer')}
         ${bouton('data-action="feuille-positions-reinit"', '<path d="M5 12A7 7 0 1 1 8 17.5M5 12V7M5 12H10"/>', 'Remettre le nord, la barre d\'échelle et la situation à leur place de départ', 'Replacer')}
-        <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>
       </div>`;
   }
 
@@ -1166,15 +1162,17 @@ export function ouvrirPlansChantier({
     if (etat.ecran !== 'feuille') return;
     bandeDessin = htmlBandeFeuille();
     page.majBandePage?.();
+    majEnteteOutils();
   }
 
   function htmlFeuille() {
     bandeDessin = htmlBandeFeuille();
     return `
-      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. Présentation, format, échelle et PDF : bande du bas.</p>
+      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. Présentation et PDF : bandeau du haut ; format, échelle et cadrage : bande du bas.</p>
       <div class="travail-chantier">
-        <div class="vue-calage vue-feuille">
+        <div class="vue-calage vue-feuille avec-pastilles">
           <div class="toile-feuille" data-feuille><canvas></canvas></div>
+          <div class="plan-calques pastilles-chantier" data-zone="pastilles"></div>
           <div class="pied-vue etat-chantier" data-zone="etat-feuille"></div>
         </div>
         <aside class="carte-calage panneau-chantier" data-zone="panneau-feuille"></aside>
@@ -1621,27 +1619,12 @@ export function ouvrirPlansChantier({
     const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
     const nomPdf = `${nomFichier()}.pdf`;
     majBandeFeuille();
+    majPastilles();
     zone.innerHTML = `
       <h3>Feuille ${bulle('feuilleChantier')}</h3>
       <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
-      <h3>Plans de la feuille</h3>
-      ${plans().length ? `<p class="aide-calage">${r.plans ? 'Réglés à part de l\'écran.' : 'Comme à l\'écran.'}</p>
-        ${plans().map((x) => {
-    const eff = plansDeLaFeuille(plansAvecCalques(plans(), p.fond), plansFond(), r.plans).find((y) => y.id === x.id);
-    const op = Math.round(100 - (eff ? (eff.transparence ?? 0) : (r.plans?.[x.id]?.opacite !== undefined ? 100 - r.plans[x.id].opacite : (x.transparence ?? 0))));
-    return `<div class="plan-feuille"><label class="case-chantier"><input type="checkbox" data-feuille-plan="${echapper(x.id)}" ${eff ? 'checked' : ''}> ${echapper(x.nom)}</label>
-          <label class="champ-calage"><span>Opacité : <b data-valeur-de="op-${echapper(x.id)}">${op} %</b></span><input type="range" min="0" max="100" step="5" value="${op}" data-feuille-plan-op="${echapper(x.id)}"></label></div>`;
-  }).join('')}
-        ${r.plans ? '<button type="button" class="lien-calage" data-action="feuille-plans-reinit">Remettre comme à l\'écran</button>' : ''}` : '<p class="aide-calage">Aucun plan dans le projet.</p>'}
-      <h3>Fond</h3>
-      <label class="case-chantier"><input type="checkbox" data-fond="carte" ${p.fond.carte ? 'checked' : ''}> Carte nationale swisstopo</label>
-      <label class="case-chantier"><input type="checkbox" data-fond="ortho" ${p.fond.ortho ? 'checked' : ''}> Photo aérienne swisstopo</label>
-      ${p.fond.ortho ? `<label class="champ-calage"><span>Photo pâlie : <b data-valeur-de="paleur">${p.fond.paleur ?? PALEUR_ORTHO} %</b></span><input type="range" min="0" max="90" step="5" value="${p.fond.paleur ?? PALEUR_ORTHO}" data-feuille-curseur="paleur"></label>` : ''}
-      <label class="case-chantier"><input type="checkbox" data-fond="cadastre" ${p.fond.cadastre ? 'checked' : ''}> Cadastre</label>
-      <label class="case-chantier"><input type="checkbox" data-fond="surfaces" ${p.fond.surfaces !== false ? 'checked' : ''}> Surfaces du projet</label>
-      <label class="case-chantier"><input type="checkbox" data-fond="points" ${p.fond.points !== false ? 'checked' : ''}> Points levés</label>
       <h3>Cadres de détail</h3>
       ${htmlPanneauDetails(r, p)}
       <h3>Cartouche</h3>
@@ -1945,6 +1928,173 @@ export function ouvrirPlansChantier({
 
   // ---------------------------------------------------------------- Mises à jour
 
+
+  // ------------------------------------------------------------------ Bandeau du haut et pastilles (0.335.0)
+  /** Outils de l'onglet Dessin posés dans le bandeau du haut (sélection, annuler, tout voir) : libère le ruban. */
+  function htmlOutilsDessinEntete() {
+    const bt = (attrs, icone, titre, court) => `<button type="button" class="outil-ruban" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
+    return `${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
+      ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer', 'Effacer')}
+      ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)', 'Annuler')}
+      ${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir', 'Tout')}`;
+  }
+
+  function majEnteteOutils() {
+    const zone = page.querySelector('[data-zone="outils-entete"]');
+    if (!zone) return;
+    zone.innerHTML = etat.ecran === 'dessin' ? htmlOutilsDessinEntete() : etat.ecran === 'feuille' ? enteteOutils : '';
+    if (etat.ecran === 'dessin') majOutils();
+  }
+
+  const reglageCalque = (id, i) => plan()?.fond?.calques?.[id]?.[i] ?? {};
+
+  /** Contenu du menu d'une pastille (écran Dessin, ou Présentation : plans de la feuille et photo pâlie). */
+  function menuPastille(cle) {
+    const p = plan();
+    const feuilleEcran = etat.ecran === 'feuille';
+    if (cle === 'fond') {
+      return htmlMenuFond(p.fond) + (feuilleEcran && p.fond.ortho ? `<label class="champ-calage"><span>Photo pâlie : <b data-valeur-de="paleur">${p.fond.paleur ?? PALEUR_ORTHO} %</b></span><input type="range" min="0" max="90" step="5" value="${p.fond.paleur ?? PALEUR_ORTHO}" data-feuille-curseur="paleur"></label>` : '');
+    }
+    if (cle === 'points') {
+      const listes = listesPoints ? listesPoints() : [{ id: '__tous', nom: 'Points levés', points: points() }];
+      const caches = new Set(p.fond.listesPointsCachees ?? []);
+      return htmlMenuPoints({ listes: listes.map((l) => ({ id: l.id, nom: l.nom, n: l.points.length, montre: p.fond.points !== false && !caches.has(l.id) })), noms: Boolean(p.fond.nomsPoints) });
+    }
+    if (feuilleEcran) { // plans de la feuille : cases + opacité propres (« Répliquer » = comme à l'écran)
+      const r = reglagesFeuille(p);
+      return `<button type="button" class="bouton-secondaire petit" data-action="feuille-plans-reinit" title="La feuille reprend les plans, calques et fonds réglés dans Dessin">⇆ Répliquer le dessin</button>
+        ${plans().length ? plans().map((x) => {
+    const eff = plansDeLaFeuille(plansAvecCalques(plans(), p.fond), plansFond(), r.plans).find((y) => y.id === x.id);
+    const op = Math.round(100 - (eff ? (eff.transparence ?? 0) : (r.plans?.[x.id]?.opacite !== undefined ? 100 - r.plans[x.id].opacite : (x.transparence ?? 0))));
+    return `<div class="plan-feuille"><label class="case-chantier"><input type="checkbox" data-feuille-plan="${echapper(x.id)}" ${eff ? 'checked' : ''}> ${echapper(x.nom)}</label>
+          <label class="champ-calage"><span>Opacité : <b data-valeur-de="op-${echapper(x.id)}">${op} %</b></span><input type="range" min="0" max="100" step="5" value="${op}" data-feuille-plan-op="${echapper(x.id)}"></label></div>`;
+  }).join('') : '<p class="aide-calage">Aucun plan dans le projet.</p>'}`;
+    }
+    const montres = new Set(plansMontres().map((x) => x.id));
+    return htmlMenuPlan({
+      plans: plans().map((x) => ({
+        id: x.id, nom: x.nom ?? x.id, montre: montres.has(x.id),
+        calques: (x.calques ?? []).map((c, i) => { const r = reglageCalque(x.id, i); return { i, nom: c.nom, visible: (r.visible ?? c.visible) !== false, couleur: r.couleur ?? c.couleur ?? '#000000', gele: Boolean(r.gele) }; }),
+      })),
+      deplie: etat.planDeplie,
+      phase: p.phases.length > 1 ? { nom: p.phases.find((ph) => ph.id === p.phaseActive)?.nom ?? '', propre: Boolean(p.fond.plansParPhase?.[p.phaseActive]) } : null,
+    });
+  }
+
+  /** Redessine les pastilles Fond / Plan / Points (et le menu ouvert). Une pastille est pâle quand tout ce qu'elle gère est caché. */
+  function majPastilles() {
+    const zone = page.querySelector('[data-zone="pastilles"]');
+    const p = plan();
+    if (!zone || !p) return;
+    const f = p.fond;
+    const pales = { fond: !(f.ortho || f.carte || f.cadastre || f.surfaces !== false), plan: !plansMontres().length, points: f.points === false };
+    zone.innerHTML = htmlPastilles({ ouvert: etat.menuPastille, pales, menus: etat.menuPastille ? { [etat.menuPastille]: menuPastille(etat.menuPastille) } : {} });
+  }
+
+  function rafraichirVue() {
+    if (etat.ecran === 'feuille') {
+      majPanneauFeuille();
+      return dessinerApercu();
+    }
+    majTout();
+  }
+
+  function basculerFond(cle) {
+    const p = plan();
+    if (!avantChangement()) return majPastilles();
+    p.fond[cle] = cle === 'surfaces' ? p.fond.surfaces === false : !p.fond[cle];
+    if (cle === 'surfaces' && !surfaces().length && p.fond.surfaces) message('Le projet n\'a aucune surface (ou elles sont cachées par le dossier choisi).', 4000);
+    enregistrer();
+    rafraichirVue();
+    if (cle !== 'surfaces' && p.fond[cle]) setTimeout(() => {
+      if (etat.fondEtat?.manquantes && !etat.fondEtat.enCours) message('Fond swisstopo indisponible (pas de connexion ?).', 4000);
+    }, 6000);
+  }
+
+  /** Montre ou cache un plan du projet pour la phase active (son choix propre s'il en a un, sinon le choix général). */
+  function basculerPlan(id, montre) {
+    const p = plan();
+    if (!avantChangement()) return majPastilles();
+    const ph = p.phaseActive;
+    if (p.fond.plansParPhase?.[ph]) {
+      const ens = new Set(p.fond.plansParPhase[ph]);
+      if (montre) ens.add(id); else ens.delete(id);
+      p.fond.plansParPhase[ph] = [...ens];
+    } else {
+      const caches = new Set(p.fond.plansCaches ?? []);
+      if (montre) caches.delete(id); else caches.add(id);
+      p.fond.plansCaches = [...caches];
+    }
+    enregistrer();
+    rafraichirVue();
+  }
+
+  function choixPropreDePhase(propre) {
+    const p = plan();
+    if (!avantChangement()) return majPastilles();
+    const ph = p.phaseActive;
+    if (propre) p.fond.plansParPhase = { ...(p.fond.plansParPhase ?? {}), [ph]: plansMontres(ph).map((x) => x.id) };
+    else if (p.fond.plansParPhase) {
+      delete p.fond.plansParPhase[ph];
+      if (!Object.keys(p.fond.plansParPhase).length) delete p.fond.plansParPhase;
+    }
+    enregistrer();
+    rafraichirVue();
+  }
+
+  /** Règle un calque d'un plan : { visible }, { couleur } ou { gele } (rangé dans plan.fond.calques[idPlan][n°]). */
+  function reglerCalque(cle, champs) {
+    const [id, i] = [cle.slice(0, cle.lastIndexOf(':')), cle.slice(cle.lastIndexOf(':') + 1)];
+    const p = plan();
+    if (!avantChangement()) return majPastilles();
+    p.fond.calques ??= {};
+    p.fond.calques[id] ??= {};
+    p.fond.calques[id][i] = { ...(p.fond.calques[id][i] ?? {}), ...champs };
+    enregistrer();
+    rafraichirVue();
+  }
+
+  /** Une case de la liste des points levés (ou « noms »). */
+  function reglerPoints(cle, coche) {
+    const p = plan();
+    if (!avantChangement()) return majPastilles();
+    if (cle === '__noms') {
+      if (coche) p.fond.nomsPoints = true; else delete p.fond.nomsPoints;
+    } else if (cle === '__tous') p.fond.points = coche;
+    else {
+      const ids = (listesPoints ? listesPoints() : []).map((l) => l.id);
+      const caches = new Set(p.fond.listesPointsCachees ?? []);
+      if (p.fond.points === false) ids.forEach((id) => caches.add(id)); // tout était caché : on repart de rien
+      if (coche) caches.delete(cle); else caches.add(cle);
+      p.fond.listesPointsCachees = [...caches];
+      p.fond.points = ids.some((id) => !caches.has(id));
+    }
+    enregistrer();
+    rafraichirVue();
+  }
+
+  /** Appui long sur une pastille : tout montrer (si tout est caché) ou tout cacher. */
+  function toutMontrerOuCacher(cle) {
+    const p = plan();
+    if (!avantChangement()) return;
+    if (cle === 'fond') {
+      const montre = !(p.fond.ortho || p.fond.carte || p.fond.cadastre || p.fond.surfaces !== false);
+      Object.assign(p.fond, { ortho: montre, carte: montre, cadastre: montre, surfaces: montre });
+    } else if (cle === 'plan') {
+      const ids = plans().map((x) => x.id);
+      const montre = !plansMontres().length;
+      const ph = p.phaseActive;
+      if (p.fond.plansParPhase?.[ph]) p.fond.plansParPhase[ph] = montre ? ids : [];
+      else p.fond.plansCaches = montre ? [] : ids;
+    } else {
+      const montre = p.fond.points === false;
+      p.fond.points = montre;
+      if (montre) delete p.fond.listesPointsCachees;
+    }
+    enregistrer();
+    rafraichirVue();
+  }
+
   function majTout() {
     if (etat.ecran !== 'dessin') return;
     majOutils();
@@ -1955,13 +2105,9 @@ export function ouvrirPlansChantier({
   function majOutils() {
     page.querySelectorAll('[data-outil]').forEach((b) => b.classList.toggle('actif', b.dataset.outil === etat.outil));
     page.querySelectorAll('[data-accroche]').forEach((b) => b.classList.toggle('actif', etat.accroches.has(b.dataset.accroche)));
-    page.querySelector('[data-action="fond-points"]')?.classList.toggle('actif', plan()?.fond?.points !== false);
-    page.querySelector('[data-action="fond-carte"]')?.classList.toggle('actif', Boolean(plan()?.fond?.carte));
-    page.querySelector('[data-action="fond-ortho"]')?.classList.toggle('actif', Boolean(plan()?.fond?.ortho));
-    page.querySelector('[data-action="fond-cadastre"]')?.classList.toggle('actif', Boolean(plan()?.fond?.cadastre));
-    page.querySelector('[data-action="fond-surfaces"]')?.classList.toggle('actif', plan()?.fond?.surfaces !== false);
     page.querySelector('[data-action="ortho"]')?.classList.toggle('actif', etat.ortho);
     page.querySelector('[data-action="construction-visible"]')?.classList.toggle('actif', plan()?.construction?.visible !== false);
+    majPastilles();
     page.querySelector('[data-action="biblio"]')?.setAttribute('aria-pressed', String(etat.biblio.ouvert));
     page.querySelector('[data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     const toile = page.querySelector('[data-toile]');
@@ -2405,6 +2551,66 @@ export function ouvrirPlansChantier({
 
   // ---------------------------------------------------------------- Événements
 
+  // ------------------------------------------------------------------ Pastilles : clics, cases, appui long (0.335.0)
+  let minuterieLong = null;
+  let appuiLongFait = false;
+  page.addEventListener('pointerdown', (ev) => {
+    clearTimeout(minuterieLong);
+    appuiLongFait = false;
+    const pastille = ev.target.closest('[data-pastille]');
+    const ligne = pastille ? null : ev.target.closest('[data-calque-ligne]');
+    if (!pastille && !ligne) return;
+    minuterieLong = setTimeout(() => {
+      appuiLongFait = true;
+      navigator.vibrate?.(40);
+      if (pastille) toutMontrerOuCacher(pastille.dataset.pastille);
+      else {
+        const cle = ligne.dataset.calqueLigne;
+        reglerCalque(cle, { gele: !reglageCalque(cle.slice(0, cle.lastIndexOf(':')), cle.slice(cle.lastIndexOf(':') + 1)).gele });
+      }
+    }, 600);
+  });
+  ['pointerup', 'pointercancel'].forEach((t) => page.addEventListener(t, () => clearTimeout(minuterieLong)));
+  page.addEventListener('contextmenu', (ev) => { if (ev.target.closest('[data-pastille], [data-calque-ligne]')) ev.preventDefault(); });
+  page.addEventListener('click', (ev) => { // après un appui long, le clic qui suit est ignoré
+    if (appuiLongFait && ev.target.closest('[data-pastille], [data-calque-ligne]')) {
+      appuiLongFait = false;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    }
+  }, true);
+  page.addEventListener('click', (ev) => {
+    const pastille = ev.target.closest('[data-pastille]');
+    if (pastille) {
+      ev.stopImmediatePropagation();
+      etat.menuPastille = etat.menuPastille === pastille.dataset.pastille ? null : pastille.dataset.pastille;
+      return majPastilles();
+    }
+    const deplier = ev.target.closest('[data-pastille-deplier]');
+    if (deplier) {
+      ev.stopImmediatePropagation();
+      etat.planDeplie = etat.planDeplie === deplier.dataset.pastilleDeplier ? null : deplier.dataset.pastilleDeplier;
+      return majPastilles();
+    }
+    if (etat.menuPastille && !ev.target.closest('[data-zone="pastilles"]')) { // un clic ailleurs ferme le menu (et continue normalement)
+      etat.menuPastille = null;
+      majPastilles();
+    }
+  });
+  page.addEventListener('change', (ev) => {
+    const c = ev.target;
+    const d = c.dataset;
+    if (!c.closest?.('[data-zone="pastilles"]')) return;
+    if (d.pastilleFond) basculerFond(d.pastilleFond);
+    else if (d.pastillePlan) basculerPlan(d.pastillePlan, c.checked);
+    else if (d.pastillePhasePropre) choixPropreDePhase(c.checked);
+    else if (d.pastilleCalque) reglerCalque(d.pastilleCalque, { visible: c.checked });
+    else if (d.pastilleCouleur) reglerCalque(d.pastilleCouleur, { couleur: c.value });
+    else if (d.pastillePoints) reglerPoints(d.pastillePoints, c.checked);
+    else return;
+    ev.stopImmediatePropagation();
+  });
+
   page.addEventListener('click', async (ev) => {
     const b = ev.target.closest('button');
     if (!b || b.disabled) return;
@@ -2508,18 +2714,6 @@ export function ouvrirPlansChantier({
       return ouvrirModelesGrues({
         projet: leProjet, lectureSeule, message, modeleInitial: () => { const o = plan()?.objets.find((x) => x.id === etat.choisi); return o?.modele === 'fiche' ? o.modeleGrue : null; }, modifie: () => { modifie(); synchroModeles(); }, redessiner: () => { synchroModeles(); majTout(); },
       });
-    }
-    if (['fond-carte', 'fond-ortho', 'fond-cadastre', 'fond-surfaces'].includes(b.dataset.action)) {
-      if (!avantChangement()) return;
-      const cle = { 'fond-carte': 'carte', 'fond-ortho': 'ortho', 'fond-cadastre': 'cadastre', 'fond-surfaces': 'surfaces' }[b.dataset.action];
-      p.fond[cle] = cle === 'surfaces' ? p.fond.surfaces === false : !p.fond[cle];
-      if (cle === 'surfaces' && !surfaces().length && p.fond.surfaces) message('Le projet n\'a aucune surface (ou elles sont cachées par le dossier choisi).', 4000);
-      enregistrer();
-      majTout();
-      if (cle !== 'surfaces' && p.fond[cle]) setTimeout(() => {
-        if (etat.fondEtat?.manquantes && !etat.fondEtat.enCours) message('Fond swisstopo indisponible (pas de connexion ?).', 4000);
-      }, 6000);
-      return;
     }
     if (b.dataset.outil) {
       etat.coupeProchaine = false;
@@ -2640,73 +2834,6 @@ export function ouvrirPlansChantier({
       enregistrer();
       majPanneau();
       return vue?.redessinerDessus();
-    }
-    if (b.dataset.action === 'fond-points') {
-      // 0.299.0 : fenêtre de cases : les noms des points (une case pour toutes les listes), puis chaque liste.
-      if (!listesPoints) {
-        if (!avantChangement()) return;
-        p.fond.points = p.fond.points === false;
-        enregistrer();
-        return majTout();
-      }
-      const listes = listesPoints();
-      if (!listes.length) return message('Le projet n\'a aucun point levé.', 3500);
-      const caches = new Set(p.fond.listesPointsCachees ?? []);
-      const montres = p.fond.points !== false;
-      const coches = await demanderCases({
-        titre: 'Points levés montrés sur le plan',
-        options: [
-          { cle: '__noms', texte: 'Écrire les noms des points (toutes les listes)', coche: Boolean(p.fond.nomsPoints) },
-          ...listes.map((l) => ({ cle: l.id, texte: `${l.nom} (${l.points.length})`, coche: montres && !caches.has(l.id) })),
-        ],
-      });
-      if (!coches || !avantChangement()) return;
-      const ids = listes.map((l) => l.id).filter((id) => coches.includes(id));
-      p.fond.points = ids.length > 0;
-      p.fond.listesPointsCachees = listes.map((l) => l.id).filter((id) => !coches.includes(id));
-      if (coches.includes('__noms')) p.fond.nomsPoints = true;
-      else delete p.fond.nomsPoints;
-      enregistrer();
-      return majTout();
-    }
-    if (b.dataset.action === 'fond-plans') {
-      const tous = plans();
-      if (!tous.length) return message('Le projet n\'a aucun plan (DXF, PDF, IFC) à mettre dessous.', 4000);
-      // 0.296.1 : choix général ou propre à une phase (« changer de plan par phase »)
-      let phase = null;
-      if (p.phases.length > 1) {
-        const rep = await demanderChoix({
-          titre: 'Plans montrés dessous : pour quelle phase ?',
-          boutons: [
-            { cle: '__toutes', texte: 'Toutes les phases', detail: 'choix général (phases sans choix propre)', principal: true },
-            ...p.phases.map((ph) => ({ cle: ph.id, texte: ph.nom, detail: p.fond.plansParPhase?.[ph.id] ? 'choix propre à cette phase' : 'suit le choix général' })),
-            ...(p.fond.plansParPhase && Object.keys(p.fond.plansParPhase).length ? [{ cle: '__reinit', texte: 'Tout remettre au choix général', detail: 'efface les choix par phase' }] : []),
-          ],
-        });
-        if (!rep) return;
-        if (rep === '__reinit') {
-          if (!avantChangement()) return;
-          delete p.fond.plansParPhase;
-          enregistrer();
-          return majTout();
-        }
-        phase = rep === '__toutes' ? null : rep;
-      }
-      const caches = new Set(p.fond.plansCaches ?? []);
-      const actuels = phase ? new Set(plansMontres(phase).map((x) => x.id)) : null;
-      const nomPhase = p.phases.find((x) => x.id === phase)?.nom;
-      const coches = await demanderCases({ titre: phase ? `Plans montrés dessous en « ${nomPhase} »` : 'Plans du projet montrés dessous', options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: phase ? actuels.has(x.id) : !caches.has(x.id) })) });
-      if (!coches || !avantChangement()) return;
-      if (phase) {
-        p.fond.plansParPhase = { ...(p.fond.plansParPhase ?? {}), [phase]: coches };
-      } else {
-        p.fond.plansCaches = tous.map((x) => x.id).filter((id) => !coches.includes(id));
-      }
-      enregistrer();
-      return majTout();
-    }
-    if (b.dataset.action === 'fond-calques') {
-      return ouvrirGestionCalques({ plans: plansMontres, plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessiner(); } });
     }
     if (b.dataset.action === 'gestion-phases') {
       return ouvrirGestionPhases({ plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessinerDessus(); } });

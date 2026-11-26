@@ -14663,6 +14663,26 @@ dialog.page-chantier[open] {
   background: var(--fond); color: var(--encre);
 }
 .entete-chantier { border-bottom-color: #b45309; }
+/* 0.335.0 : outils dans le bandeau du haut ; pastilles Fond / Plan / Points posées sur le plan */
+.outils-entete { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: #ffffff; }
+.outils-entete + .nom-plan-chantier { margin-left: 0; }
+.outils-entete .outil-ruban { color: #ffffff; background: transparent; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; min-width: 52px; height: 46px; padding: 2px 6px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; font: inherit; }
+.outils-entete .outil-ruban span { font-size: 0.7rem; }
+.outils-entete .outil-ruban svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.outils-entete .outil-ruban.actif { background: #ffffff; color: var(--sombre); }
+.outils-entete .outil-ruban:disabled { opacity: 0.4; }
+.outils-entete .groupe-ruban { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 4px; padding: 0; border: none; }
+.outils-entete .champ-bande { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.outils-entete .champ-bande span { color: #ffffff; font-size: 0.7rem; }
+.outils-entete .champ-bande select { max-width: 150px; }
+.outils-entete .bouton { background: #16a34a; color: #ffffff; border: none; border-radius: 8px; min-height: 40px; padding: 0 14px; font-weight: 700; cursor: pointer; }
+.vue-chantier.avec-pastilles, .vue-feuille.avec-pastilles { position: relative; }
+.pastilles-chantier { z-index: 6; max-width: calc(100% - 20px); }
+.pastilles-chantier .puce.pale { opacity: 0.45; }
+.pastilles-chantier .puce.ouvert { outline: 2px solid #b45309; }
+.pastilles-chantier .menu-pastille { max-height: 60vh; overflow-y: auto; min-width: 250px; }
+.pastilles-chantier .liste-calques-menu { list-style: none; margin: 0 0 6px 16px; padding: 0; max-height: 220px; overflow-y: auto; }
+.pastilles-chantier .liste-calques-menu li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
 .nom-plan-chantier { margin-left: auto; padding: 4px 10px; border-radius: 999px; background: #b45309; color: #ffffff; font-size: 0.85rem; }
 .page-chantier .outil-ruban svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .page-chantier .outil-ruban.actif { background: color-mix(in srgb, #b45309 14%, var(--surface)); border-color: #b45309; color: #b45309; }
