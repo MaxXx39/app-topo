@@ -135,9 +135,10 @@ export function ouvrirPlansChantier({
     return res;
   };
   let dernierMessagePrise = 0;
+  let bandeDessin = ''; // 0.327.0 : outils posés dans la bande du bas (accroches, ortho, échelle, 3D, texte) : remplie par htmlDessin
   const page = document.createElement('dialog');
   page.className = 'page-chantier';
-  habillerPage(page, { couleur: '#b45309', titre: 'Plans de chantier' });
+  habillerPage(page, { couleur: '#b45309', titre: 'Plans de chantier', contenuBande: () => bandeDessin });
   document.body.append(page);
   page.showModal();
 
@@ -309,7 +310,16 @@ export function ouvrirPlansChantier({
 
   // ================================================================ Page
 
+  /** Remet la bande du bas à jour (valeurs de l'échelle, du texte…) sans tout redessiner. */
+  function majBande() {
+    if (etat.ecran === 'dessin') {
+      page.majBandePage?.();
+      majOutils();
+    }
+  }
+
   function dessiner() {
+    bandeDessin = ''; // seul l'onglet Dessiner met des outils dans la bande (htmlDessin la remplit)
     synchroModeles();
     vue?.detruire();
     vue = null;
@@ -401,6 +411,19 @@ export function ouvrirPlansChantier({
       perpendiculaire: '<path d="M5 19H19M12 19V6"/><path d="M12 15H16V19"/>',
     };
     const TITRES_ACCROCHE = { point: 'Accroche : point levé', sommet: 'Accroche : sommet', milieu: 'Accroche : milieu', ligne: 'Accroche : sur la ligne', croisement: 'Accroche : croisement', perpendiculaire: 'Accroche : perpendiculaire' };
+    // 0.327.0 : accroches, ortho, échelle, effet 3D et taille du texte des symboles sont dans la BANDE DU BAS (à droite du bouton de l'appli) :
+    // ça libère le ruban du haut. Les gestionnaires restent ceux de la page (clics et changements sur toute la page).
+    const echellePapier = plan()?.echelle ?? ECHELLE_PAPIER;
+    bandeDessin = `
+      ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c], etat.accroches.has(c) ? 'actif' : '')).join(''))}
+      ${groupe('Ortho', `${bt('data-action="ortho"', '<path d="M5 5V19H19"/><path d="M5 14H10V19"/>', 'Ortho (F8) : le dessin est aimanté aux directions N / S / E / O ou à celles du repère', etat.ortho ? 'actif' : '')}
+          <input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" class="champ-ortho" title="Angle du repère de l'Ortho en degrés (0 = Nord / Sud / Est / Ouest)" aria-label="Angle du repère de l'Ortho">
+          ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
+          ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}`)}
+      ${groupe('Échelle', `<label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${echellePapier}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label>
+        <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>`)}
+      ${groupe('Affichage', `<label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
+        <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${plan()?.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4" aria-label="Texte des symboles en mm sur le papier"></label>`)}`;
     return `
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
         ${groupe('Sélection', `${outil('choisir', ICONE_CHOISIR, 'Sélectionner')}
@@ -408,7 +431,6 @@ export function ouvrirPlansChantier({
           ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)')}`)}
         ${groupe('Dessin', OUTILS.map(([c, i, t]) => outil(c, i, t)).join(''))}
         ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles'))}
-        ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c])).join(''))}
         ${groupe('Fond', `${bt('data-action="fond-plans"', '<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>', 'Plans du projet dessous (par phase)')}
           ${bt('data-action="fond-calques"', '<path d="M12 4L21 9L12 14L3 9Z"/><path d="M3 13L12 18L21 13"/>', 'Calques des plans affichés (masquer, couleur)')}
           ${bt('data-action="fond-points"', '<circle cx="7" cy="8" r="1.7"/><circle cx="16" cy="7" r="1.7"/><circle cx="11" cy="16" r="1.7"/><circle cx="19" cy="15" r="1.7"/>', 'Points levés')}
@@ -416,10 +438,6 @@ export function ouvrirPlansChantier({
           ${bt('data-action="fond-ortho"', '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M8 7L9.5 5H14.5L16 7"/>', 'Fond : photo aérienne')}
           ${bt('data-action="fond-cadastre"', '<path d="M4 4H20V20H4Z"/><path d="M4 12H20M12 4V20"/>', 'Fond : cadastre')}
           ${bt('data-action="fond-surfaces"', '<path d="M3 18L9 8L14 13L21 5"/><path d="M3 18H21"/>', 'Fond : surfaces du projet')}`)}
-        ${groupe('Ortho', `${bt('data-action="ortho"', '<path d="M5 5V19H19"/><path d="M5 14H10V19"/>', 'Ortho (F8) : le dessin est aimanté aux directions N / S / E / O ou à celles du repère')}
-          <input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" class="champ-ortho" title="Angle du repère de l'Ortho en degrés (0 = Nord / Sud / Est / Ouest)" aria-label="Angle du repère de l'Ortho">
-          ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
-          ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}`)}
         ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
         ${groupe('Coupe', `${bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne')}
           ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`)}
@@ -1200,7 +1218,7 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
       <label class="champ-calage"><span>Date (vide = du jour)</span><input type="text" maxlength="20" value="${echapper(r.date)}" placeholder="${new Date().toLocaleDateString('fr-CH')}" data-feuille="date"></label>
       <label class="champ-calage"><span>Dessiné par</span><input type="text" maxlength="40" value="${echapper(r.auteur)}" placeholder="${echapper(auteur())}" data-feuille="auteur"></label>
-      <label class="champ-calage"><span>Logo</span><select data-feuille="logo">${options([['perrin', 'Perrin'], ['aucun', 'Sans logo'], ['image', r.logo?.startsWith?.('data:') ? 'Image choisie' : 'Autre image…']], r.logo?.startsWith?.('data:') ? 'image' : r.logo)}</select></label>
+      <label class="champ-calage"><span>Logo</span><select data-feuille="logo">${options([['perrin', 'Perrin'], ['natalini', 'Natalini'], ['ronchi', 'Ronchi'], ['aucun', 'Sans logo'], ['image', r.logo?.startsWith?.('data:') ? 'Image choisie' : 'Autre image…']], r.logo?.startsWith?.('data:') ? 'image' : r.logo)}</select></label>
       ${r.logo?.startsWith?.('data:') ? '<button type="button" class="lien-calage" data-action="feuille-logo">Changer d\'image…</button>' : ''}
       <label class="case-chantier"><input type="checkbox" data-feuille-case="legende" ${r.legende ? 'checked' : ''}> Légende automatique</label>
       <label class="case-chantier"><input type="checkbox" data-feuille-case="nord" ${r.nord ? 'checked' : ''}> Nord</label>
@@ -1600,9 +1618,6 @@ export function ouvrirPlansChantier({
     }
     zone.innerHTML = `
       <h3>Plan</h3>
-      <label class="champ-calage"><span>Échelle d'impression 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-champ="echelle"></label>
-      <label class="case-chantier" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> Effet 3D des symboles</label>
-      <label class="champ-calage"><span>Texte des symboles (mm sur le papier)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm"></label>
       <h3>Phases</h3>
       <ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
         <input type="checkbox" data-phase-visible="${ph.id}" ${ph.visible !== false ? 'checked' : ''} aria-label="Montrer ${echapper(ph.nom)}">
@@ -2279,7 +2294,8 @@ export function ouvrirPlansChantier({
       return majConsigne();
     }
     if (c.dataset.champ === 'echelle') {
-      const v = nombreDe(c);
+      const v = Number(String(c.value).replace(/^\s*1\s*:\s*/, '').replace(',', '.').trim());
+      if (!Number.isFinite(v) || v < 1 || v > 10000) { message('Échelle : un nombre entre 1 et 10000 (ex. 200 pour le 1:200).', 3500); return majBande(); }
       if (v === null || !avantChangement()) return majPanneau();
       p.echelle = v;
       enregistrer();

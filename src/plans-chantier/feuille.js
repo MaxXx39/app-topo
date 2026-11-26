@@ -14,6 +14,8 @@ import {
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
+import logoNatalini from '../assets/logo-natalini.jpg?inline';
+import logoRonchi from '../assets/logo-ronchi.jpg?inline';
 
 const DPI_PDF = { a4: 220, a3: 200, a2: 160, a1: 130 };
 
@@ -31,7 +33,9 @@ export function chargerImage(adresse) {
   }
   return images.get(adresse);
 }
-export const adresseLogo = (logo) => (logo === 'aucun' ? null : !logo || logo === 'perrin' ? logoPerrin : logo);
+/** Logos livrés (0.327.0 : + Natalini et Ronchi) ; sinon une image choisie (data:…). */
+export const LOGOS_LIVRES = { perrin: logoPerrin, natalini: logoNatalini, ronchi: logoRonchi };
+export const adresseLogo = (logo) => (logo === 'aucun' ? null : !logo ? logoPerrin : LOGOS_LIVRES[logo] ?? logo);
 
 /**
  * Prépare une page : mise en page, vue du cadre, légende. donnees : { plan, plans, points, surfaces, bib, projet, auteur }.

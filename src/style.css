@@ -15157,3 +15157,29 @@ body.page-applis-ouverte :is(.cible-haut, .bouton-inverser-cible, .barre-pointag
 .case-logo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--bordure); border-radius: 10px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.72rem; cursor: pointer; }
 .case-logo .logo-materiel { width: 34px; height: 34px; margin: 0; }
 .case-logo.actif { border: 2px solid #0f766e; background: color-mix(in srgb, #0f766e 10%, var(--surface)); }
+
+/* 0.327.0 : bande du bas des applis plein écran : place à droite du bouton ☰ pour les outils de l'appli (Plans de chantier : accroches, ortho, échelle, 3D, texte). */
+.bande-appli.bande-page { gap: 8px; }
+.bande-page .zone-bande-page { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; margin: 4px 8px 4px 0; padding: 2px 6px; overflow-x: auto; border-radius: 12px; background: var(--surface); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+.bande-page .zone-bande-page:empty { display: none; }
+.bande-page .zone-bande-page .groupe-ruban { flex: none; display: flex; align-items: center; gap: 2px; padding: 0 4px; border: none; border-right: 1px solid var(--bordure); border-radius: 0; background: transparent; }
+.bande-page .zone-bande-page .outil-ruban { min-width: 40px; min-height: 44px; padding: 2px 5px; }
+.page-chantier .bande-page .outil-ruban.actif { background: color-mix(in srgb, #b45309 14%, var(--surface)); border-color: #b45309; color: #b45309; }
+.page-chantier .bande-page .outil-ruban svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.page-chantier .bande-page .outil-ruban span { font-size: 0.7rem; }
+.champ-bande, .case-bande { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; white-space: nowrap; }
+.champ-bande input { width: 64px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; }
+.bande-page .zone-bande-page .champ-ortho { width: 56px; }
+body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px; }
+.bande-page .zone-bande-page .groupe-ruban { flex-direction: row; flex-wrap: nowrap; }
+.bande-page .zone-bande-page .groupe-ruban .titre-groupe { display: none; }
+.bande-page .zone-bande-page .champ-bande span, .bande-page .zone-bande-page .case-bande span { color: var(--encre); font-weight: 600; }
+.bande-page .zone-bande-page .champ-bande { flex-direction: row; }
+.bande-page .zone-bande-page .case-bande input[type='checkbox'] { width: 18px; height: 18px; accent-color: #b45309; }
+
+/* 0.327.0 : liste des plans calés : UNE ligne par plan (le fichier dans l'infobulle), actions dans un bouton « ⋮ » (fenêtre de choix). */
+.tableau-calage td { white-space: nowrap; }
+.tableau-calage td.nom-ligne-calage { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.tableau-calage .actions-ligne-calage { width: 1%; text-align: right; }
+.bouton-menu-plan { min-width: 40px; font-size: 1.2rem; font-weight: 800; line-height: 1; }
+.tableau-calage td .aide-calage { white-space: nowrap; }
