@@ -15192,3 +15192,8 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 .champ-bande select { max-width: 130px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.85rem; }
 .bande-page .zone-bande-page .groupe-ruban { gap: 6px; padding: 0 8px; }
 .bande-page .zone-bande-page .bouton { background: var(--couleur-appli, #b45309); color: #ffffff; border: none; border-radius: 8px; padding: 0 16px; min-height: 40px; font-weight: 700; cursor: pointer; }
+
+/* 0.331.0 : aperçu de la feuille zoomable : la toile défile, la page reste centrée quand elle est plus petite que la vue */
+.toile-feuille { display: block; overflow: auto; text-align: center; }
+.toile-feuille canvas { display: inline-block; margin: 8px auto; vertical-align: top; cursor: grab; }
+.valeur-zoom { min-width: 48px; text-align: center; font-weight: 700; font-size: 0.85rem; }

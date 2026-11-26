@@ -47,7 +47,7 @@ export function preparerPage(donnees, page, pxParMm) {
   const objets = objetsDeLaPage(plan, page);
   const nomSymbole = (cle) => bib.find((s) => s.cle === cle)?.nom ?? String(cle).replace(/^[a-z]+:/, '');
   const legende = r.legende ? elementsLegende(objets, nomSymbole) : [];
-  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length);
+  const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, { coin: r.cartouche, positions: r.positions, situation: r.situation });
   const centre = r.centre ?? donnees.centre ?? [2500000, 1118000];
   const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';

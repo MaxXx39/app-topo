@@ -43,7 +43,7 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { accrocherBoite, positionDeBoite, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -1102,9 +1102,18 @@ export function ouvrirPlansChantier({
         <label class="champ-bande"><span>Sens</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
         <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
         <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
+        <label class="champ-bande" title="Coin du cartouche (la légende le suit ; nord, barre d'échelle et situation se replacent pour ne pas le recouvrir)"><span>Cartouche</span><select data-feuille="cartouche">${options(COINS_CARTOUCHE, r.cartouche)}</select></label>
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Aperçu">
+        ${bouton('data-action="feuille-zoom-moins"', '<circle cx="11" cy="11" r="6"/><path d="M8 11H14M16 16L20 20"/>', 'Zoom arrière sur l\'aperçu (molette aussi)', 'Zoom −')}
+        <span class="valeur-zoom" title="Zoom de l'aperçu (ne change pas ce qui est imprimé)">${Math.round((etat.feuilleZoom ?? 1) * 100)} %</span>
+        ${bouton('data-action="feuille-zoom-plus"', '<circle cx="11" cy="11" r="6"/><path d="M8 11H14M11 8V14M16 16L20 20"/>', 'Zoom avant sur l\'aperçu (molette aussi)', 'Zoom +')}
+        ${bouton('data-action="feuille-zoom-ajuster"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Toute la feuille dans la vue', 'Ajuster')}
+        ${bouton(`data-action="feuille-deplacer-plan" aria-pressed="${Boolean(etat.feuilleDeplacerPlan)}"`, '<path d="M12 3V21M3 12H21M12 3L9.5 6M12 3L14.5 6M12 21L9.5 18M12 21L14.5 18M3 12L6 9.5M3 12L6 14.5M21 12L18 9.5M21 12L18 14.5"/>', 'Déplacer le plan sur la feuille (sinon glisser déplace seulement la vue ; nord, barre d\'échelle et situation se glissent directement)', 'Déplacer le plan', false).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleDeplacerPlan ? ' actif' : ''}"`)}
       </div>
       <div class="groupe-ruban" role="group" aria-label="Sortie">
-        ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer la feuille sur les éléments', 'Recentrer')}
+        ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer le plan sur les éléments', 'Recentrer')}
+        ${bouton('data-action="feuille-positions-reinit"', '<path d="M5 12A7 7 0 1 1 8 17.5M5 12V7M5 12H10"/>', 'Remettre le nord, la barre d\'échelle et la situation à leur place de départ', 'Replacer')}
         <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>
       </div>`;
   }
@@ -1152,17 +1161,51 @@ export function ouvrirPlansChantier({
     feuille = { canvas, page: 0, geste: null };
     feuille.observateur = new ResizeObserver(() => dessinerApercu());
     feuille.observateur.observe(toile);
+
+    /** Point (mm de papier) sous le doigt. */
+    const enMm = (ev) => {
+      const r = canvas.getBoundingClientRect();
+      return [((ev.clientX - r.left) / r.width) * feuille.mise.page.largeur, ((ev.clientY - r.top) / r.height) * feuille.mise.page.hauteur];
+    };
+    /** Élément déplaçable (nord, barre d'échelle, situation) sous le point, ou null. */
+    const elementSous = ([x, y]) => {
+      const bs = feuille.mise?.boites ?? {};
+      for (const nom of ['situation', 'nord', 'barre']) {
+        const b = bs[nom];
+        if (b && x >= b.x && x <= b.x + b.l && y >= b.y && y <= b.y + b.h) return nom;
+      }
+      return null;
+    };
+
     canvas.addEventListener('pointerdown', (ev) => {
-      if (!plan()) return;
+      if (!plan() || !feuille.mise) return;
       canvas.setPointerCapture(ev.pointerId);
-      const r = reglagesFeuille(plan());
-      feuille.geste = { x: ev.clientX, y: ev.clientY, centre: r.centre ?? donneesFeuille().centre ?? [0, 0], change: false };
+      // 0.331.0 : par défaut, glisser = déplacer la VUE (le plan ne bouge pas sur la feuille) ; le bouton « Déplacer le plan » change cela.
+      if (etat.feuilleDeplacerPlan) {
+        const r = reglagesFeuille(plan());
+        feuille.geste = { type: 'plan', x: ev.clientX, y: ev.clientY, centre: r.centre ?? donneesFeuille().centre ?? [0, 0], change: false };
+        return;
+      }
+      const nom = elementSous(enMm(ev));
+      if (nom) {
+        feuille.geste = { type: 'element', nom, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[nom] }, change: false };
+        return;
+      }
+      feuille.geste = { type: 'vue', x: ev.clientX, y: ev.clientY, sx: toile.scrollLeft, sy: toile.scrollTop, change: false };
     });
     canvas.addEventListener('pointermove', (ev) => {
       const g = feuille?.geste;
-      if (!g) return;
+      if (!g) {
+        canvas.style.cursor = !etat.feuilleDeplacerPlan && feuille.mise && elementSous(enMm(ev)) ? 'move' : '';
+        return;
+      }
       const dx = ev.clientX - g.x;
       const dy = ev.clientY - g.y;
+      if (g.type === 'vue') {
+        toile.scrollLeft = g.sx - dx;
+        toile.scrollTop = g.sy - dy;
+        return;
+      }
       if (!g.change && Math.hypot(dx, dy) < 4) return;
       if (!g.change) {
         if (!avantChangement()) {
@@ -1170,6 +1213,21 @@ export function ouvrirPlansChantier({
           return;
         }
         g.change = true;
+      }
+      if (g.type === 'element') {
+        // px d'aperçu → mm de papier ; la boîte s'accroche au cadre et aux autres éléments (comme un bloc).
+        const mise = feuille.mise;
+        const mmPx = 1 / (feuille.pxParMm || 1);
+        let b = { ...g.boite, x: g.boite.x + dx * mmPx, y: g.boite.y + dy * mmPx };
+        const autres = [...mise.fixes, ...Object.entries(mise.boites).filter(([n, v]) => n !== g.nom && v).map(([, v]) => v)];
+        b = accrocherBoite(b, autres, mise.cadre, 8 * mmPx);
+        b.x = Math.min(mise.cadre.x + mise.cadre.l - b.l, Math.max(mise.cadre.x, b.x));
+        b.y = Math.min(mise.cadre.y + mise.cadre.h - b.h, Math.max(mise.cadre.y, b.y));
+        const f = plan().feuille ?? {};
+        plan().feuille = { ...f, positions: { ...(f.positions ?? {}), [g.nom]: positionDeBoite(mise, b) } };
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
       }
       // px d'aperçu → mm de papier → m sur le terrain.
       const m = (plan().echelle ?? ECHELLE_PAPIER) / 1000 / (feuille.pxParMm || 1);
@@ -1182,7 +1240,32 @@ export function ouvrirPlansChantier({
     };
     canvas.addEventListener('pointerup', fin);
     canvas.addEventListener('pointercancel', fin);
+    // Molette = zoom de l'aperçu autour du pointeur.
+    toile.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      zoomerFeuille(ev.deltaY < 0 ? 1.2 : 1 / 1.2, ev.clientX, ev.clientY);
+    }, { passive: false });
     majFeuille();
+  }
+
+  /** Zoom de l'aperçu de la feuille (ne change pas ce qui est imprimé) : facteur, autour d'un point de l'écran (sinon le centre). */
+  function zoomerFeuille(facteur, cx = null, cy = null) {
+    if (!feuille) return;
+    const toile = page.querySelector('[data-feuille]');
+    const c = feuille.canvas;
+    const t = toile.getBoundingClientRect();
+    const x = cx ?? t.left + t.width / 2;
+    const y = cy ?? t.top + t.height / 2;
+    const avant = c.getBoundingClientRect();
+    const rx = (x - avant.left) / Math.max(1, avant.width);
+    const ry = (y - avant.top) / Math.max(1, avant.height);
+    const nouveau = facteur === 0 ? 1 : (etat.feuilleZoom ?? 1) * facteur;
+    etat.feuilleZoom = Math.min(8, Math.max(1, Math.round(nouveau * 100) / 100));
+    dessinerApercu(); // règle tout de suite la taille de la toile
+    const apres = c.getBoundingClientRect();
+    toile.scrollLeft += apres.left + rx * apres.width - x;
+    toile.scrollTop += apres.top + ry * apres.height - y;
+    majBandeFeuille();
   }
 
   function majFeuille() {
@@ -1201,7 +1284,11 @@ export function ouvrirPlansChantier({
     const r = reglagesFeuille(plan());
     const mise = miseEnPageFeuille(r.format, r.orientation, 0);
     const densite = window.devicePixelRatio || 1;
-    const pxParMm = Math.min((toile.clientWidth - 16) / mise.page.largeur, (toile.clientHeight - 16) / mise.page.hauteur);
+    const ajuste = Math.min((toile.clientWidth - 16) / mise.page.largeur, (toile.clientHeight - 16) / mise.page.hauteur);
+    // 0.331.0 : zoom de l'aperçu (jamais au-delà d'environ 5000 px de côté : la toile reste dessinable)
+    const plafond = 5000 / (Math.max(mise.page.largeur, mise.page.hauteur) * ajuste * densite);
+    etat.feuilleZoom = Math.min(Math.max(1, etat.feuilleZoom ?? 1), Math.max(1, plafond), 8);
+    const pxParMm = ajuste * etat.feuilleZoom;
     feuille.pxParMm = pxParMm;
     const c = feuille.canvas;
     c.style.width = `${Math.round(mise.page.largeur * pxParMm)}px`;
@@ -1218,6 +1305,7 @@ export function ouvrirPlansChantier({
     try {
       const donnees = donneesFeuille();
       prep = preparerPage(donnees, pages[feuille.page], pxParMm);
+      feuille.mise = prep.mise; // pour le toucher (nord, barre d'échelle, situation)
       const logo = await chargerImage(adresseLogo(r.logo));
       if (!feuille || feuille.canvas !== c || feuille.numero !== numero) return; // un dessin plus récent a pris la suite
       dessinerPage(ctx, donnees, prep, pxParMm, {
@@ -1362,6 +1450,22 @@ export function ouvrirPlansChantier({
       const choix = await demanderChoix({ titre: `Supprimer « ${a.nom} » ?`, texte: 'Les réglages actuels de la feuille restent comme ils sont ; seule la présentation enregistrée disparaît.', boutons: [{ cle: 'non', texte: 'Garder', principal: true }, { cle: 'oui', texte: 'Supprimer' }] });
       if (choix !== 'oui' || !avantChangement()) return;
       supprimerPresentation(p, a.id);
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'feuille-zoom-plus') return zoomerFeuille(1.25);
+    if (b.dataset.action === 'feuille-zoom-moins') return zoomerFeuille(0.8);
+    if (b.dataset.action === 'feuille-zoom-ajuster') return zoomerFeuille(0);
+    if (b.dataset.action === 'feuille-deplacer-plan') {
+      etat.feuilleDeplacerPlan = !etat.feuilleDeplacerPlan;
+      message(etat.feuilleDeplacerPlan ? 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.' : 'Glisser déplace maintenant la vue ; le plan reste en place.', 3500);
+      return majBandeFeuille();
+    }
+    if (b.dataset.action === 'feuille-positions-reinit') {
+      if (!avantChangement()) return;
+      const f = { ...(p.feuille ?? {}) };
+      delete f.positions;
+      p.feuille = f;
       enregistrer();
       return majFeuille();
     }
