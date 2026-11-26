@@ -9,7 +9,7 @@ import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
-  reglagesFeuille, FORMATS_FEUILLE,
+  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
@@ -52,8 +52,8 @@ export function preparerPage(donnees, page, pxParMm) {
   const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';
   const champs = {
-    affaire: donnees.projet?.cartouche?.affaire || donnees.projet?.nom || '',
-    projet: donnees.projet?.cartouche?.designation ?? '',
+    affaire: nomChantierCartouche(donnees.projet?.cartouche, donnees.projet?.nom, r.chantier), // « affaire - désignation », modifiable (0.329.0)
+    projet: '',
     titre: r.titre || plan.nom,
     phase: page.titre ? `Phase : ${page.titre}${datesDePhase(plan.phases.find((p) => p.id === page.phase)) ? ` (${datesDePhase(plan.phases.find((p) => p.id === page.phase))})` : ''}` : '',
     echelle: plan.echelle ?? 200,
@@ -246,19 +246,21 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
   const vueS = { echelle: (s * 1000) / echSit, estCentre: centre[0], nordCentre: centre[1], largeur: B.l * s, hauteur: B.h * s, rotation: 0 };
   prep.vueSituation = vueS;
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff'; // fond blanc gardé : on ne voit jamais le plan dessous
   ctx.fillRect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
   ctx.beginPath();
   ctx.rect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
   ctx.clip();
   ctx.translate(mm(B.x), mm(B.y));
+  ctx.globalAlpha = 1 - sit.transparence / 100; // 0.329.0 : transparence de la carte
   dessinerFondSwisstopo(ctx, vueS, { carte: true }, 1, quandTuile);
+  ctx.globalAlpha = 1;
   const e = etendueDuCadre(d.pc, mise.cadre, centre);
   const a = versEcran(e.estMin, e.nordMax, vueS);
   const b = versEcran(e.estMax, e.nordMin, vueS);
   ctx.fillStyle = 'rgba(220,38,38,0.15)';
   ctx.strokeStyle = '#dc2626';
-  ctx.lineWidth = Math.max(1, 0.5 * s);
+  ctx.lineWidth = Math.max(1, sit.epaisseur * s); // 0.329.0 : épaisseur réglable
   // Rectangle rouge : jamais plus petit que 5 mm sur le papier (0.295.1), centré sur la zone du plan.
   const mini = 5 * mise.k * s;
   const [rl, rh] = [Math.max(b.x - a.x, mini), Math.max(b.y - a.y, mini)];

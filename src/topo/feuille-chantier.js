@@ -14,13 +14,22 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', logo: f.logo ?? 'perrin',
   };
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
+/** Nom du chantier du cartouche : celui tapé, sinon « affaire - désignation » du projet (0.329.0). */
+export const nomChantierCartouche = (cartouche, nomProjet, tape = '') => String(tape || '').trim()
+  || [cartouche?.affaire || nomProjet, cartouche?.lieu ?? cartouche?.designation].map((x) => String(x ?? '').trim()).filter(Boolean).join(' - ');
+
 /** Vue de situation (0.293.0) : petit cadre carte nationale dans un coin, zone du plan en rouge. */
-export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60, auto: Boolean(s.auto) });
+export const situationDe = (s = {}) => ({
+  actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60, auto: Boolean(s.auto),
+  // 0.329.0 : transparence de la carte (0 à 90 %, fond blanc gardé : la carte s'efface vers le blanc pour faire ressortir le rectangle)
+  // et épaisseur du trait du rectangle rouge (mm sur le papier).
+  transparence: Math.min(90, Math.max(0, Number(s.transparence) || 0)), epaisseur: Math.min(3, Math.max(0.2, Number(s.epaisseur) || 0.5)),
+});
 
 /**
  * Échelle de la carte de situation : celle tapée, ou en automatique (0.295.1) celle qui donne à la zone du plan (rectangle
@@ -150,7 +159,7 @@ export function textesCartouche(cartouche, k, champs) {
   const t = (texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: String(texte ?? ''), x, y: yy, taille: taille * k, gras, couleur });
   const xm = x0 + (cartouche.x + cartouche.l - x0) / 2;
   return [
-    t(champs.affaire, x0, y(0.15), 8, true),
+    t(champs.affaire, x0, y(0.15), 8, true), // 0.329.0 : « affaire - désignation » (modifiable), sur une seule ligne
     t(champs.projet, x0, y(0.27), 6.5),
     t(champs.titre, x0, y(0.41), 9.5, true),
     t(`Indice ${champs.indice}`, x0, y(0.54), 8, true), // 0.297.0 : l'indice sous le numéro et le nom du plan

@@ -42,7 +42,7 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { plansDeLaFeuille, reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -1237,6 +1237,7 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-fond="surfaces" ${p.fond.surfaces !== false ? 'checked' : ''}> Surfaces du projet</label>
       <label class="case-chantier"><input type="checkbox" data-fond="points" ${p.fond.points !== false ? 'checked' : ''}> Points levés</label>
       <h3>Cartouche</h3>
+      <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(leProjet().cartouche, leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
       <label class="champ-calage"><span>Date (vide = du jour)</span><input type="text" maxlength="20" value="${echapper(r.date)}" placeholder="${new Date().toLocaleDateString('fr-CH')}" data-feuille="date"></label>
@@ -1250,7 +1251,9 @@ export function ouvrirPlansChantier({
       ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
       <label class="case-chantier"><input type="checkbox" data-situation="auto" ${r.situation.auto ? 'checked' : ''}> Échelle automatique (la zone du plan reste bien visible)</label>
       ${r.situation.auto ? '' : `<label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>`}
-      <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>` : ''}
+      <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>
+      <label class="champ-calage" title="La carte s'efface vers le blanc (le plan dessous ne se voit jamais) : le rectangle rouge ressort"><span>Transparence de la carte : <b data-valeur-de="sit-transparence">${r.situation.transparence} %</b></span><input type="range" min="0" max="90" step="5" value="${r.situation.transparence}" data-situation="transparence"></label>
+      <label class="champ-calage"><span>Épaisseur du rectangle rouge (mm)</span><input type="number" min="0.2" max="3" step="0.1" value="${r.situation.epaisseur}" data-situation="epaisseur"></label>` : ''}
       <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
       ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}
       <h3>Enregistrer</h3>

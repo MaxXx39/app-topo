@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.328.0 — Plans de chantier : déplacer par un angle (rectangle, rond), cote en « hauteur » (demande du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.329.0 — Plans de chantier : vue de situation (transparence, épaisseur), nom du chantier modifiable (demande du 26.11)
+- **Situation** (`topo/feuille-chantier.js` `situationDe`, `plans-chantier/feuille.js` `dessinerSituation`, onglet Feuille) : **transparence de la carte** (curseur 0 à 90 %, 0 au départ = comme avant) : la carte est dessinée en `globalAlpha` sur un **fond blanc gardé** (on ne voit jamais le plan dessous) ; **épaisseur du rectangle rouge** (0,2 à 3 mm sur le papier, 0,5 au départ). **Pas vérifié visuellement avec les vraies tuiles swisstopo** (réseau bloqué ici) : l'épaisseur est vérifiée à l'écran, la transparence par le calcul seulement.
+- **Nom du chantier du cartouche** : champ « Nom du chantier » de l'onglet Feuille (`plan.feuille.chantier`) ; vide = **« affaire - désignation »** du projet (`nomChantierCartouche` : `projet.cartouche.affaire` (ou le nom du projet) + `projet.cartouche.lieu`). **Corrigé au passage** : le cartouche lisait `cartouche.designation`, qui n'existe pas (le projet stocke la désignation dans `lieu`) : la ligne « désignation » était toujours vide. Une seule ligne en gras en haut du cartouche (la 2e ligne est supprimée).
+- Tests `feuille-chantier-nom.test.js` (3). Essayé en Playwright : situation active, épaisseur 1,6 mm, nom tapé écrit dans le cartouche.
+
+## 0.328.0 — Plans de chantier : déplacer par un angle (rectangle, rond), cote en « hauteur » (demande du 26.11)
 - **Réponses de l'utilisateur** : rectangle / rond = **déplacer en saisissant un angle** (la forme garde sa taille) ; cote « en hauteur » = **éloigner / rapprocher la ligne de cote**.
 - **Rectangle** (`estRectangle` de `topo/plan-chantier.js` : zone de 4 points aux angles droits à 1° près) : prendre un **angle** déplace TOUT le rectangle, l'angle pris suit la souris et s'accroche (`etat.glisse.type === 'coin'`, `plans-chantier/appli.js`). **Avant, glisser un angle déformait le rectangle ; ce n'est plus possible** (agrandir un rectangle : pas encore, à proposer : poignées au milieu des côtés).
 - **Rond** : `poigneesDe` = centre (déplacer), bord est (rayon), **+ nord, ouest, sud** (déplacer en prenant ce point, avec accroche).
