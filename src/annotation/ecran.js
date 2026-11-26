@@ -8,7 +8,14 @@ import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 
 const MODES = { loupe: 'Loupe', gnss: 'GNSS', tablette: 'Tablette' };
-const SOURCES = { loupe: 'loupe', gnss: 'GNSS', tablette: 'GPS tablette' };
+const SOURCES = { loupe: 'Manuel', gnss: 'GNSS', tablette: 'GPS tablette' };
+
+/** Petites icônes des 3 façons de prendre la position (0.322.0 : pour voir tout de suite dans quel mode on est). */
+export const ICONES_SOURCE = {
+  loupe: '<svg class="ico-source" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  gnss: '<svg class="ico-source" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v7M8 6l4 4 4-4M5 21h14M12 10v11M7 14a7 7 0 0 1 10 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  tablette: '<svg class="ico-source" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18.5" r="1" fill="currentColor"/></svg>',
+};
 const ICONE_PHOTO = '<path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.2" />';
 
 const nombre = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
@@ -72,7 +79,8 @@ export function dateHeure(iso) {
  * { nom (affiché dans l'ID), remarque, photos (nombre de photos du prochain point), position (ou null : Enreg. grisé),
  * dernier (nom du dernier point enregistré, ou '') }.
  */
-export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier }) {
+export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier, mode = null }) {
+  const attente = { loupe: 'touche le plan', gnss: 'prends le point GNSS', tablette: 'prends le GPS tablette' }[mode] ?? 'choisis un mode';
   return `<div class="bandeau-annotation">
       <label class="pastille-annotation photo" title="Photo du prochain point (puis on peut dessiner dessus)" aria-label="Photo du prochain point">
         <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>${photos > 0 ? `<span class="badge-photos">${photos}</span>` : ''}
@@ -86,7 +94,7 @@ export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier
           <input type="text" class="remarque-bandeau" data-champ="remarque-annotation" value="${echapper(remarque)}" placeholder="Remarque" autocomplete="off" aria-label="Remarque" /></label>
       </div>
       <button type="button" class="bouton-enreg-annotation" data-action="enregistrer-annotation" ${position ? '' : 'disabled'} title="Enregistrer le point">
-        <span>Enreg. point</span><small>${position ? echapper(SOURCES[position.source] ?? '') : 'prends une position'}</small></button>
+        <span>Enreg. point</span><small>${position ? `${ICONES_SOURCE[position.source] ?? ''}${echapper(SOURCES[position.source] ?? '')}` : echapper(attente)}</small></button>
     </div>`;
 }
 
@@ -99,8 +107,12 @@ export function htmlAnnotation({ mode, fiche, photos = [], manuel, tablette, lis
   const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${fiche?.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
       <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}${a.dossiers ? ` · ${echapper(a.dossiers)}` : ''}</small></button>`).join('');
   const invite = mode === 'loupe'
-    ? 'Touche le plan, place la croix, puis lève le doigt'
-    : 'Choisis Manuel, GNSS ou GPS tablette en bas';
+    ? `${ICONES_SOURCE.loupe} Manuel : touche le plan, place la croix, puis lève le doigt`
+    : mode === 'gnss'
+      ? `${ICONES_SOURCE.gnss} GNSS : la position vient du récepteur (bouton GNSS en bas)`
+      : mode === 'tablette'
+        ? `${ICONES_SOURCE.tablette} GPS tablette : la position vient de la tablette (bouton en bas)`
+        : 'Choisis Manuel, GNSS ou GPS tablette en bas';
   return `<div class="ecran-annotation">
       <div class="entete-annotation"><button type="button" class="bouton-engrenage-annotation ${reglages ? 'actif' : ''}" data-action="basculer-reglages-annotation" title="Réglage du GPS de la tablette" aria-label="Réglage du GPS de la tablette" aria-expanded="${reglages}">⚙</button>
         ${fiche ? '<span class="invite-annotation"></span>' : `<span class="invite-annotation"><strong>${invite}</strong></span>`}${bulle('annotation')}</div>

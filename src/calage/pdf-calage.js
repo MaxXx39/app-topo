@@ -3,7 +3,7 @@
 // PDF scanné (sans traits) ou au choix : la page devient une image (on clique les points à vue, sans accroche).
 // Pas d'échelle demandée : le plan est lu à la taille de la feuille (mètres de papier) et le calage trouve l'échelle.
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from '../import/pdf.js';
-import { dxfDuPdf } from '../topo/pdf-dxf.js';
+import { dxfDuPdf, precisionPdf } from '../topo/pdf-dxf.js';
 import { lirePlanDxf } from '../topo/dxf-plan.js';
 import { planImagePdf, facteurDeRendu, NETTETE_DEPART } from '../topo/pdf-image.js';
 
@@ -38,7 +38,7 @@ export async function lirePdfPourCalage(octets, nom, choisir, avancer = () => {}
     const avertissements = [];
     let plan;
     if (mode === 'traits') {
-      const lecture = lirePlanDxf(dxfDuPdf(contenu), nom);
+      const lecture = lirePlanDxf(dxfDuPdf(contenu), nom, { precision: precisionPdf(null) });
       if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun trait lisible');
       plan = lecture.plan;
       if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) : seuls les traits et les textes sont lus.`);

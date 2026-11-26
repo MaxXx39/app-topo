@@ -5,6 +5,7 @@
 import { jsPDF } from 'jspdf';
 import { MOIS, JOURS_COURTS } from './planning.js';
 import { dateSuisse } from './donnees.js';
+import { dessinerLogoPdf } from './logos.js';
 
 const MARGE = 22;
 const H_TITRE = 30;
@@ -27,7 +28,7 @@ function fonce(hexa, facteur = 0.6) {
 /**
  * PDF (Blob) du mois. donnees : donneesDuMois(parc, annee, mois) (sans la veille) ; edite : date du jour 'AAAA-MM-JJ'.
  */
-export function pdfDuMois(donnees, edite) {
+export function pdfDuMois(donnees, edite, { logos = false } = {}) {
   const { annee, mois, n, jours, groupes } = donnees;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const largeurPage = doc.internal.pageSize.getWidth();
@@ -136,9 +137,15 @@ export function pdfDuMois(donnees, edite) {
     g.articles.forEach(({ article, barres }, i) => {
       rect(xNum, t, L_NUM, hLigne, article.couleur);
       ecrire(xCode + L_CODE / 2, t + hLigne / 2 + 2.8, couper(article.codeCompta, 'normal', 8, L_CODE - 3), 'normal', 8, { centre: true });
+      // 0.325.0 : logo de la catégorie devant le n° (case « Logos » du planning).
+      const tLogo = Math.min(14, hLigne - 3);
+      const avecLogo = logos && g.categorie.logo && tLogo >= 7;
+      if (avecLogo) dessinerLogoPdf(doc, g.categorie.logo, xNum + 3, t + (hLigne - tLogo) / 2, tLogo);
+      const xTexte = xNum + 3 + (avecLogo ? tLogo + 3 : 0);
+      const lTexte = L_NUM - 5 - (avecLogo ? tLogo + 3 : 0);
       let taille = 8.5;
-      while (taille > 6 && largeur(article.numero, 'bold', taille) > L_NUM - 5) taille -= 0.25;
-      ecrire(xNum + 3, t + hLigne / 2 + taille / 3, couper(article.numero, 'bold', taille, L_NUM - 5), 'bold', taille);
+      while (taille > 6 && largeur(article.numero, 'bold', taille) > lTexte) taille -= 0.25;
+      ecrire(xTexte, t + hLigne / 2 + taille / 3, couper(article.numero, 'bold', taille, lTexte), 'bold', taille);
       const margeV = Math.min(2.2, hLigne * 0.12);
       barres.forEach((b) => {
         const bx1 = xj(b.j1) + 0.8;

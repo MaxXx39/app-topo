@@ -45,23 +45,24 @@ const TEXTE_BULLE = 'Inclinaison perdue : la canne était bullée au départ (mo
 const m3 = (v) => (v == null ? '–' : v.toFixed(3));
 
 /**
- * Fenêtre de résultat (0.229.0) : moyenne, plus petite et plus grande lecture de E / N / H, écart (mm), précision la moins bonne.
+ * Fenêtre de résultat (0.229.0) : médiane (0.322.0), plus petite et plus grande lecture de E / N / H, écart (mm), précision la moins bonne.
  * Renvoie une promesse : 'valider', 'refaire' ou null (annulé).
  */
 function montrerResultat(point, perdues = 0, avertir = false) {
   const info = point.mesureDuree;
   const bulle = perdues > 0 && avertir ? `<p class="avertissement-bulle">${ICONE_BULLE}<span>${TEXTE_BULLE} (${perdues} lecture${perdues > 1 ? 's' : ''} sur ${info.lectures})</span></p>` : '';
   const ligne = (nom, moy, lim) => `<tr><th>${nom}</th><td>${m3(moy)}</td><td>${m3(lim?.min)}</td><td>${m3(lim?.max)}</td><td>${lim ? Math.round((lim.max - lim.min) * 1000) : '–'}</td></tr>`;
+  const dispersion = info.dispersion ? `<p class="avertissement-bulle"><span>⚠ Une lecture s'écarte de ${Math.round(info.ecartMaxPlan * 1000)} mm de la médiane : lecture isolée possible (reflet). La médiane la met de côté ; « Refaire » si le doute reste.</span></p>` : '';
   return new Promise((fin) => {
     const fond = document.createElement('div');
     fond.className = 'fond-mesure-duree';
     fond.innerHTML = `<div class="fenetre-mesure-duree resultat-mesure-duree" role="dialog" aria-label="Résultat de la mesure">
         <p class="titre-mesure-duree">Mesure de ${info.dureeS} s · ${info.lectures} lectures</p>
         <table class="tableau-mesure-duree">
-          <thead><tr><th></th><th>Moyenne</th><th>Mini</th><th>Maxi</th><th>Écart (mm)</th></tr></thead>
+          <thead><tr><th></th><th>Médiane</th><th>Mini</th><th>Maxi</th><th>Écart (mm)</th></tr></thead>
           <tbody>${ligne('E', point.est, info.limites.est)}${ligne('N', point.nord, info.limites.nord)}${ligne('H', point.altitude, info.limites.altitude)}</tbody>
         </table>
-        ${bulle}
+        ${bulle}${dispersion}
         <p class="aide-mesure-duree">Écart max au plan : ${Math.round(info.ecartMaxPlan * 1000)} mm${point.precisionH != null ? ` · Préc. H ${m3(point.precisionH)}` : ''}${point.precisionV != null ? ` · V ${m3(point.precisionV)}` : ''}</p>
         <div class="boutons-duree">
           <button type="button" class="bouton" data-fin="valider">Valider</button>

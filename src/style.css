@@ -14082,7 +14082,7 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
     bottom: calc(var(--hauteur-bande, 0px) + 16px);
     width: calc(var(--largeur-panneau) - 32px);
     max-width: 420px;
-    height: 220px;
+    height: var(--encart-plan, 220px);
     z-index: 13;
     border: 3px solid #0d9488;
     border-radius: 12px;
@@ -14207,8 +14207,8 @@ body.appli-windows .ligne-case { display: none; }
     position: fixed;
     display: grid;
     place-items: center;
-    left: calc(min(var(--largeur-panneau) - 32px, 420px) + 16px - 48px);
-    bottom: calc(var(--hauteur-bande, 0px) + 16px + 220px + 6px);
+    left: calc(min(var(--largeur-panneau) - 32px, 420px) + 16px - 48px - 6px);
+    bottom: calc(var(--hauteur-bande, 0px) + 16px + var(--encart-plan, 220px) - 44px - 8px);
     width: 48px;
     height: 44px;
     z-index: 30;
@@ -14376,7 +14376,7 @@ dialog.page-materiel[open] {
 .choix-vue button.actif { background: var(--sombre); color: #ffffff; border-color: var(--sombre); }
 .fins-proches { margin: 0; color: var(--gris); }
 .cadre-planning { overflow-x: auto; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon); }
-.grille-planning { --l-nom: 190px; min-width: calc(var(--l-nom) + var(--jours) * 30px); user-select: none; -webkit-user-select: none; }
+.grille-planning { --l-nom: 300px; min-width: calc(var(--l-nom) + var(--jours) * 30px); user-select: none; -webkit-user-select: none; }
 .ligne-pl {
   position: relative;
   display: grid;
@@ -15111,15 +15111,49 @@ dialog.page-chantier[open], dialog.page-plateformes[open] { padding-bottom: 0; }
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 .projet-page-nom { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bande-bas-page {
-  order: 99; flex: 0 0 auto; display: flex; align-items: stretch; justify-content: flex-start;
-  height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
-  background: var(--sombre, #1b2b36); border-top: 3px solid var(--couleur-appli-page, #1b2b36);
+.bande-appli.bande-page {
+  order: 99; position: static; flex: 0 0 auto; z-index: auto; left: auto; right: auto; width: auto;
+  height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom)); background: transparent; border-top: none; box-shadow: none;
 }
-.bouton-appli-page {
-  display: inline-flex; align-items: center; gap: 10px; min-width: 140px; padding: 0 18px;
-  border: 0; border-right: 1px solid rgba(255, 255, 255, 0.2); background: var(--couleur-appli-page, #1b2b36);
-  color: #ffffff; font: inherit; font-weight: 700; cursor: pointer;
-}
-.grille-appli-page { display: grid; grid-template-columns: repeat(2, 7px); gap: 3px; }
-.grille-appli-page i { width: 7px; height: 7px; border-radius: 2px; background: #ffffff; }
+.bande-appli.bande-page .bouton-appli { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45); }
+
+/* 0.322.0 (photos CC180 du 26.11) : applis plein écran sous Windows (1280 × 800) : moins de hauteur perdue, ruban de calage en entier. */
+body.appli-windows .bandeau-projet-page { min-height: 26px; padding: 2px 12px; }
+body.appli-windows .bande-appli.bande-page { height: 56px; padding: 5px 8px; }
+body.appli-windows .entete-calage { padding: 4px 12px; gap: 4px 10px; }
+body.appli-windows .entete-calage h2 { font-size: 0.9rem; }
+body.appli-windows .etapes-calage button { padding: 3px 10px; }
+body.appli-windows .entete-calage .retour-reglages { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+body.appli-windows .page-calage .ruban-calage { flex-wrap: wrap; overflow: visible; gap: 4px; padding: 4px; }
+body.appli-windows .page-calage .ruban-calage .groupe-ruban { flex-shrink: 1; }
+body.appli-windows .contenu-calage { padding: 6px 12px 8px; gap: 6px; }
+body.appli-windows .carte-calage { padding: 8px 12px; gap: 6px; }
+
+/* 0.322.0 : Annotation : icônes des modes Manuel / GNSS / GPS tablette, mode actif en ambre, source écrite sous « Enreg. point ». */
+.ico-source { width: 1.1em; height: 1.1em; vertical-align: -0.2em; margin-right: 0.3em; flex: none; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure.actif { background: var(--ambre); color: #1b2b36; box-shadow: inset 0 -4px 0 #1b2b36; }
+.invite-annotation .ico-source { width: 1.3em; height: 1.3em; }
+.bouton-enreg-annotation small { display: inline-flex; align-items: center; }
+
+/* 0.323.0 (demande du 26.11) : menu Applications ouvert = le plan seul, sans les outils de l'appli d'avant. */
+body.page-applis-ouverte #plan g.implantation,
+body.page-applis-ouverte :is(.cible-haut, .bouton-inverser-cible, .barre-pointage, .plan-coordonnees) { display: none !important; }
+
+/* 0.324.0 : Matériel : désignation en 3 champs, aperçu, ＋ catégorie dans la fiche. */
+.ligne-categorie { display: flex; gap: 6px; align-items: center; }
+.ligne-categorie select { flex: 1 1 auto; min-width: 0; }
+.apercu-designation strong { font-size: 1rem; }
+
+/* 0.325.0 : logos des catégories du Matériel (famille A, trait simple). */
+.logo-materiel { width: 1.25em; height: 1.25em; vertical-align: -0.25em; margin-right: 6px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nom-pl .logo-materiel { margin-right: 0; width: 20px; height: 20px; }
+.bouton-logo-categorie { width: 40px; height: 40px; padding: 4px; border: 1px dashed var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); cursor: pointer; }
+.bouton-logo-categorie .logo-materiel { width: 100%; height: 100%; margin: 0; }
+.bouton-logo-categorie .sans-logo { color: var(--gris); font-size: 1.2rem; }
+.case-logos-pdf { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+.fond-choix-logo { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(0, 0, 0, 0.45); }
+.fenetre-choix-logo { background: var(--surface); color: var(--encre); border-radius: var(--rayon); padding: 14px; width: min(560px, 94vw); max-height: 90vh; overflow: auto; }
+.grille-logos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+.case-logo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--bordure); border-radius: 10px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.72rem; cursor: pointer; }
+.case-logo .logo-materiel { width: 34px; height: 34px; margin: 0; }
+.case-logo.actif { border: 2px solid #0f766e; background: color-mix(in srgb, #0f766e 10%, var(--surface)); }

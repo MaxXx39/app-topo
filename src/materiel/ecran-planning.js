@@ -11,6 +11,12 @@ import {
   prolongerAffectations, affectationsFinissantLe, remettreAffectations, responsableDe, nomDuChantier, nomFichierMois,
 } from './planning.js';
 import { pdfDuMois } from './pdf-mois.js';
+import { svgLogo } from './logos.js';
+
+/** Case « Logos » du PDF : gardée sur ce PC (décochée au départ). */
+function lireLogosPdf() {
+  try { return localStorage.getItem('topo-materiel-logos-pdf') === '1'; } catch { return false; }
+}
 import { excelDuMois } from './excel-mois.js';
 import {
   comparer, resultatDuJour, ecartsAVerifier, texteEcart, propositionsDePrerempli, appliquerPropositions, STATUTS_COMPARAISON,
@@ -27,7 +33,7 @@ const DEPLACEMENT_MINI = 4; // px : en dessous, c'est un toucher (ouvrir la barr
  */
 export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer, redessiner, chargerJournaux = null }) {
   const jour = aujourdhui();
-  const etat = { annee: Number(jour.slice(0, 4)), mois: Number(jour.slice(5, 7)), vue: 'mois', inactifs: false, reperer: '' };
+  const etat = { annee: Number(jour.slice(0, 4)), mois: Number(jour.slice(5, 7)), vue: 'mois', inactifs: false, reperer: '', logosPdf: lireLogosPdf() };
   // Affichage du mois (0.276.0) : 'prevu' (le planning), 'reel' (ce que les journaux ont vu), 'comp' (les deux, avec les écarts).
   const recap = { affichage: 'prevu', journaux: null, chargement: false, erreur: '' };
   const pile = []; // copies des affectations avant chaque changement du planning
@@ -273,7 +279,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
   function exporter(format) {
     const donnees = donneesDuMois(obtenirParc(), etat.annee, etat.mois);
     if (!donnees.groupes.length) return message('Rien à exporter : aucun article actif.', 4000);
-    if (format === 'pdf') enregistrer(pdfDuMois(donnees, jour), nomFichierMois(etat.annee, etat.mois, 'pdf'));
+    if (format === 'pdf') enregistrer(pdfDuMois(donnees, jour, { logos: etat.logosPdf }), nomFichierMois(etat.annee, etat.mois, 'pdf'));
     else enregistrer(new Blob([excelDuMois(donnees)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nomFichierMois(etat.annee, etat.mois, 'xlsx'));
     return undefined;
   }
@@ -383,6 +389,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
         <button type="button" class="bouton-secondaire" data-action="annuler" ${pile.length ? '' : 'aria-disabled="true"'} title="Ctrl+Z">↶ Annuler${pile.length ? ` (${pile.length})` : ''}</button>
         <button type="button" class="bouton-secondaire" data-action="prolonger">↦ Prolonger ${MOIS[moisPrecedent.mois - 1]}</button>
         <button type="button" class="bouton-secondaire" data-action="saisir">＋ Saisie</button>
+        <label class="case-logos-pdf" title="Mettre le logo de la catégorie devant chaque article dans le PDF"><input type="checkbox" data-champ="logos-pdf" ${etat.logosPdf ? 'checked' : ''} /> Logos</label>
         <button type="button" class="bouton" data-action="exporter-pdf">PDF du mois</button>
         <button type="button" class="bouton-secondaire" data-action="exporter-excel">Excel du mois</button>` : ''}
       </div>
@@ -428,7 +435,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       ${g.articles.map(({ article, barres }) => {
         const pale = etat.reperer.trim() && !repere(article.numero, article.designation) && !barres.some((b) => repere(b.principal, b.responsable));
         return `<div class="ligne-pl${pale ? ' pale' : ''}${article.statut !== 'actif' ? ' inactif' : ''}" data-article="${echapper(article.id)}">
-          <div class="nom-pl"><span class="pastille-article" style="background:${article.couleur};color:${texteSurCouleur(article.couleur)}">${echapper(article.numero)}</span><span class="designation-pl">${echapper(article.designation)}</span></div>
+          <div class="nom-pl">${svgLogo(g.categorie.logo)}<span class="pastille-article" style="background:${article.couleur};color:${texteSurCouleur(article.couleur)}">${echapper(article.numero)}</span><span class="designation-pl">${echapper(article.designation)}</span></div>
           ${d.jours.map((x) => {
             const r = comparaison ? resultatDuJour(comparaison, article.id, x.iso) : null;
             if (!r) return `<div class="${classesJour(x)}" data-j="${x.j}" style="grid-column:${colonne(x.j)}"></div>`;
@@ -595,6 +602,11 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       if (cadre) cadre.innerHTML = etat.vue === 'annee' ? htmlAnnee() : htmlMois();
     });
     page.addEventListener('change', (evenement) => {
+      if (evenement.target.dataset.champ === 'logos-pdf') {
+        etat.logosPdf = evenement.target.checked;
+        try { localStorage.setItem('topo-materiel-logos-pdf', etat.logosPdf ? '1' : '0'); } catch { /* sans stockage : pas gardé */ }
+        return;
+      }
       if (evenement.target.dataset.planning !== 'inactifs') return;
       etat.inactifs = evenement.target.checked;
       redessiner();

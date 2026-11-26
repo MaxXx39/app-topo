@@ -339,6 +339,7 @@ export function creerNavigation(nav, actions) {
     placerSousEntete(page);
     page.hidden = false;
     document.body.classList.add('page-applis-ouverte');
+    document.dispatchEvent(new CustomEvent('page-applis'));
     mettreAJour();
   }
 
@@ -346,6 +347,7 @@ export function creerNavigation(nav, actions) {
     pageOuverte = false;
     page.hidden = true;
     document.body.classList.remove('page-applis-ouverte');
+    document.dispatchEvent(new CustomEvent('page-applis'));
     mettreAJour();
   }
 

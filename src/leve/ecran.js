@@ -506,7 +506,9 @@ export function creerEcranLeve(conteneur, actions) {
     document.body.classList.toggle('cible-masquee', Boolean(zone && cibleDemandee && planEnGrandDemande));
     const cible = planEnGrandDemande ? null : cibleDemandee;
     const avant = document.body.classList.contains('cible-en-haut');
-    document.body.classList.toggle('cible-en-haut', Boolean(zone && cible));
+    // 0.323.0 : menu Applications ouvert = le plan seul (pas de cible ni d'encart de l'appli d'avant).
+    const menuOuvert = document.body.classList.contains('page-applis-ouverte');
+    document.body.classList.toggle('cible-en-haut', Boolean(zone && cible && !menuOuvert));
     // 0.138.0 : le plan devient (ou n'est plus) un encart en haut à droite : main.js le recadre.
     if (avant !== document.body.classList.contains('cible-en-haut')) document.dispatchEvent(new CustomEvent('cible-en-haut'));
     if (!zone) return;

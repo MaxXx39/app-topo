@@ -24,17 +24,19 @@ export function habillerPage(page, { couleur, titre }) {
       haut.innerHTML = `<span class="projet-page-nom">${echapper(nomDuProjet())}</span>`;
       page.prepend(haut);
     }
-    if (!page.querySelector(':scope > .bande-bas-page')) {
+    if (!page.querySelector(':scope > .bande-page')) {
+      // 0.323.0 : même bouton que la bande des autres applis (Contrôle…) : « ☰ Nom », sans bandeau sombre derrière.
       const bas = document.createElement('div');
-      bas.className = 'bande-bas-page';
-      bas.innerHTML = `<button type="button" class="bouton-appli-page" data-action="retour" aria-label="Applications : retour au menu"><span class="grille-appli-page" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>${echapper(titre)}</span></button>`;
+      bas.className = 'bande-appli bande-page';
+      bas.innerHTML = `<div class="bouton-appli"><button type="button" class="partie-appli" data-action="retour" title="Menu des applications" aria-label="Menu des applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg><span>${echapper(titre)}</span></button></div>`;
       page.append(bas);
     }
   };
-  page.style.setProperty('--couleur-appli-page', couleur);
+  page.style.setProperty('--couleur-appli', couleur);
+  page.style.setProperty('--texte-appli', '#ffffff');
   const observateur = new MutationObserver(() => {
     if (!page.isConnected) return observateur.disconnect();
-    if (!page.querySelector(':scope > .bandeau-projet-page') || !page.querySelector(':scope > .bande-bas-page')) poser();
+    if (!page.querySelector(':scope > .bandeau-projet-page') || !page.querySelector(':scope > .bande-page')) poser();
   });
   observateur.observe(page, { childList: true });
   poser();

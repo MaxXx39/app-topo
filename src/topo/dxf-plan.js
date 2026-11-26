@@ -54,7 +54,7 @@ export function estEnMn95(bornes) {
  * (LEADER) sont lues, marquées s = 'DIMENSION' / 'LEADER' pour que le nettoyage puisse les retirer. Ailleurs dans
  * Topo, elles restent ignorées comme avant.
  */
-export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map(), annotations = false } = {}) {
+export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map(), annotations = false, precision = 1000 } = {}) {
   if (texte.startsWith('AutoCAD Binary DXF')) return { erreur: 'DXF binaire : enregistre le fichier en DXF « texte » (ASCII)' };
   const paires = lirePaires(texte);
   if (paires.length === 0) return { erreur: 'fichier vide ou illisible' };
@@ -64,7 +64,7 @@ export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map(), annota
   const calquesLus = lireCalques(sections.TABLES ?? []);
   const blocs = lireBlocs(sections.BLOCKS ?? []);
   const infosXrefs = remplirXrefs(blocs, calquesLus, xrefs);
-  const lecteur = creerLecteur(calquesLus, { annotations });
+  const lecteur = creerLecteur(calquesLus, { annotations, precision });
   for (const entite of decouperEntites(sections.ENTITIES)) lecteur.ajouter(entite, blocs, identite(), 0);
   const plan = lecteur.terminer(nom);
   if (infosXrefs.length) plan.compte.xrefs = infosXrefs;
@@ -492,7 +492,7 @@ export function texteSansMiseEnForme(texte) {
 }
 
 /** Crée le lecteur qui accumule les objets du plan (coordonnées absolues). */
-function creerLecteur(calquesLus, { annotations = false } = {}) {
+function creerLecteur(calquesLus, { annotations = false, precision = 1000 } = {}) {
   let sourceCourante = null; // 'DIMENSION' pendant la lecture du bloc d'une cotation (0.281.0)
   const calques = []; // [{ nom, couleur, visible }]
   const indexCalque = new Map();
@@ -757,7 +757,8 @@ function creerLecteur(calquesLus, { annotations = false } = {}) {
   function terminer(nom) {
     const vide = !Number.isFinite(estMin);
     const origine = vide ? { est: 0, nord: 0 } : { est: Math.floor(estMin), nord: Math.floor(nordMin) };
-    const mm = (v) => Math.round(v * 1000) / 1000;
+    // précision : 1000 = au millimètre (plans MN95) ; un plan PDF sans échelle (feuille de 0,3 m) demande bien plus (0.326.0).
+    const mm = (v) => Math.round(v * precision) / precision;
     const local = ([x, y]) => [mm(x - origine.est), mm(y - origine.nord)];
     const contenu = {
       traits: brut.traits.map(({ c, k, points, f, z, s }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}), ...(s ? { s } : {}) })),
