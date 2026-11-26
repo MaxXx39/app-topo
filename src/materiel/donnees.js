@@ -4,7 +4,7 @@
 //
 // Forme du parc :
 // { version: 1, modifieLe (ISO),
-//   categories: [{ id, nom, ordre }],
+//   categories: [{ id, nom, ordre, logo (clé de materiel/logos.js, 0.325.0, facultatif) }],
 //   articles: [{ id, categorieId, ordre, numero (n° interne, unique : le même que la tablette),
 //                designation (calculée : « Marque - Modèle - Autre - N° interne », 0.324.0), autre (3e champ de la désignation),
 //                codeCompta (N° MS, se répète), couleur '#RRGGBB', statut, marque, modele,
@@ -207,6 +207,14 @@ export function ajouterCategorie(parc, nom) {
   if (parc.categories.some((c) => c.nom.toLowerCase() === n.toLowerCase())) throw new Error(`La catégorie « ${n} » existe déjà`);
   const categorie = { id: nouvelId('cat'), nom: n, ordre: Math.max(0, ...parc.categories.map((c) => c.ordre)) + 1 };
   parc.categories.push(categorie);
+  return categorie;
+}
+
+/** Choisit le logo d'une catégorie (clé de logos.js, ou '' pour aucun). */
+export function definirLogoCategorie(parc, id, cle) {
+  const categorie = parc.categories.find((c) => c.id === id);
+  if (!categorie) throw new Error('Catégorie introuvable');
+  if (cle) categorie.logo = String(cle); else delete categorie.logo;
   return categorie;
 }
 

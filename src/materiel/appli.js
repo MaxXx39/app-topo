@@ -14,8 +14,9 @@ import {
   ajouterCategorie, renommerCategorie, supprimerCategorie, deplacerCategorie, ajouterChantier, modifierChantier,
   supprimerChantier, chantiersTries, responsables, chantierDuProjet, projetsSansChantier, cleNumeroDuProjet,
   normaliserNumeroChantier, dateSuisse, montantSuisse, texteSurCouleur, nouvelId,
-  marquesDuParc, modelesDuParc, designationArticle,
+  marquesDuParc, modelesDuParc, designationArticle, definirLogoCategorie,
 } from './donnees.js';
+import { LOGOS, svgLogo, logoDeCle } from './logos.js';
 import {
   lireParcLocal, enregistrerParcLocal, lireFichierLocal, enregistrerFichierLocal, supprimerFichierLocal,
   listerFichiersLocaux, lireEtatDrive, ecrireEtatDrive, choixSynchro, enregistrerCopieAvantRestauration,
@@ -335,13 +336,14 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     }
     const ordreLibre = !colonne && !filtre.texte && !filtre.statut;
     const nomCategorie = new Map(parc.categories.map((c) => [c.id, c.nom]));
+    const logoCategorie = new Map(parc.categories.map((c) => [c.id, c.logo]));
     const parent = new Map(parc.articles.map((a) => [a.id, a.numero]));
     zone.innerHTML = liste.length === 0
       ? `<p class="vide">${parc.articles.length ? 'Aucun article ne correspond.' : 'Aucun article pour l\'instant.'}</p>`
       : `<table class="tableau-materiel">
         <thead><tr>${COLONNES.map(([c, t]) => `<th><button type="button" class="tri" data-tri="${c}">${t}${tri.colonne === c ? (tri.sens > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}<th><span class="sr">Ordre</span></th></tr></thead>
         <tbody>${liste.map((a) => `<tr data-article="${echapper(a.id)}" class="ligne-statut-${a.statut}">
-          <td>${echapper(a.designation)}${a.parentId ? ` <span class="aide">(accessoire de ${echapper(parent.get(a.parentId) ?? '?')})</span>` : ''}</td>
+          <td>${svgLogo(logoCategorie.get(a.categorieId))}${echapper(a.designation)}${a.parentId ? ` <span class="aide">(accessoire de ${echapper(parent.get(a.parentId) ?? '?')})</span>` : ''}</td>
           <td><span class="pastille-article" style="background:${a.couleur};color:${texteSurCouleur(a.couleur)}">${echapper(a.numero)}</span></td>
           <td>${echapper(nomCategorie.get(a.categorieId) ?? '')}</td>
           <td>${echapper(a.codeCompta)}</td>
@@ -568,6 +570,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
         <button type="button" class="bouton-secondaire" data-action="recolorer" ${parc.articles.length ? '' : 'aria-disabled="true"'}>Recolorer tout le parc</button>
       </div>
       ${cats.length ? `<ul class="liste-categories">${cats.map((c, i) => `<li>
+        <button type="button" class="bouton-logo-categorie" data-action="logo-categorie" data-id="${echapper(c.id)}" title="Choisir le logo de la catégorie" aria-label="Logo de ${echapper(c.nom)}">${svgLogo(c.logo) || '<span class="sans-logo">＋</span>'}</button>
         <span class="nom-categorie">${echapper(c.nom)}</span>
         <span class="aide">${parc.articles.filter((a) => a.categorieId === c.id).length} article(s)</span>
         <span class="ordre-materiel">
@@ -577,6 +580,25 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
         <button type="button" class="bouton-lien" data-action="renommer-categorie" data-id="${echapper(c.id)}">renommer</button>
         <button type="button" class="bouton-lien" data-action="supprimer-categorie" data-id="${echapper(c.id)}">supprimer</button>
       </li>`).join('')}</ul>` : '<p class="vide">Aucune catégorie. Exemple : Canne GPS, Station totale, Divers.</p>'}`;
+  }
+
+  /** Fenêtre de choix du logo d'une catégorie : renvoie la clé, '' (aucun) ou null (fermé sans choisir). */
+  function choisirLogo(categorie) {
+    return new Promise((fin) => {
+      const fond = document.createElement('div');
+      fond.className = 'fond-choix-logo';
+      fond.innerHTML = `<div class="fenetre-choix-logo" role="dialog" aria-label="Logo de la catégorie">
+        <p class="titre-mesure-duree">Logo de « ${echapper(categorie?.nom ?? '')} »</p>
+        <div class="grille-logos">${LOGOS.map((l) => `<button type="button" class="case-logo ${l.cle === categorie?.logo ? 'actif' : ''}" data-logo="${l.cle}" title="${echapper(l.nom)}">${svgLogo(l.cle)}<span>${echapper(l.nom)}</span></button>`).join('')}</div>
+        <div class="boutons-duree"><button type="button" class="bouton-secondaire" data-logo="">Aucun logo</button><button type="button" class="bouton-lien" data-logo="__fermer">Fermer</button></div></div>`;
+      fond.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-logo]');
+        if (!b && e.target !== fond) return;
+        fond.remove();
+        fin(!b || b.dataset.logo === '__fermer' ? null : b.dataset.logo);
+      });
+      page.append(fond); // dans la page (une fenêtre modale cache tout ce qui est hors d'elle)
+    });
   }
 
   // Sauvegarde : fichier .zip complet, restauration, listes Excel.
@@ -809,6 +831,12 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       const { ok, resultat } = await changer((p) => ajouterCategorie(p, nom));
       if (!ok) return;
       fiche = { ...fiche, saisie: { ...saisie, categorieId: resultat.id } };
+      return dessiner();
+    }
+    if (action === 'logo-categorie') {
+      const choisi = await choisirLogo(parc.categories.find((c) => c.id === id));
+      if (choisi === null) return;
+      await changer((p) => definirLogoCategorie(p, id, choisi));
       return dessiner();
     }
     if (action === 'nouvelle-categorie' || action === 'renommer-categorie') {

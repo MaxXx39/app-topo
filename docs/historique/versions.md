@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.324.0 — Matériel : désignation en 3 champs, désignation en premier, ＋ catégorie dans la fiche (demande du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.325.0 — Matériel : logos par catégorie (famille A simplifiée), case « Logos » du PDF (réponses du 26.11)
+- **16 logos** très simples (cercles, rectangles, lignes : `materiel/logos.js`, mêmes primitives pour l'écran SVG et le PDF jsPDF). Un logo se range sur la **catégorie** (`categorie.logo`, `definirLogoCategorie`) : onglet Catégories, bouton carré devant chaque nom → fenêtre de choix (4 × 4, « Aucun logo »). Affiché devant la désignation dans le **Parc** et devant le n° dans le **Planning**.
+- **PDF du mois** : case « **Logos** » à côté du bouton (gardée sur ce PC : `topo-materiel-logos-pdf`), logo dessiné devant le n° interne (`pdfDuMois(…, { logos })`). **Excel : pas de logos** (réponse « PDF » de l'utilisateur). Vérifié en vrai PDF (pdftoppm) et dans le navigateur (choix du logo). La fenêtre de choix est ajoutée DANS la page (un `<dialog>` modal cache tout ce qui est dehors).
+- Tests `materiel-logos.test.js`.
+
+## 0.324.0 — Matériel : désignation en 3 champs, désignation en premier, ＋ catégorie dans la fiche (demande du 26.11)
 - **Désignation** = « Marque - Modèle - Autre - N° interne » (`designationArticle` de `materiel/donnees.js`, parties vides sautées), calculée et rangée dans `article.designation` (le reste du code, les tablettes et les exports la lisent comme avant). Fiche : nouveau bloc **« Désignation »** en premier (Marque, Modèle, Autre + aperçu pendant la frappe) ; **Marque / Modèle retirés de « Achat et garantie »**. Marque et Modèle = listes proposées d'après le parc (`marquesDuParc`, `modelesDuParc` : ceux de la marque d'abord), toujours modifiables à la main.
 - **Ancien parc** : la désignation libre devient le champ « Autre » (`normaliserParc`) ; un appel sans `autre` (import, anciens tests) prend `designation` comme « Autre ».
 - **Parc** : colonne Désignation **en premier**, puis le N°. **Planning** : colonne Article élargie (190 → 300 px) pour voir la désignation à côté du n°.

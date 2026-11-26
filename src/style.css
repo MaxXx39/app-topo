@@ -15143,3 +15143,17 @@ body.page-applis-ouverte :is(.cible-haut, .bouton-inverser-cible, .barre-pointag
 .ligne-categorie { display: flex; gap: 6px; align-items: center; }
 .ligne-categorie select { flex: 1 1 auto; min-width: 0; }
 .apercu-designation strong { font-size: 1rem; }
+
+/* 0.325.0 : logos des catégories du Matériel (famille A, trait simple). */
+.logo-materiel { width: 1.25em; height: 1.25em; vertical-align: -0.25em; margin-right: 6px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nom-pl .logo-materiel { margin-right: 0; width: 20px; height: 20px; }
+.bouton-logo-categorie { width: 40px; height: 40px; padding: 4px; border: 1px dashed var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); cursor: pointer; }
+.bouton-logo-categorie .logo-materiel { width: 100%; height: 100%; margin: 0; }
+.bouton-logo-categorie .sans-logo { color: var(--gris); font-size: 1.2rem; }
+.case-logos-pdf { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+.fond-choix-logo { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(0, 0, 0, 0.45); }
+.fenetre-choix-logo { background: var(--surface); color: var(--encre); border-radius: var(--rayon); padding: 14px; width: min(560px, 94vw); max-height: 90vh; overflow: auto; }
+.grille-logos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+.case-logo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--bordure); border-radius: 10px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.72rem; cursor: pointer; }
+.case-logo .logo-materiel { width: 34px; height: 34px; margin: 0; }
+.case-logo.actif { border: 2px solid #0f766e; background: color-mix(in srgb, #0f766e 10%, var(--surface)); }
