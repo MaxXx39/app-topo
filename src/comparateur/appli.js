@@ -4,6 +4,7 @@
 // centre, modifications / annotations à droite) · Rapport (PDF avec pdf-lib, image PNG).
 // Calculs : topo/comparaison-pdf.js ; lecture des PDF : lecture.js ; détection en arrière-plan : calculs.js ;
 // calage automatique : celui du calage de plans (calage/calcul-auto.js) ; rapport : rapport.js.
+import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte } from '../outils/choix.js';
@@ -38,6 +39,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
   projet.comparaisons ??= [];
   const page = document.createElement('dialog');
   page.className = 'page-comparateur';
+  habillerPage(page, { couleur: '#0e7490', titre: 'Comparer des PDF' });
   document.body.append(page);
   page.showModal();
 

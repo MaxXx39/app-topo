@@ -4,6 +4,7 @@
 // devient une surface du projet (« Surf-Plateforme A ») : volumes, Implanter › Surface, exports LandXML / DXF, Drive.
 // Calculs : topo/plateforme.js. Page plein écran (comme Plans de chantier) : ruban en haut, bandeau de la plateforme
 // choisie, plan, tableau unique (points puis côtés), panneau à droite (liste, talus, Δ Z, volumes).
+import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderChamps } from '../outils/choix.js';
@@ -46,6 +47,7 @@ export function ouvrirPlateformes({
 }) {
   const page = document.createElement('dialog');
   page.className = 'page-plateformes';
+  habillerPage(page, { couleur: '#6d28d9', titre: 'Plateformes' });
   document.body.append(page);
   page.showModal();
 

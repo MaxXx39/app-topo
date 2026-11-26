@@ -3,6 +3,7 @@
 // (comme les Réglages) : Parc (liste, fiche d'un article), Chantiers, Catégories. Le planning du mois et
 // ses exports viennent ensuite (étape 2), puis la comparaison avec le recap des tablettes (étape 3).
 // Les calculs et contrôles sont dans donnees.js ; ici seulement l'écran, l'enregistrement et Drive.
+import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte } from '../outils/choix.js';
@@ -60,6 +61,7 @@ function ouAujourdhui(parc, article, jour = aujourdhui()) {
 export async function ouvrirMateriel({ materiel = null, nomsProjets = async () => [], quandRetour = null, message = () => {}, enregistrer = null }) {
   const page = document.createElement('dialog');
   page.className = 'page-materiel';
+  habillerPage(page, { couleur: '#0f766e', titre: 'Matériel' });
   page.innerHTML = '<p class="vide">Chargement du parc…</p>';
   document.body.append(page);
   page.showModal();

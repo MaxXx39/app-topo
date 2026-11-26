@@ -7,6 +7,7 @@
 // 0.281.0 : calage automatique (topo/calage-auto.js, en arrière-plan), nouvel indice qui a bougé recalé tout seul,
 // « Ce qui a changé » entre deux indices (topo/differences-plan.js), cotations et lignes de repère lues.
 // Calculs : topo/calage-plan.js (caler), topo/nettoyage-plan.js (nettoyer) ; rangement : calage/plans.js.
+import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderChamps } from '../outils/choix.js';
@@ -52,6 +53,7 @@ const enCouleur = (plan, couleur) => Object.assign(Object.create(plan), { couleu
 export function ouvrirCalage({ projet, simple = false, depart = null, controlerPlan = null, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
   const page = document.createElement('dialog');
   page.className = 'page-calage';
+  habillerPage(page, { couleur: '#1e40af', titre: 'Calage de plans' });
   document.body.append(page);
   page.showModal();
 
@@ -106,7 +108,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       lu: null, fichier: '', nom: '', lecture: '', indice: 'A', nouvelIndice: null, elements: [], enCours: null, resultat: null,
       erreur: '', enregistre: null, recette: null, avant: [], dessinZone: null, selection: [], type: 'point', role: 'calage',
       auto: null, calculAuto: false, voirChangements: false, occupe: '', verif: null, modeReference: false, comparaison: null, baseId: '', refVisible: false,
-      enleverMain: false, voirEnleves: false, choisirCalques: false, curseurZone: null, lecturePdf: null, dejaCale: false,
+      enleverMain: false, voirEnleves: false, choisirCalques: false, curseurZone: null, lecturePdf: null, dejaCale: false, renet: null,
     });
   }
 
@@ -197,7 +199,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
         <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}${p.controle ? `<br><span class="aide-calage">Points : ${echapper(resumeControlePlan(p.controle))}</span>` : ''}</td>
         <td><strong>${echapper(c.indice ?? '')}</strong>${indices.length > 1 ? ` <span class="aide-calage">(${indices.length} indices)</span>` : ''}${c.indices?.at(-1)?.changements ? ` <span class="aide-calage" title="Objets ajoutés / supprimés depuis l'indice d'avant">+${c.indices.at(-1).changements.ajoutes} / −${c.indices.at(-1).changements.supprimes}</span>` : ''}${c.methode === 'automatique' ? ' <span class="aide-calage">· auto</span>' : ''}</td>
         <td>${dateCourte(c.le)}</td>
-        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-modifier-plan="${echapper(p.id)}" title="Nom, indice, dossier">Modifier…</button>${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>`}
+        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-modifier-plan="${echapper(p.id)}" title="Nom, indice, dossier">Modifier…</button>${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button><button type="button" class="bouton-secondaire petit" data-renettoyer="${echapper(p.id)}" title="Revoir les calques, les objets enlevés, la zone… (le plan reçu d'origine est gardé)">Nettoyage…</button>`}
           <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}" title="Contre un autre plan du projet">Vérifier</button>${controlerPlan ? `<button type="button" class="bouton-secondaire petit" data-controler="${echapper(p.id)}" title="Un point du plan contre un point levé (vert ≤ 2 mm, orange ≤ 15 mm)">Contrôler (points)</button>` : ''}</td>
       </tr>${indices.length > 1 && !simple ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
@@ -1362,6 +1364,49 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     return recette;
   }
 
+  /**
+   * 0.321.0 : modifier le nettoyage d'un plan déjà calé. Le plan reçu d'origine est gardé dans le plan enregistré
+   * (`contenu.original`) : on rouvre l'étape Nettoyer avec la recette enregistrée (calage inchangé), puis on remplace le plan.
+   */
+  async function renettoyer(planId) {
+    const plan = projet.plansDxf.find((p) => p.id === planId);
+    const c = plan?.calage;
+    if (!c) return;
+    const original = plan.contenu?.original;
+    if (!original) {
+      message('Ce plan a été enregistré avant que l\'original soit gardé : faites « Nouvel indice… » avec le fichier d\'origine (la recette de nettoyage est reprise), ou enregistrez-le à nouveau une fois.', 9000);
+      return;
+    }
+    remettreAZero();
+    etat.dejaCale = estDejaCale(plan);
+    etat.referenceId = c.referenceId;
+    if (!etat.dejaCale && !reference()) {
+      message(`La référence « ${c.referenceNom} » n'est plus dans le projet : le calage ne peut pas être rouvert.`, 6000);
+      return;
+    }
+    Object.assign(etat, {
+      renet: { planId, ancien: plan }, lu: original, fichier: c.fichier ?? plan.nom, nom: plan.nom, indice: c.indice ?? 'A',
+      elements: c.elements.map((e) => ({ ...e, plan: [...e.plan], ref: [...e.ref] })), role: 'calage', type: 'point', affichage: 'deux',
+    });
+    if (etat.dejaCale) etat.resultat = resultatDejaCale();
+    else {
+      if (!etat.elements.some((e) => e.role === 'calage')) {
+        etat.auto = { similitude: { ...c.similitude }, niveau: c.auto?.niveau ?? 'forte', echelleBrute: c.echelleBrute, echelleArrondie: c.echelleArrondie, sources: [`calage de l'indice ${c.indice ?? '?'}`] };
+      }
+      recalculer();
+    }
+    if (!etat.resultat) {
+      message(etat.erreur || 'Le calage de ce plan ne peut pas être rouvert.', 5000);
+      return;
+    }
+    etat.recette = JSON.parse(JSON.stringify(c.nettoyage ?? recetteDeDepart(original)));
+    etat.recette.types = { ...recetteDeDepart(original).types, ...etat.recette.types };
+    etat.recette.enleves ??= [];
+    etat.avant = [];
+    etape = 'nettoyer';
+    dessiner();
+  }
+
   function enregistrer() {
     const { plan: propre } = planNettoye();
     if (!propre.compte.objets) {
@@ -1382,10 +1427,18 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     });
     if (!ni && dossiers().length) plan.sousDossiers = etat.dossier ? [etat.dossier] : (dossierDepart() ? [dossierDepart()] : []);
     // Nouvel indice : l'indice d'avant reste dans le projet (caché), le nouveau prend sa place à l'écran.
-    const range = ajouterPlan(plan, ni ? { conserve: ni.planId } : {});
+    // 0.321.0 : le plan reçu d'origine est gardé dans le plan (même fichier que son contenu), pour pouvoir refaire le nettoyage.
+    if (!simple) plan.contenu = { ...plan.contenu, original: etat.lu };
+    const rn = etat.renet;
+    if (rn) {
+      // Nettoyage modifié : même plan (id, nom, indice, historique, vérification) ; seuls le nettoyage et son contenu changent.
+      plan.nom = rn.ancien.nom;
+      plan.calage = { ...rn.ancien.calage, nettoyage: JSON.parse(JSON.stringify(etat.recette)), reperes: plan.calage.reperes, calquesVus: plan.calage.calquesVus, nettoyeLe: new Date().toISOString() };
+    }
+    const range = ajouterPlan(plan, rn ? { remplace: rn.planId } : ni ? { conserve: ni.planId } : {});
     if (!range) return;
     etat.enregistre = range;
-    message(`Plan « ${etat.enregistre.nom} » ${etat.dejaCale ? 'importé (déjà calé)' : 'calé'} et rangé dans le projet`, 4000, { ok: true });
+    message(rn ? `Nettoyage de « ${range.nom} » mis à jour` : `Plan « ${etat.enregistre.nom} » ${etat.dejaCale ? 'importé (déjà calé)' : 'calé'} et rangé dans le projet`, 4000, { ok: true });
     etape = 'fin';
     dessiner();
   }
@@ -1567,6 +1620,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     else if (action === 'finir-axe') finirAxe();
     else if (cible.dataset.modifierPlan) modifierPlanListe(cible.dataset.modifierPlan);
     else if (cible.dataset.indiceDe) commencerIndice(cible.dataset.indiceDe);
+    else if (cible.dataset.renettoyer) renettoyer(cible.dataset.renettoyer);
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
     else if (cible.dataset.controler) {
       // Contrôle avec les points levés (0.309.0) : celui de la page Plans (barre sur le plan de l'appli).

@@ -3,11 +3,13 @@
 // Page plein écran à part (comme Calage de plans) : « Plans » (liste du projet) · « Dessiner » (bandeau d'outils en
 // haut comme AutoCAD, plan au centre, phases et élément choisi à droite).
 // Étape 1 : zones, lignes (clôtures…), pistes, flèches, textes, phases, accroches, fonds. 0.289.0 (étapes 2 à 4) :
-// symboles (bibliothèque de blocs modernisés à gauche, grues réglables, base-vie à étage, import d'un DXF de blocs),
+// symboles (bibliothèque de blocs modernisés à gauche, grues réglables, base-vie à étage,
+// import d'un DXF de blocs),
 // fond swisstopo / cadastre / surfaces, onglet « Feuille » (A4 / A3 / A1, cartouche avec logo, légende, nord, échelle,
 // une page par phase), PDF et DXF.
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
+import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
@@ -135,6 +137,7 @@ export function ouvrirPlansChantier({
   let dernierMessagePrise = 0;
   const page = document.createElement('dialog');
   page.className = 'page-chantier';
+  habillerPage(page, { couleur: '#b45309', titre: 'Plans de chantier' });
   document.body.append(page);
   page.showModal();
 
