@@ -14,7 +14,7 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, logo: f.logo ?? 'perrin',
+    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), logo: f.logo ?? 'perrin',
   };
 }
 
@@ -232,9 +232,27 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
  * Vue du cadre du plan (pour dessiner) : px par m, centre, taille en px. pxParMm : définition du dessin (px / mm de
  * papier). Le centre est celui de la feuille (feuille.centre), sinon le milieu des éléments, sinon des plans.
  */
-export function vueDuCadre(plan, cadre, pxParMm, centre) {
+export function vueDuCadre(plan, cadre, pxParMm, centre, rotation = 0) {
   const echelle = plan.echelle ?? ECHELLE_PAPIER;
-  return { echelle: (pxParMm * 1000) / echelle, estCentre: centre[0], nordCentre: centre[1], largeur: cadre.l * pxParMm, hauteur: cadre.h * pxParMm, rotation: 0 };
+  return { echelle: (pxParMm * 1000) / echelle, estCentre: centre[0], nordCentre: centre[1], largeur: cadre.l * pxParMm, hauteur: cadre.h * pxParMm, rotation };
+}
+
+/** Rotation de la feuille (°) ramenée à −180…180 ; arrondie au centième. */
+export const rotationDeFeuille = (v) => {
+  const n = Number(String(v ?? 0).replace(',', '.'));
+  if (!Number.isFinite(n)) return 0;
+  return Math.round((((n + 180) % 360 + 360) % 360 - 180) * 100) / 100;
+};
+
+/**
+ * Rotation de la feuille (0.332.0) qui met une ligne du plan à l'HORIZONTALE (ou à la VERTICALE) : « angle » = angle de la ligne
+ * sur le terrain (°, depuis l'Est, sens inverse des aiguilles, comme `angleDeLaLigne`). La rotation est la direction du terrain
+ * montrée en haut de la feuille (azimut, voir plan/vue.js) ; on garde le plan « à l'endroit » (de −90° à 90°).
+ */
+export function rotationPourAligner(angle, vertical = false) {
+  const base = vertical ? 90 - angle : -angle;
+  const r = ((((base + 90) % 180) + 180) % 180) - 90;
+  return Math.round(r * 100) / 100;
 }
 
 /** Centre de départ de la feuille : milieu des éléments du plan (ou des plans du projet, ou null). */

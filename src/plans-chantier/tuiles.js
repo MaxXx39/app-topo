@@ -51,6 +51,19 @@ function tuile(adresse, traitsSeulement, quandPrete) {
  * Renvoie { tuiles, manquantes, enCours } (manquantes = pas chargées : pas de connexion ?).
  */
 export function dessinerFondSwisstopo(ctx, vue, fond, densite = 1, quandPrete = null) {
+  if (!vue.rotation) return dessinerFondDroit(ctx, vue, fond, densite, quandPrete);
+  // 0.332.0 : vue tournée : le fond est dessiné « droit » sur un carré qui couvre la diagonale, puis tourné autour du centre de la vue.
+  const D = Math.hypot(vue.largeur, vue.hauteur);
+  ctx.save();
+  ctx.translate(vue.largeur / 2, vue.hauteur / 2);
+  ctx.rotate((-vue.rotation * Math.PI) / 180);
+  ctx.translate(-D / 2, -D / 2);
+  const res = dessinerFondDroit(ctx, { ...vue, rotation: 0, largeur: D, hauteur: D }, fond, densite, quandPrete);
+  ctx.restore();
+  return res;
+}
+
+function dessinerFondDroit(ctx, vue, fond, densite = 1, quandPrete = null) {
   const res = { tuiles: 0, manquantes: 0, enCours: 0 };
   const couches = [fond?.carte ? 'carte' : null, fond?.ortho ? 'satellite' : null, fond?.cadastre ? 'cadastre' : null].filter(Boolean);
   if (!couches.length) return res;

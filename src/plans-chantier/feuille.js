@@ -3,7 +3,7 @@
 // puis cadre, nord, barre d'échelle, légende et cartouche avec logo. Dans le PDF (jsPDF), l'image de la feuille est
 // posée en entier et les textes de la légende et du cartouche sont écrits en vrai texte (nets à l'impression).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
-import { versEcran } from '../plan/vue.js';
+import { versEcran, versTerrain } from '../plan/vue.js';
 import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
@@ -49,7 +49,7 @@ export function preparerPage(donnees, page, pxParMm) {
   const legende = r.legende ? elementsLegende(objets, nomSymbole) : [];
   const mise = miseEnPageFeuille(r.format, r.orientation, legende.length, { coin: r.cartouche, positions: r.positions, situation: r.situation });
   const centre = r.centre ?? donnees.centre ?? [2500000, 1118000];
-  const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre);
+  const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre, r.rotation);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';
   const champs = {
     affaire: nomChantierCartouche(donnees.projet?.cartouche, donnees.projet?.nom, r.chantier), // « affaire - désignation », modifiable (0.329.0)
@@ -155,7 +155,7 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   ctx.strokeStyle = '#1b2b36';
   ctx.lineWidth = Math.max(1, 0.5 * s);
   ctx.strokeRect(mm(c.x), mm(c.y), mm(c.l), mm(c.h));
-  if (prep.r.nord) dessinerNord(ctx, mise.nord, s);
+  if (prep.r.nord) dessinerNord(ctx, mise.nord, s, prep.r.rotation); // le nord tourne avec le plan (0.332.0)
   if (prep.r.situation.actif) dessinerSituation(ctx, d, prep, s, quandTuile, texte);
   if (prep.r.barre) {
     const b = barreDeLaFeuille(plan.echelle ?? 200, mise.barre.max);
@@ -258,15 +258,25 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
   const e = etendueDuCadre(d.pc, mise.cadre, centre);
   const a = versEcran(e.estMin, e.nordMax, vueS);
   const b = versEcran(e.estMax, e.nordMin, vueS);
+  // 0.332.0 : plan tourné : la zone vue est un rectangle penché ; on trace ses 4 coins.
+  const penche = vue.rotation ? [[0, 0], [vue.largeur, 0], [vue.largeur, vue.hauteur], [0, vue.hauteur]].map(([x, y]) => { const t = versTerrain(x, y, vue); return versEcran(t.est, t.nord, vueS); }) : null;
   ctx.fillStyle = 'rgba(220,38,38,0.15)';
   ctx.strokeStyle = '#dc2626';
   ctx.lineWidth = Math.max(1, sit.epaisseur * s); // 0.329.0 : épaisseur réglable
   // Rectangle rouge : jamais plus petit que 5 mm sur le papier (0.295.1), centré sur la zone du plan.
   const mini = 5 * mise.k * s;
-  const [rl, rh] = [Math.max(b.x - a.x, mini), Math.max(b.y - a.y, mini)];
-  const [rx, ry] = [(a.x + b.x) / 2 - rl / 2, (a.y + b.y) / 2 - rh / 2];
-  ctx.fillRect(rx, ry, rl, rh);
-  ctx.strokeRect(rx, ry, rl, rh);
+  if (penche) {
+    ctx.beginPath();
+    penche.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    const [rl, rh] = [Math.max(b.x - a.x, mini), Math.max(b.y - a.y, mini)];
+    const [rx, ry] = [(a.x + b.x) / 2 - rl / 2, (a.y + b.y) / 2 - rh / 2];
+    ctx.fillRect(rx, ry, rl, rh);
+    ctx.strokeRect(rx, ry, rl, rh);
+  }
   ctx.restore();
   ctx.strokeStyle = '#1b2b36';
   ctx.lineWidth = Math.max(1, 0.5 * s);
@@ -288,10 +298,17 @@ function boite(ctx, b, s) {
 }
 
 /** Flèche du nord (le plan est toujours nord en haut). */
-function dessinerNord(ctx, n, s) {
+function dessinerNord(ctx, n, s, rotation = 0) {
   const x = n.x * s;
   const y = n.y * s;
   const t = n.t * s;
+  ctx.save();
+  if (rotation) {
+    // Le plan montre en haut la direction « rotation » (azimut) : le nord est alors tourné de −rotation (sens des aiguilles).
+    ctx.translate(x, y);
+    ctx.rotate((-rotation * Math.PI) / 180);
+    ctx.translate(-x, -y);
+  }
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.beginPath();
   ctx.arc(x, y, t * 0.75, 0, 2 * Math.PI);
@@ -319,6 +336,7 @@ function dessinerNord(ctx, n, s) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('N', x, y - t * 0.95);
+  ctx.restore();
 }
 
 /** Petit dessin d'un genre dans la légende, dans la boîte b (px). */

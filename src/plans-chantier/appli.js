@@ -15,6 +15,7 @@ import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
 import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroche.js';
+import { deplacer, versTerrain } from '../plan/vue.js';
 import {
   GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
   deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
@@ -43,7 +44,7 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { accrocherBoite, positionDeBoite, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -1109,7 +1110,14 @@ export function ouvrirPlansChantier({
         <span class="valeur-zoom" title="Zoom de l'aperçu (ne change pas ce qui est imprimé)">${Math.round((etat.feuilleZoom ?? 1) * 100)} %</span>
         ${bouton('data-action="feuille-zoom-plus"', '<circle cx="11" cy="11" r="6"/><path d="M8 11H14M11 8V14M16 16L20 20"/>', 'Zoom avant sur l\'aperçu (molette aussi)', 'Zoom +')}
         ${bouton('data-action="feuille-zoom-ajuster"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Toute la feuille dans la vue', 'Ajuster')}
-        ${bouton(`data-action="feuille-deplacer-plan" aria-pressed="${Boolean(etat.feuilleDeplacerPlan)}"`, '<path d="M12 3V21M3 12H21M12 3L9.5 6M12 3L14.5 6M12 21L9.5 18M12 21L14.5 18M3 12L6 9.5M3 12L6 14.5M21 12L18 9.5M21 12L18 14.5"/>', 'Déplacer le plan sur la feuille (sinon glisser déplace seulement la vue ; nord, barre d\'échelle et situation se glissent directement)', 'Déplacer le plan', false).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleDeplacerPlan ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-deplacer-plan" aria-pressed="${etat.feuilleMode === 'plan'}"`, '<path d="M12 3V21M3 12H21M12 3L9.5 6M12 3L14.5 6M12 21L9.5 18M12 21L14.5 18M3 12L6 9.5M3 12L6 14.5M21 12L18 9.5M21 12L18 14.5"/>', 'Déplacer le plan sur la feuille (sinon glisser déplace seulement la vue ; nord, barre d\'échelle et situation se glissent directement)', 'Déplacer le plan', false).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'plan' ? ' actif' : ''}"`)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Rotation">
+        <label class="champ-bande" title="Rotation du plan sur la feuille, en degrés (le nord tourne avec lui)"><span>Rotation °</span><input type="text" inputmode="decimal" value="${r.rotation}" data-feuille="rotation" size="5" autocomplete="off"></label>
+        ${bouton(`data-action="feuille-aligner-h" aria-pressed="${etat.feuilleMode === 'aligner-h'}"`, '<path d="M3 12H21M3 8V16M21 8V16"/>', 'Aligner : cliquez une ligne du plan, elle devient horizontale', 'Aligner ―').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'aligner-h' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-aligner-v" aria-pressed="${etat.feuilleMode === 'aligner-v'}"`, '<path d="M12 3V21M8 3H16M8 21H16"/>', 'Aligner : cliquez une ligne du plan, elle devient verticale', 'Aligner |').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'aligner-v' ? ' actif' : ''}"`)}
+        ${bouton(`data-action="feuille-pivoter" aria-pressed="${etat.feuilleMode === 'pivoter'}"`, '<path d="M20 12A8 8 0 1 1 15 4.6M20 4V9H15"/>', 'Pivoter à la main : glissez sur la feuille (crans de 5°)', 'Pivoter').replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'pivoter' ? ' actif' : ''}"`)}
+        ${bouton('data-action="feuille-nord-haut"', '<path d="M12 4V16M8 8L12 4L16 8M6 20H18"/>', 'Nord en haut (rotation 0°)', 'Nord en haut', !r.rotation)}
       </div>
       <div class="groupe-ruban" role="group" aria-label="Sortie">
         ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer le plan sur les éléments', 'Recentrer')}
@@ -1180,10 +1188,24 @@ export function ouvrirPlansChantier({
     canvas.addEventListener('pointerdown', (ev) => {
       if (!plan() || !feuille.mise) return;
       canvas.setPointerCapture(ev.pointerId);
-      // 0.331.0 : par défaut, glisser = déplacer la VUE (le plan ne bouge pas sur la feuille) ; le bouton « Déplacer le plan » change cela.
-      if (etat.feuilleDeplacerPlan) {
-        const r = reglagesFeuille(plan());
-        feuille.geste = { type: 'plan', x: ev.clientX, y: ev.clientY, centre: r.centre ?? donneesFeuille().centre ?? [0, 0], change: false };
+      const mode = etat.feuilleMode ?? 'vue';
+      // 0.331.0 : par défaut, glisser = déplacer la VUE (le plan ne bouge pas sur la feuille) ; les boutons de la bande changent le mode.
+      if (mode === 'plan') {
+        feuille.geste = { type: 'plan', x: ev.clientX, y: ev.clientY, vue0: { ...feuille.vue }, change: false };
+        return;
+      }
+      if (mode === 'pivoter') {
+        // 0.332.0 : on tourne le plan autour du centre du cadre ; la rotation suit le doigt par crans de 5°.
+        const r = canvas.getBoundingClientRect();
+        const c = feuille.mise.cadre;
+        const cx = r.left + ((c.x + c.l / 2) / feuille.mise.page.largeur) * r.width;
+        const cy = r.top + ((c.y + c.h / 2) / feuille.mise.page.hauteur) * r.height;
+        feuille.geste = { type: 'pivot', cx, cy, a0: Math.atan2(ev.clientY - cy, ev.clientX - cx), r0: reglagesFeuille(plan()).rotation, change: false, x: ev.clientX, y: ev.clientY };
+        return;
+      }
+      if (mode.startsWith('aligner')) {
+        aligner(enMm(ev), mode === 'aligner-v');
+        feuille.geste = null;
         return;
       }
       const nom = elementSous(enMm(ev));
@@ -1196,7 +1218,8 @@ export function ouvrirPlansChantier({
     canvas.addEventListener('pointermove', (ev) => {
       const g = feuille?.geste;
       if (!g) {
-        canvas.style.cursor = !etat.feuilleDeplacerPlan && feuille.mise && elementSous(enMm(ev)) ? 'move' : '';
+        const mode = etat.feuilleMode ?? 'vue';
+        canvas.style.cursor = mode.startsWith('aligner') ? 'crosshair' : mode === 'pivoter' ? 'alias' : mode === 'vue' && feuille.mise && elementSous(enMm(ev)) ? 'move' : '';
         return;
       }
       const dx = ev.clientX - g.x;
@@ -1229,14 +1252,23 @@ export function ouvrirPlansChantier({
         imageApercu = requestAnimationFrame(() => dessinerApercu());
         return;
       }
-      // px d'aperçu → mm de papier → m sur le terrain.
-      const m = (plan().echelle ?? ECHELLE_PAPIER) / 1000 / (feuille.pxParMm || 1);
-      plan().feuille = { ...(plan().feuille ?? {}), centre: [g.centre[0] - dx * m, g.centre[1] + dy * m] };
+      if (g.type === 'pivot') {
+        const delta = ((Math.atan2(ev.clientY - g.cy, ev.clientX - g.cx) - g.a0) * 180) / Math.PI; // sens des aiguilles = positif
+        plan().feuille = { ...(plan().feuille ?? {}), rotation: rotationDeFeuille(Math.round((g.r0 - delta) / 5) * 5) };
+        cancelAnimationFrame(imageApercu);
+        imageApercu = requestAnimationFrame(() => dessinerApercu());
+        return;
+      }
+      // glisser le plan : la vue du cadre se décale (la rotation est prise en compte)
+      const v = deplacer(g.vue0, dx, dy);
+      plan().feuille = { ...(plan().feuille ?? {}), centre: [v.estCentre, v.nordCentre] };
       dessinerApercu();
     });
     const fin = () => {
-      if (feuille?.geste?.change) enregistrer();
+      const g = feuille?.geste;
+      if (g?.change) enregistrer();
       if (feuille) feuille.geste = null;
+      if (g?.change && g.type === 'pivot') majBandeFeuille(); // la valeur de la rotation s'affiche
     };
     canvas.addEventListener('pointerup', fin);
     canvas.addEventListener('pointercancel', fin);
@@ -1245,6 +1277,24 @@ export function ouvrirPlansChantier({
       ev.preventDefault();
       zoomerFeuille(ev.deltaY < 0 ? 1.2 : 1 / 1.2, ev.clientX, ev.clientY);
     }, { passive: false });
+    majFeuille();
+  }
+
+  /** Aligner (0.332.0) : le clic sur une ligne du plan (ou d'un élément dessiné) la rend horizontale (ou verticale) sur la feuille. */
+  function aligner([x, y], vertical) {
+    const mise = feuille.mise;
+    const vue = feuille.vue;
+    const t = versTerrain((x - mise.cadre.x) * feuille.pxParMm, (y - mise.cadre.y) * feuille.pxParMm, vue);
+    const tolerance = 10 / vue.echelle;
+    const autres = plan().objets;
+    const lignes = [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(autres), ...sourcesDesPlans(plansFond(), { est: t.est, nord: t.nord }, tolerance).lignes];
+    const angle = angleDeLaLigne(lignes, [t.est, t.nord], tolerance, 0);
+    if (angle === null) return message('Aucune ligne ici : cliquez sur une ligne du plan ou un élément dessiné.', 3500);
+    if (!avantChangement()) return;
+    plan().feuille = { ...(plan().feuille ?? {}), rotation: rotationPourAligner(angle, vertical) };
+    etat.feuilleMode = 'vue';
+    enregistrer();
+    message(`Plan tourné de ${rotationPourAligner(angle, vertical)}° : la ligne est ${vertical ? 'verticale' : 'horizontale'}.`, 4000, { ok: true });
     majFeuille();
   }
 
@@ -1306,6 +1356,7 @@ export function ouvrirPlansChantier({
       const donnees = donneesFeuille();
       prep = preparerPage(donnees, pages[feuille.page], pxParMm);
       feuille.mise = prep.mise; // pour le toucher (nord, barre d'échelle, situation)
+      feuille.vue = prep.vue;
       const logo = await chargerImage(adresseLogo(r.logo));
       if (!feuille || feuille.canvas !== c || feuille.numero !== numero) return; // un dessin plus récent a pris la suite
       dessinerPage(ctx, donnees, prep, pxParMm, {
@@ -1456,10 +1507,18 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'feuille-zoom-plus') return zoomerFeuille(1.25);
     if (b.dataset.action === 'feuille-zoom-moins') return zoomerFeuille(0.8);
     if (b.dataset.action === 'feuille-zoom-ajuster') return zoomerFeuille(0);
-    if (b.dataset.action === 'feuille-deplacer-plan') {
-      etat.feuilleDeplacerPlan = !etat.feuilleDeplacerPlan;
-      message(etat.feuilleDeplacerPlan ? 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.' : 'Glisser déplace maintenant la vue ; le plan reste en place.', 3500);
+    const modes = { 'feuille-deplacer-plan': ['plan', 'Déplacer le plan : glissez sur la feuille pour décaler le plan dans le cadre.'], 'feuille-aligner-h': ['aligner-h', 'Aligner : cliquez une ligne du plan, elle deviendra horizontale.'], 'feuille-aligner-v': ['aligner-v', 'Aligner : cliquez une ligne du plan, elle deviendra verticale.'], 'feuille-pivoter': ['pivoter', 'Pivoter : glissez autour du centre de la feuille (crans de 5°).'] };
+    if (modes[b.dataset.action]) {
+      const [mode, texte] = modes[b.dataset.action];
+      etat.feuilleMode = etat.feuilleMode === mode ? 'vue' : mode;
+      message(etat.feuilleMode === 'vue' ? 'Glisser déplace maintenant la vue ; le plan reste en place.' : texte, 3500);
       return majBandeFeuille();
+    }
+    if (b.dataset.action === 'feuille-nord-haut') {
+      if (!avantChangement()) return;
+      p.feuille = { ...(p.feuille ?? {}), rotation: 0 };
+      enregistrer();
+      return majFeuille();
     }
     if (b.dataset.action === 'feuille-positions-reinit') {
       if (!avantChangement()) return;
