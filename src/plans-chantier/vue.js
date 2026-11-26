@@ -10,6 +10,7 @@ import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { pointsDePrise } from '../topo/prise-bloc.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
+import { resultatMesure } from '../topo/mesure-plan.js';
 
 const SEUIL_GLISSER_PX = 5;
 const FACTEUR_MOLETTE = 1.2;
@@ -406,9 +407,11 @@ export function creerVueChantier(conteneur, options) {
       return;
     }
     const pts = curseur ? [...s.points, curseur] : s.points;
-    const couleur = pc ? couleurObjet(pc, { type: s.outil, categorie: s.categorie, style: s.style, phase: pc.phaseActive }) : ORANGE;
-    chemin(ctx, pts, s.outil === 'zone');
-    if (s.outil === 'zone' && pts.length >= 3) {
+    const mesure = s.outil === 'mesure'; // 0.334.0 : mesure rapide (rien n'est enregistré), tracée en bleu avec le résultat près du curseur
+    const couleur = mesure ? '#2563eb' : pc ? couleurObjet(pc, { type: s.outil, categorie: s.categorie, style: s.style, phase: pc.phaseActive }) : ORANGE;
+    const fermee = s.outil === 'zone' || (mesure && s.mode === 'surface');
+    chemin(ctx, pts, fermee);
+    if (fermee && pts.length >= 3) {
       ctx.globalAlpha = 0.12;
       ctx.fillStyle = couleur;
       ctx.fill();
@@ -425,6 +428,20 @@ export function creerVueChantier(conteneur, options) {
     for (const p of s.points) {
       const q = ecran(p);
       ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+    }
+    if (mesure && curseur) {
+      const lignes = resultatMesure(s.mode, pts).lignes;
+      const c = ecran(curseur);
+      ctx.font = 'bold 13px sans-serif';
+      const l = Math.max(...lignes.map((t) => ctx.measureText(t).width), 0) + 12;
+      lignes.forEach((t, i) => {
+        const x = c.x + 14;
+        const y = c.y + 14 + i * 20;
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillRect(x, y, l, 18);
+        ctx.fillStyle = '#1e3a8a';
+        ctx.fillText(t, x + 6, y + 13);
+      });
     }
   }
 

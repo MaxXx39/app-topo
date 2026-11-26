@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.333.0 — Feuille : cadres de détail (1 ou 2 autres endroits du plan) (demande du 26.11, 3e et dernière livraison)
+Lire seulement la section utile : `grep -n '^## 0.334.0 — Plans de chantier, lot 1 (demandes du 26.11 : petits correctifs)
+- **Décisions de l'utilisateur** : mode Intermédiaire demandé, mais Plans de chantier est déjà une appli Expert (rien à poser dans l'appli) ; mesure = affichage seulement (rien d'enregistré) ; traits de construction = couleurs au choix (pas de familles).
+- **Décaler une construction = une construction** : `segmentProcheAvecOrigine` / `ligneProcheAvecOrigine` (`topo/plan-chantier.js`) disent si la ligne touchée est une construction ; la copie garde trait et couleur (droite infinie ou segment comme l'original). Le bouton « ⇉ Décaler » existe aussi pour une construction choisie (pas pour une ligne de coupe).
+- **Couleur d'une construction** : liste de 7 couleurs (cyan par défaut) pour le nouvel outil et pour la ligne choisie (`couleur` de l'objet, `couleurObjet` la respecte même en « couleurs par phases »).
+- **Mesure rapide** (outil « Mesure », `topo/mesure-plan.js`, formules de `mesure-rapide.js`) : Longueur (total + dernier côté), Angle (3 points, sommet = le 2e, degrés décimaux), Surface (+ périmètre) ; résultat près du curseur et en bas ; Entrée = effacer ; rien n'est enregistré ni imprimé. Tests `mesure-plan.test.js` (4).
+- **Texte « Plans de chantier » en haut à gauche retiré** (la bulle d'aide reste). **« Présentation 1 »** créée d'office pour un plan sans présentation (renommable). **Surbrillance** orange de la ligne visée avant le clic de « Aligner » (Feuille).
+- Reste (lots 2 à 4, maquettes à valider) : pastilles Fond / Plan / Points comme les autres modules (appui long = geler) + bouton « Répliquer » dans Feuille ; onglets Gestion de plan chantier / Dessin / Présentation + outils à droite ; popups (détail, cartouche, situation) et outils rangés par type.
+
+## 0.333.0 — Feuille : cadres de détail (1 ou 2 autres endroits du plan) (demande du 26.11, 3e et dernière livraison)
 - **Réponses de l'utilisateur** : titre, bord au choix, fond et calques au choix, échelle propre, repère sur le plan principal, taille à la souris avec accroches, bords arrondis ou en cercle (loupe).
 - **Modèle** `feuille.details` [{ id, lettre (A, B), titre, centre [est, nord], echelle (1:50 au départ ≈ ¼ de celle du plan), forme (rectangle / rond), fw, fh (taille en fractions du cadre : suit un changement de format), pos { fx, fy }, bord { epaisseur, couleur, trait }, fond (blanc / photo / carte / aucun), plans (null = comme la feuille, sinon ids), repere }] (`topo/details-feuille.js`, **2 au plus**, `MAX_DETAILS`). Fait partie des présentations (dans `feuille`).
 - **Mise en page** : `miseEnPageFeuille(…, { details })` place chaque cadre (`boites['det:<id>']`) dans un coin libre (jamais sur le cartouche / légende / autres éléments) ou à sa place choisie ; nord, barre d'échelle et situation s'écartent.
