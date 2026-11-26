@@ -1772,8 +1772,8 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ouvrirPartieProjet('points');
   },
   applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() && !estDansAppliWindows() }) // 0.320.14 : Topo Tablette (Windows, avec souris) montre aussi Plans de chantier, Plateformes, Comparer, Matériel
-    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile. Sauf Topo Tablette (Windows, 0.322.0 : le plan se choisit comme une appli).
-    .filter((a) => a.cle !== 'plan' || estDansAppliWindows() || !window.matchMedia('(min-width: 900px)').matches),
+    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
+    .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
   titre: titreAppli,
   sousApplis,
@@ -4263,6 +4263,14 @@ function demanderEncartPlan() {
   requestAnimationFrame(() => { encartEnAttente = false; placerEncartPlan(); });
 }
 document.addEventListener('cible-en-haut', demanderEncartPlan);
+// 0.323.0 : menu Applications ouvert / fermé : la cible et l'encart de l'appli d'avant partent (ou reviennent).
+document.addEventListener('page-applis', () => {
+  if (document.body.classList.contains('page-applis-ouverte') && document.body.classList.contains('cible-en-haut')) {
+    document.body.classList.remove('cible-en-haut');
+    document.dispatchEvent(new CustomEvent('cible-en-haut'));
+  }
+  // À la fermeture, la cible revient au prochain état du récepteur (5 fois par seconde).
+});
 window.addEventListener('resize', demanderEncartPlan);
 new MutationObserver(demanderEncartPlan).observe(document.body, { subtree: true, childList: true, characterData: true });
 // 0.151.0 : bouton « Implanter » en bas à droite du plan (point ou ligne choisi).
