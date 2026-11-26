@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.323.0 — Bouton du bas comme Contrôle, menu = plan seul (retours du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.324.0 — Matériel : désignation en 3 champs, désignation en premier, ＋ catégorie dans la fiche (demande du 26.11)
+- **Désignation** = « Marque - Modèle - Autre - N° interne » (`designationArticle` de `materiel/donnees.js`, parties vides sautées), calculée et rangée dans `article.designation` (le reste du code, les tablettes et les exports la lisent comme avant). Fiche : nouveau bloc **« Désignation »** en premier (Marque, Modèle, Autre + aperçu pendant la frappe) ; **Marque / Modèle retirés de « Achat et garantie »**. Marque et Modèle = listes proposées d'après le parc (`marquesDuParc`, `modelesDuParc` : ceux de la marque d'abord), toujours modifiables à la main.
+- **Ancien parc** : la désignation libre devient le champ « Autre » (`normaliserParc`) ; un appel sans `autre` (import, anciens tests) prend `designation` comme « Autre ».
+- **Parc** : colonne Désignation **en premier**, puis le N°. **Planning** : colonne Article élargie (190 → 300 px) pour voir la désignation à côté du n°.
+- **＋ Catégorie** à côté de la liste des catégories dans la fiche (ce qui est tapé reste).
+- **Logos devant les articles** : planche de 16 dessins en 2 familles (A trait noir, B trait blanc sur carré de couleur) envoyée pour validation ; **rien de codé** (case « logo dans l'export » à faire après le choix).
+- Tests `materiel-donnees.test.js` (+2). Pas d'essai visuel.
+
+## 0.323.0 — Bouton du bas comme Contrôle, menu = plan seul (retours du 26.11)
 - **Applis plein écran** (Calage, Matériel, Plans de chantier, Plateformes, Comparer) : le bouton du bas est **le même que la bande des autres applis** (`.bande-appli.bande-page` + `.bouton-appli` + `.partie-appli`, ☰ + nom, couleur de l'appli), **sans bandeau sombre** derrière (comme Contrôle). Le nom du projet reste en haut. Vérifié en Playwright (Calage 1366 × 768, retour au menu).
 - **Tuile « Plan » sous Windows retirée** (0.322.0 annulée, demande de l'utilisateur). **Menu Applications ouvert = le plan seul** : `g.implantation` du plan, cible, ⇄, barres de pointage et coordonnées cachés (`body.page-applis-ouverte`) ; l'encart « cible en haut » n'est pas posé tant que le menu est ouvert (`montrerCibleEnHaut` de `leve/ecran.js`, événement `page-applis` de `navigation/bande.js`). Pas essayé avec un vrai récepteur.
 - **Maquette (pas codée)** : pastille rouge « niveau à bulle + Sans incl. / canne bullée » sous le logo du récepteur, à la place de « Contrôle à refaire » : envoyée à l'utilisateur pour validation.

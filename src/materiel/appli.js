@@ -14,6 +14,7 @@ import {
   ajouterCategorie, renommerCategorie, supprimerCategorie, deplacerCategorie, ajouterChantier, modifierChantier,
   supprimerChantier, chantiersTries, responsables, chantierDuProjet, projetsSansChantier, cleNumeroDuProjet,
   normaliserNumeroChantier, dateSuisse, montantSuisse, texteSurCouleur, nouvelId,
+  marquesDuParc, modelesDuParc, designationArticle,
 } from './donnees.js';
 import {
   lireParcLocal, enregistrerParcLocal, lireFichierLocal, enregistrerFichierLocal, supprimerFichierLocal,
@@ -35,8 +36,8 @@ const libelleStatut = (s) => STATUTS.find(([c]) => c === s)?.[1] ?? s;
 
 // Colonnes du tableau du parc : [clé, titre, valeur pour le tri].
 const COLONNES = [
-  ['numero', 'N°', (a) => a.numero],
   ['designation', 'Désignation', (a) => a.designation],
+  ['numero', 'N°', (a) => a.numero],
   ['categorie', 'Catégorie', (a, p) => p.categories.find((c) => c.id === a.categorieId)?.nom ?? ''],
   ['codeCompta', 'Code compta', (a) => a.codeCompta],
   ['statut', 'Statut', (a) => libelleStatut(a.statut)],
@@ -340,8 +341,8 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       : `<table class="tableau-materiel">
         <thead><tr>${COLONNES.map(([c, t]) => `<th><button type="button" class="tri" data-tri="${c}">${t}${tri.colonne === c ? (tri.sens > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}<th><span class="sr">Ordre</span></th></tr></thead>
         <tbody>${liste.map((a) => `<tr data-article="${echapper(a.id)}" class="ligne-statut-${a.statut}">
-          <td><span class="pastille-article" style="background:${a.couleur};color:${texteSurCouleur(a.couleur)}">${echapper(a.numero)}</span></td>
           <td>${echapper(a.designation)}${a.parentId ? ` <span class="aide">(accessoire de ${echapper(parent.get(a.parentId) ?? '?')})</span>` : ''}</td>
+          <td><span class="pastille-article" style="background:${a.couleur};color:${texteSurCouleur(a.couleur)}">${echapper(a.numero)}</span></td>
           <td>${echapper(nomCategorie.get(a.categorieId) ?? '')}</td>
           <td>${echapper(a.codeCompta)}</td>
           <td><span class="statut-materiel statut-${a.statut}">${libelleStatut(a.statut)}</span></td>
@@ -356,7 +357,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
   // Fiche d'un article (nouveau ou existant).
   function htmlFiche() {
     const article = fiche.id ? parc.articles.find((a) => a.id === fiche.id) : null;
-    const v = article ?? fiche.brouillon ?? { categorieId: filtre.categorieId || categoriesTriees(parc)[0]?.id, statut: 'actif' };
+    const v = fiche.saisie ?? article ?? fiche.brouillon ?? { categorieId: filtre.categorieId || categoriesTriees(parc)[0]?.id, statut: 'actif' };
     const couleur = v.couleur || couleurProposee(parc, v.categorieId);
     const champ = (nom, titre, { type = 'text', classe = '', attributs = '' } = {}) => {
       const valeur = ['dateAchat', 'finGarantie'].includes(nom) ? dateSuisse(v[nom]) : nom === 'prixChf' ? montantSuisse(v[nom]).replace(/'/g, '') : (v[nom] ?? '');
@@ -370,14 +371,21 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
         <h3>${article ? `Article ${echapper(article.numero)}` : 'Nouvel article'}</h3>
       </div>
       <form class="fiche-materiel" data-zone="fiche" autocomplete="off">
+        <fieldset><legend>Désignation</legend>
+          <label class="champ-materiel"><span>Marque</span><input type="text" name="marque" list="liste-marques" value="${echapper(v.marque ?? '')}" placeholder="ex. Emlid" /></label>
+          <label class="champ-materiel"><span>Modèle</span><input type="text" name="modele" list="liste-modeles" value="${echapper(v.modele ?? '')}" placeholder="ex. Reach RX2" /></label>
+          <label class="champ-materiel large"><span>Autre</span><input type="text" name="autre" value="${echapper(v.autre ?? '')}" placeholder="ex. Canne GPS" /></label>
+          <datalist id="liste-marques">${marquesDuParc(parc).map((m) => `<option value="${echapper(m)}"></option>`).join('')}</datalist>
+          <datalist id="liste-modeles">${modelesDuParc(parc, v.marque).map((m) => `<option value="${echapper(m)}"></option>`).join('')}</datalist>
+          <p class="champ-materiel large apercu-designation"><span>Désignation</span><strong data-zone="apercu-designation">${echapper(designationArticle(v) || '—')}</strong></p>
+        </fieldset>
         <fieldset><legend>Identité</legend>
-          <label class="champ-materiel"><span>Catégorie *</span><select name="categorieId">
-            ${categoriesTriees(parc).map((c) => `<option value="${echapper(c.id)}" ${c.id === v.categorieId ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('')}</select></label>
+          <label class="champ-materiel"><span>Catégorie *</span><span class="ligne-categorie"><select name="categorieId">
+            ${categoriesTriees(parc).map((c) => `<option value="${echapper(c.id)}" ${c.id === v.categorieId ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('')}</select><button type="button" class="bouton-secondaire petit" data-action="categorie-fiche" title="Nouvelle catégorie">＋</button></span></label>
           <label class="champ-materiel"><span>Statut</span><select name="statut">
             ${STATUTS.map(([c, t]) => `<option value="${c}" ${c === v.statut ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           ${champ('numero', 'N° interne * (= n° de la tablette)', { attributs: 'required placeholder="ex. 953"' })}
           ${champ('codeCompta', 'Code compta (N° MS, à facturer)', { attributs: 'placeholder="ex. 112"' })}
-          ${champ('designation', 'Désignation', { classe: 'large', attributs: 'placeholder="ex. Canne GPS RX2"' })}
           <label class="champ-materiel large"><span>Accessoire de</span><select name="parentId"><option value="">— aucun —</option>
             ${principaux.map((a) => `<option value="${echapper(a.id)}" ${a.id === v.parentId ? 'selected' : ''}>${echapper(a.numero)} ${echapper(a.designation)}</option>`).join('')}</select></label>
           <div class="champ-materiel large"><span>Couleur sur le planning</span>
@@ -387,7 +395,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
             </div></div>
         </fieldset>
         <fieldset><legend>Achat et garantie</legend>
-          ${champ('marque', 'Marque')}${champ('modele', 'Modèle')}${champ('numeroSerie', 'N° de série')}${champ('fournisseur', 'Fournisseur')}
+          ${champ('numeroSerie', 'N° de série')}${champ('fournisseur', 'Fournisseur')}
           ${champ('dateAchat', 'Date d\'achat', { attributs: 'placeholder="JJ.MM.AAAA"' })}
           ${champ('prixChf', 'Prix (CHF)', { attributs: 'inputmode="decimal" placeholder="0.00"' })}
           ${champ('finGarantie', 'Fin de garantie', { attributs: 'placeholder="JJ.MM.AAAA"' })}
@@ -793,6 +801,16 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     }
     if (action === 'archiver-anciens') return archiverLesAnciens();
     // Catégories
+    if (action === 'categorie-fiche') {
+      // 0.324.0 : nouvelle catégorie depuis la fiche d'un article (ce qui est tapé reste dans la fiche).
+      const saisie = champsDeLaFiche();
+      const nom = await demanderTexte({ titre: 'Nouvelle catégorie', valeur: '' });
+      if (nom === null) return;
+      const { ok, resultat } = await changer((p) => ajouterCategorie(p, nom));
+      if (!ok) return;
+      fiche = { ...fiche, saisie: { ...saisie, categorieId: resultat.id } };
+      return dessiner();
+    }
     if (action === 'nouvelle-categorie' || action === 'renommer-categorie') {
       const ancienne = parc.categories.find((c) => c.id === id);
       const nom = await demanderTexte({ titre: ancienne ? 'Renommer la catégorie' : 'Nouvelle catégorie', valeur: ancienne?.nom ?? '' });
@@ -859,6 +877,11 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     agir(zone === 'chantier' ? 'enregistrer-chantier' : 'enregistrer-article').catch((erreur) => message(`Erreur : ${erreur.message}`, 8000));
   });
   page.addEventListener('input', (evenement) => {
+    // 0.324.0 : aperçu « Marque - Modèle - Autre - N° » pendant la frappe.
+    if (['marque', 'modele', 'autre', 'numero'].includes(evenement.target.name) && fiche) {
+      const apercu = page.querySelector('[data-zone="apercu-designation"]');
+      if (apercu) apercu.textContent = designationArticle(champsDeLaFiche()) || '—';
+    }
     if (evenement.target.dataset.filtre === 'texte') {
       filtre.texte = evenement.target.value;
       dessinerTableau();

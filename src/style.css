@@ -14376,7 +14376,7 @@ dialog.page-materiel[open] {
 .choix-vue button.actif { background: var(--sombre); color: #ffffff; border-color: var(--sombre); }
 .fins-proches { margin: 0; color: var(--gris); }
 .cadre-planning { overflow-x: auto; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon); }
-.grille-planning { --l-nom: 190px; min-width: calc(var(--l-nom) + var(--jours) * 30px); user-select: none; -webkit-user-select: none; }
+.grille-planning { --l-nom: 300px; min-width: calc(var(--l-nom) + var(--jours) * 30px); user-select: none; -webkit-user-select: none; }
 .ligne-pl {
   position: relative;
   display: grid;
@@ -15138,3 +15138,8 @@ body.appli-windows .carte-calage { padding: 8px 12px; gap: 6px; }
 /* 0.323.0 (demande du 26.11) : menu Applications ouvert = le plan seul, sans les outils de l'appli d'avant. */
 body.page-applis-ouverte #plan g.implantation,
 body.page-applis-ouverte :is(.cible-haut, .bouton-inverser-cible, .barre-pointage, .plan-coordonnees) { display: none !important; }
+
+/* 0.324.0 : Matériel : désignation en 3 champs, aperçu, ＋ catégorie dans la fiche. */
+.ligne-categorie { display: flex; gap: 6px; align-items: center; }
+.ligne-categorie select { flex: 1 1 auto; min-width: 0; }
+.apercu-designation strong { font-size: 1rem; }

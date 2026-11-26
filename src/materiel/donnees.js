@@ -6,7 +6,8 @@
 // { version: 1, modifieLe (ISO),
 //   categories: [{ id, nom, ordre }],
 //   articles: [{ id, categorieId, ordre, numero (n° interne, unique : le même que la tablette),
-//                designation, codeCompta (N° MS, se répète), couleur '#RRGGBB', statut, marque, modele,
+//                designation (calculée : « Marque - Modèle - Autre - N° interne », 0.324.0), autre (3e champ de la désignation),
+//                codeCompta (N° MS, se répète), couleur '#RRGGBB', statut, marque, modele,
 //                numeroSerie, dateAchat, prixChf, fournisseur, finGarantie, notes, photo (id de fichier joint ou null),
 //                documents: [{ id, nom, ajouteLe }], parentId (accessoire de), telephone, swiposNumero,
 //                swiposMotDePasse, creeLe, modifieLe }],
@@ -42,8 +43,42 @@ export function normaliserParc(lu) {
     if (Array.isArray(lu[cle])) parc[cle] = lu[cle].filter((x) => x && typeof x === 'object' && x.id);
   }
   parc.modifieLe = typeof lu.modifieLe === 'string' ? lu.modifieLe : null;
-  for (const a of parc.articles) a.documents = Array.isArray(a.documents) ? a.documents : [];
+  for (const a of parc.articles) {
+    a.documents = Array.isArray(a.documents) ? a.documents : [];
+    // 0.324.0 : la désignation est faite de Marque, Modèle et Autre ; l'ancienne désignation libre devient « Autre ».
+    if (typeof a.autre !== 'string') {
+      const ancienne = String(a.designation ?? '').trim();
+      a.autre = ancienne && ancienne !== designationArticle({ ...a, autre: '' }) ? ancienne : '';
+    }
+    a.designation = designationArticle(a);
+  }
   return parc;
+}
+
+/** Désignation d'un article (0.324.0) : « Marque - Modèle - Autre - N° interne » (parties vides sautées). */
+export function designationArticle(a) {
+  return [a?.marque, a?.modele, a?.autre, a?.numero].map((x) => String(x ?? '').trim()).filter(Boolean).join(' - ');
+}
+
+/** Marques déjà utilisées dans le parc (liste proposée à la saisie, triée, sans doublon). */
+export function marquesDuParc(parc) {
+  return listeUnique(parc.articles.map((a) => a.marque));
+}
+
+/** Modèles déjà utilisés (ceux de la marque donnée en premier, puis les autres). */
+export function modelesDuParc(parc, marque = '') {
+  const m = String(marque ?? '').trim().toLowerCase();
+  const deLaMarque = listeUnique(parc.articles.filter((a) => m && String(a.marque ?? '').trim().toLowerCase() === m).map((a) => a.modele));
+  return [...deLaMarque, ...listeUnique(parc.articles.map((a) => a.modele)).filter((x) => !deLaMarque.includes(x))];
+}
+
+function listeUnique(valeurs) {
+  const vus = new Map();
+  for (const v of valeurs) {
+    const t = String(v ?? '').trim();
+    if (t && !vus.has(t.toLowerCase())) vus.set(t.toLowerCase(), t);
+  }
+  return [...vus.values()].sort((a, b) => a.localeCompare(b, 'fr'));
 }
 
 /** Nouvel identifiant (court, tiré au hasard). */
@@ -229,8 +264,8 @@ export function couleurProposee(parc, categorieId) {
  */
 export function lireArticle(parc, champs, id = null) {
   const numero = texte(champs.numero, 'N° interne', { obligatoire: true, maxi: 100 });
-  const autre = parc.articles.find((a) => a.id !== id && a.numero.toLowerCase() === numero.toLowerCase());
-  if (autre) throw new Error(`Le n° interne « ${numero} » est déjà pris (${autre.designation || 'autre article'})`);
+  const doublon = parc.articles.find((a) => a.id !== id && a.numero.toLowerCase() === numero.toLowerCase());
+  if (doublon) throw new Error(`Le n° interne « ${numero} » est déjà pris (${doublon.designation || 'autre article'})`);
   if (!parc.categories.some((c) => c.id === champs.categorieId)) throw new Error('Choisissez une catégorie');
   const statut = STATUTS.some(([s]) => s === champs.statut) ? champs.statut : 'actif';
   const parentId = champs.parentId || null;
@@ -240,15 +275,20 @@ export function lireArticle(parc, champs, id = null) {
     if (!parent) throw new Error('Article principal introuvable');
     if (parent.parentId) throw new Error('Un accessoire ne peut pas avoir d\'accessoire (un seul niveau)');
   }
+  const marque = texte(champs.marque, 'Marque', { maxi: 100 });
+  const modele = texte(champs.modele, 'Modèle', { maxi: 100 });
+  // Sans champ « autre » (ancien appel, import) : l'ancienne désignation libre en tient lieu.
+  const autre = texte(champs.autre ?? champs.designation, 'Autre (désignation)', { maxi: 200 });
   return {
     numero,
     categorieId: champs.categorieId,
-    designation: texte(champs.designation, 'Désignation', { maxi: 200 }),
+    marque,
+    modele,
+    autre,
+    designation: designationArticle({ marque, modele, autre, numero }),
     codeCompta: texte(champs.codeCompta, 'Code compta', { maxi: 50 }),
     couleur: lireCouleur(champs.couleur, couleurProposee(parc, champs.categorieId)),
     statut,
-    marque: texte(champs.marque, 'Marque', { maxi: 100 }),
-    modele: texte(champs.modele, 'Modèle', { maxi: 100 }),
     numeroSerie: texte(champs.numeroSerie, 'N° de série', { maxi: 100 }),
     dateAchat: lireDate(champs.dateAchat, 'Date d\'achat'),
     prixChf: lireMontant(champs.prixChf, 'Prix'),
@@ -305,7 +345,8 @@ export function supprimerArticle(parc, id) {
 /** Copie d'un article (« Dupliquer ») : mêmes champs, n° à changer, sans photo ni documents. */
 export function champsDupliques(article) {
   const { id, numero, photo, documents, creeLe, modifieLe, ordre, ...reste } = article;
-  return { ...reste, numero: '', swiposMotDePasse: '' };
+  const copie = { ...reste, numero: '', swiposMotDePasse: '' };
+  return { ...copie, designation: designationArticle(copie) };
 }
 
 /** Recolore tout le parc dans l'ordre du planning (deux lignes voisines n'ont jamais la même couleur). */

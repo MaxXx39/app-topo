@@ -211,8 +211,8 @@ describe('parc lu et listes des tablettes', () => {
     parc.articles[0].swiposMotDePasse = 'secret';
     const noms = nomsPourTablettes(parc);
     expect(noms.articles).toEqual([
-      { numero: '953', designation: 'Canne RX2', categorie: 'Canne GPS' },
-      { numero: '954', designation: 'Canne RX2', categorie: 'Canne GPS' },
+      { numero: '953', designation: 'Canne RX2 - 953', categorie: 'Canne GPS' },
+      { numero: '954', designation: 'Canne RX2 - 954', categorie: 'Canne GPS' },
     ]);
     expect(JSON.stringify(noms)).not.toContain('secret');
     expect(noms.responsables).toEqual(['M. Dupont']);
@@ -236,5 +236,25 @@ describe('copie Drive du parc', async () => {
     expect(lireEtatDrive(stockage)).toEqual({ vu: null, aEnvoyer: false });
     ecrireEtatDrive({ vu: 'd1', aEnvoyer: true }, stockage);
     expect(lireEtatDrive(stockage)).toEqual({ vu: 'd1', aEnvoyer: true });
+  });
+});
+
+describe('désignation en 3 champs (0.324.0)', () => {
+  it('Marque - Modèle - Autre - N° interne, parties vides sautées', async () => {
+    const { designationArticle } = await import('../src/materiel/donnees.js');
+    expect(designationArticle({ marque: 'Emlid', modele: 'Reach RX2', autre: 'Canne GPS', numero: '953' })).toBe('Emlid - Reach RX2 - Canne GPS - 953');
+    expect(designationArticle({ marque: 'Leica', modele: '', autre: '', numero: 'Icon 1' })).toBe('Leica - Icon 1');
+  });
+  it('ancien parc : la désignation libre devient « Autre » ; marques et modèles proposés', async () => {
+    const { normaliserParc, marquesDuParc, modelesDuParc } = await import('../src/materiel/donnees.js');
+    const parc = normaliserParc({ articles: [
+      { id: 'a', numero: '953', designation: 'Canne RX2', marque: 'Emlid', modele: 'RX2' },
+      { id: 'b', numero: '1', designation: '', marque: 'leica', modele: 'iCON' },
+      { id: 'c', numero: '2', designation: '', marque: 'Hilti', modele: 'PLT400' },
+    ] });
+    expect(parc.articles[0].autre).toBe('Canne RX2');
+    expect(parc.articles[0].designation).toBe('Emlid - RX2 - Canne RX2 - 953');
+    expect(marquesDuParc(parc)).toEqual(['Emlid', 'Hilti', 'leica']);
+    expect(modelesDuParc(parc, 'Hilti')[0]).toBe('PLT400');
   });
 });
