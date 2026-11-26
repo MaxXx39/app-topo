@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.335.0 — Plans de chantier, lots 2 et 3 : pastilles Fond / Plan / Points + bandeau du haut utile (demandes du 26.11)
+Lire seulement la section utile : `grep -n '^## 0.336.0 — Plans de chantier, lot 4 : popups de la Présentation + outils de Dessin rangés par couleur (demande du 26.11, faite sans maquette : « on corrigera après »)
+- **Popups** (fenêtre non bloquante à droite de la feuille, `htmlPopupFeuille` / `majPopupFeuille`, `etat.popupFeuille`) : **Cartouche** (nom, titre, indice, date, auteur, logo, légende, nord, barre, page de coupe), **Situation** (coin, échelle, taille, transparence, épaisseur ; bouton « Réglages » seulement quand la case est cochée), **Détails** (s'ouvre aussi toute seule en touchant ou ajoutant un cadre). Le panneau de droite ne garde que Pages, la case Situation et trois boutons.
+- **Outils de Dessin par type, un fond de couleur par groupe** : Tracer (orange : zone, rectangle, rond, ligne, flèche, décaler), Annoter (bleu : texte, cote, mesure), Symboles (violet), Construction (cyan : construction, œil, coupe, tracer).
+- Essayé en Playwright : popup cartouche (indice B pris), case Situation puis popup Situation. Pas essayé : popup Détails avec de vrais cadres.
+
+## 0.335.0 — Plans de chantier, lots 2 et 3 : pastilles Fond / Plan / Points + bandeau du haut utile (demandes du 26.11)
 - **Décisions de l'utilisateur** : pastilles sur le plan en haut à gauche comme dans les autres modules, gardées aussi dans Présentation ; Carte / Ortho / Cadastre dans la pastille Fond ; pas de version téléphone (l'appli n'est pas sur Android : site et Topo Bureau seulement).
 - **Pastilles** (`plans-chantier/pastilles.js`, mêmes classes que `plan.js`) : Fond (photo, carte, cadastre, surfaces), Plan (cases des plans pour la phase active, « choix propre à la phase », ▾ calques : case + couleur), Points (noms + une case par liste). Appui long sur une pastille = tout montrer / tout cacher ; appui long sur un calque = **geler** (`gele`, affiché mais plus d'accroche : `sourcesDesPlans`). Pastille pâle = tout caché. Dans Présentation : mêmes pastilles ; Plan = plans de la feuille (cases + opacité) + « Répliquer le dessin » ; Fond = photo pâlie.
 - **Retiré** : groupe « Fond » du ruban (plans, calques, points, carte, ortho, cadastre, surfaces), fenêtre « Calques des plans affichés » (plus utilisée ici ; gardée pour Plateformes), blocs « Plans de la feuille » et « Fond » du panneau Présentation.

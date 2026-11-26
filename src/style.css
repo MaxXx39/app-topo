@@ -15217,3 +15217,12 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 .toile-feuille { display: block; overflow: auto; text-align: center; }
 .toile-feuille canvas { display: inline-block; margin: 8px auto; vertical-align: top; cursor: grab; }
 .valeur-zoom { min-width: 48px; text-align: center; font-weight: 700; font-size: 0.85rem; }
+
+/* 0.336.0 : outils de Dessin rangés par type, avec une couleur par type ; petite fenêtre de la Présentation */
+.ruban-chantier .groupe-ruban.type-trace { background: #ffedd5; border-radius: 8px; }
+.ruban-chantier .groupe-ruban.type-annoter { background: #dbeafe; border-radius: 8px; }
+.ruban-chantier .groupe-ruban.type-construction { background: #cffafe; border-radius: 8px; }
+.ruban-chantier .groupe-ruban.type-symboles { background: #ede9fe; border-radius: 8px; }
+.ruban-chantier .groupe-ruban[class*='type-'] { border-right: 0; margin: 0 2px; }
+dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330px; height: auto; max-height: 68vh; overflow-y: auto; margin: 0; padding: 12px 14px; background: var(--surface); color: var(--texte); border: 1px solid var(--bordure); border-radius: 12px; box-shadow: 0 8px 28px rgba(16, 24, 20, 0.28); z-index: 30; }
+.popup-feuille .entete-popup { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }

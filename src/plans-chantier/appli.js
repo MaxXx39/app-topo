@@ -165,7 +165,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    popupFeuille: null, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     coupe: { ouvert: false, ligne: null, cachees: new Set() }, // 0.311.0 : vue de côté (coupe) ; 0.312.0 : surfaces cachées, ligne de coupe tracée
     coupeProchaine: false, // le prochain segment de construction dessiné est une ligne de coupe
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
@@ -406,7 +406,7 @@ export function ouvrirPlansChantier({
 
   function htmlDessin() {
     // 0.297.1 : le ruban tient sur UNE ligne : icônes seules (le nom est dans l'infobulle), plus de titres de groupes.
-    const groupe = (titre, html) => `<div class="groupe-ruban" role="group" aria-label="${titre}">${html}</div>`;
+    const groupe = (titre, html, classe = '') => `<div class="groupe-ruban ${classe}" role="group" aria-label="${titre}">${html}</div>`;
     // Mots courts sous les icônes (le nom complet est dans l'infobulle) : un juste milieu entre icônes seules et textes longs.
     const COURTS = {
       'Sélectionner': 'Choisir', 'Effacer': 'Effacer', 'Annuler (Ctrl+Z)': 'Annuler', 'Zone': 'Zone', 'Ligne': 'Ligne', 'Flèche': 'Flèche', 'Texte': 'Texte',
@@ -442,11 +442,12 @@ export function ouvrirPlansChantier({
         <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${plan()?.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4" aria-label="Texte des symboles en mm sur le papier"></label>`)}`;
     return `
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
-        ${groupe('Dessin', OUTILS.map(([c, i, t]) => outil(c, i, t)).join(''))}
-        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles'))}
-        ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
+        ${groupe('Tracer', OUTILS.filter(([c]) => ['zone', 'rectangle', 'rond', 'ligne', 'fleche', 'decaler'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-trace')}
+        ${groupe('Annoter', OUTILS.filter(([c]) => ['texte', 'cotation', 'mesure'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-annoter')}
+        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles'), 'type-symboles')}
+        ${groupe('Construction', `${outil('construction', OUTILS.find(([c]) => c === 'construction')[1], 'Construction')}${bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)')}`, 'type-construction')}
         ${groupe('Coupe', `${bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne')}
-          ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`)}
+          ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`, 'type-construction')}
       </div>
       <div class="ruban-element" data-zone="bandeau-element"></div>
       <p class="consigne-calage" data-zone="consigne"></p>
@@ -1176,6 +1177,7 @@ export function ouvrirPlansChantier({
           <div class="pied-vue etat-chantier" data-zone="etat-feuille"></div>
         </div>
         <aside class="carte-calage panneau-chantier" data-zone="panneau-feuille"></aside>
+        <dialog class="popup-feuille" data-zone="popup-feuille"></dialog>
       </div>`;
   }
 
@@ -1267,7 +1269,7 @@ export function ouvrirPlansChantier({
         const B = det && feuille.mise.boites[`det:${det.id}`];
         if (det && det.centre && B) {
           const vueD = { echelle: (feuille.pxParMm * 1000) / det.echelle, estCentre: det.centre[0], nordCentre: det.centre[1], largeur: B.l * feuille.pxParMm, hauteur: B.h * feuille.pxParMm, rotation: reglagesFeuille(plan()).rotation };
-          etat.detailChoisi = det.id;
+          etat.detailChoisi = det.id; etat.popupFeuille = 'detail';
           feuille.geste = { type: 'detail-contenu', id: det.id, x: ev.clientX, y: ev.clientY, vue0: vueD, change: false };
           return;
         }
@@ -1287,7 +1289,7 @@ export function ouvrirPlansChantier({
           const nouveau = nouveauDetail(reglagesFeuille(plan()).details, [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100], plan().echelle ?? ECHELLE_PAPIER);
           if (!nouveau) { message(`${MAX_DETAILS} cadres de détail au plus.`, 3000); return; }
           modifierDetails((liste) => liste.push(nouveau));
-          etat.detailChoisi = nouveau.id;
+          etat.detailChoisi = nouveau.id; etat.popupFeuille = 'detail';
         } else {
           modifierDetails((liste) => { const d = liste.find((x) => x.id === etat.detailChoisi); if (d) d.centre = [Math.round(t.est * 100) / 100, Math.round(t.nord * 100) / 100]; });
         }
@@ -1322,7 +1324,7 @@ export function ouvrirPlansChantier({
       }
       const det = detailSous(mm);
       if (det) {
-        if (etat.detailChoisi !== det.id) { etat.detailChoisi = det.id; majFeuille(); }
+        if (etat.detailChoisi !== det.id) { etat.detailChoisi = det.id; etat.popupFeuille = 'detail'; majFeuille(); }
         feuille.geste = { type: 'detail-deplacer', id: det.id, x: ev.clientX, y: ev.clientY, boite: { ...feuille.mise.boites[`det:${det.id}`] }, change: false };
         return;
       }
@@ -1611,23 +1613,13 @@ export function ouvrirPlansChantier({
       <p class="aide-calage">Glisser le cadre = le déplacer ; ses poignées = changer sa taille (accroches) ; mode « Déplacer le plan » dans le cadre = décaler son contenu.</p>`;
   }
 
-  function majPanneauFeuille() {
-    const zone = page.querySelector('[data-zone="panneau-feuille"]');
-    if (!zone) return;
+  /** Contenu des petites fenêtres de l'onglet Présentation (0.336.0) : cartouche, situation, cadres de détail. */
+  function htmlPopupFeuille(cle) {
     const p = plan();
     const r = reglagesFeuille(p);
     const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
-    const nomPdf = `${nomFichier()}.pdf`;
-    majBandeFeuille();
-    majPastilles();
-    zone.innerHTML = `
-      <h3>Feuille ${bulle('feuilleChantier')}</h3>
-      <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
-      ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
-        ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
-      <h3>Cadres de détail</h3>
-      ${htmlPanneauDetails(r, p)}
-      <h3>Cartouche</h3>
+    if (cle === 'cartouche') {
+      return `
       <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(leProjet().cartouche, leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
@@ -1638,15 +1630,59 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-feuille-case="legende" ${r.legende ? 'checked' : ''}> Légende automatique</label>
       <label class="case-chantier"><input type="checkbox" data-feuille-case="nord" ${r.nord ? 'checked' : ''}> Nord</label>
       <label class="case-chantier"><input type="checkbox" data-feuille-case="barre" ${r.barre ? 'checked' : ''}> Barre d'échelle</label>
-      <label class="case-chantier"><input type="checkbox" data-situation="actif" ${r.situation.actif ? 'checked' : ''}> Vue de situation (carte nationale)</label>
+      <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
+      ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}`;
+    }
+    if (cle === 'situation') {
+      return `
       ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
       <label class="case-chantier"><input type="checkbox" data-situation="auto" ${r.situation.auto ? 'checked' : ''}> Échelle automatique (la zone du plan reste bien visible)</label>
       ${r.situation.auto ? '' : `<label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>`}
       <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>
       <label class="champ-calage" title="La carte s'efface vers le blanc (le plan dessous ne se voit jamais) : le rectangle rouge ressort"><span>Transparence de la carte : <b data-valeur-de="sit-transparence">${r.situation.transparence} %</b></span><input type="range" min="0" max="90" step="5" value="${r.situation.transparence}" data-situation="transparence"></label>
-      <label class="champ-calage"><span>Épaisseur du rectangle rouge (mm)</span><input type="number" min="0.2" max="3" step="0.1" value="${r.situation.epaisseur}" data-situation="epaisseur"></label>` : ''}
-      <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
-      ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}
+      <label class="champ-calage"><span>Épaisseur du rectangle rouge (mm)</span><input type="number" min="0.2" max="3" step="0.1" value="${r.situation.epaisseur}" data-situation="epaisseur"></label>` : ''}`;
+    }
+    return htmlPanneauDetails(r, p);
+  }
+
+  const TITRES_POPUP = { cartouche: 'Cartouche', situation: 'Situation', detail: 'Cadres de détail' };
+  /** Montre, met à jour ou ferme la petite fenêtre (non bloquante : on garde la feuille sous les yeux). */
+  function majPopupFeuille() {
+    const d = page.querySelector('[data-zone="popup-feuille"]');
+    if (!d) return;
+    const cle = etat.ecran === 'feuille' ? etat.popupFeuille : null;
+    const p = plan();
+    if (!cle || !p || (cle === 'situation' && !reglagesFeuille(p).situation.actif)) {
+      etat.popupFeuille = null;
+      if (d.open) d.close();
+      return;
+    }
+    d.innerHTML = `<div class="entete-popup"><b>${TITRES_POPUP[cle]}</b><button type="button" class="bouton-secondaire petit" data-action="popup-feuille-fermer" aria-label="Fermer">✕</button></div>${htmlPopupFeuille(cle)}`;
+    if (!d.open) d.show();
+  }
+
+  function majPanneauFeuille() {
+    const zone = page.querySelector('[data-zone="panneau-feuille"]');
+    if (!zone) return;
+    const p = plan();
+    const r = reglagesFeuille(p);
+    const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
+    const nomPdf = `${nomFichier()}.pdf`;
+    majBandeFeuille();
+    majPastilles();
+    majPopupFeuille();
+    zone.innerHTML = `
+      <h3>Feuille ${bulle('feuilleChantier')}</h3>
+      <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
+      ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
+        ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
+      <h3>Cartouche</h3>
+      <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="popup-feuille" data-popup="cartouche">Cartouche…</button></div>
+      <h3>Situation</h3>
+      <label class="case-chantier"><input type="checkbox" data-situation="actif" ${r.situation.actif ? 'checked' : ''}> Vue de situation (carte nationale)</label>
+      ${r.situation.actif ? '<div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="popup-feuille" data-popup="situation">Réglages de la situation…</button></div>' : ''}
+      <h3>Cadres de détail</h3>
+      <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="popup-feuille" data-popup="detail">Détails… (${r.details.length})</button></div>
       <h3>Enregistrer</h3>
       <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div><p class="aide-calage">Le PDF et le cadrage sont dans la bande du bas.</p>
       <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomPdf)}</span></p>`;
@@ -1676,6 +1712,14 @@ export function ouvrirPlansChantier({
       p.feuille = f;
       enregistrer();
       return dessinerApercu();
+    }
+    if (b.dataset.action === 'popup-feuille') {
+      etat.popupFeuille = etat.popupFeuille === b.dataset.popup ? null : b.dataset.popup;
+      return majPopupFeuille();
+    }
+    if (b.dataset.action === 'popup-feuille-fermer') {
+      etat.popupFeuille = null;
+      return majPopupFeuille();
     }
     if (b.dataset.action === 'feuille-plans-reinit') {
       if (!avantChangement()) return;
