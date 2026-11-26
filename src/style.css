@@ -15185,3 +15185,10 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 .tableau-calage td .aide-calage { white-space: nowrap; }
 /* 0.327.1 : `body.bande-vide .bande-appli { pointer-events: none }` rendait la zone d'outils de la bande des applis plein écran insensible au toucher. */
 .bande-appli.bande-page, .bande-page .zone-bande-page { pointer-events: auto; }
+
+/* 0.330.0 : bande du bas de l'onglet Feuille (présentations, format, échelle, PDF) */
+.bande-page .zone-bande-page .outil-ruban { min-width: 58px; padding: 2px 3px; }
+.bande-page .zone-bande-page .outil-ruban span { white-space: nowrap; }
+.champ-bande select { max-width: 130px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.85rem; }
+.bande-page .zone-bande-page .groupe-ruban { gap: 6px; padding: 0 8px; }
+.bande-page .zone-bande-page .bouton { background: var(--couleur-appli, #b45309); color: #ffffff; border: none; border-radius: 8px; padding: 0 16px; min-height: 40px; font-weight: 700; cursor: pointer; }

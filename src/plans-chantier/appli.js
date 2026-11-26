@@ -10,6 +10,7 @@
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
 import { habillerPage } from '../navigation/cadre-page.js';
+import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
@@ -219,6 +220,7 @@ export function ouvrirPlansChantier({
   }
   function enregistrer() {
     plan().modifieLe = new Date().toISOString();
+    synchroniserPresentation(plan()); // 0.330.0 : la présentation choisie reprend les réglages de la feuille (toute seule)
     modifie();
   }
   function annuler() {
@@ -1077,9 +1079,47 @@ export function ouvrirPlansChantier({
 
   let feuille = null; // { canvas, page (rang), observateur }
 
-  function htmlFeuille() {
+  /** Bande du bas de l'onglet Feuille (0.330.0) : présentations (liste, enregistrer, dupliquer, renommer, supprimer), format, orientation, échelle, PDF. */
+  function htmlBandeFeuille() {
+    const p = plan();
+    if (!p) return '';
+    const r = reglagesFeuille(p);
+    const liste = presentationsDe(p);
+    const active = presentationActive(p);
+    const options = (l, v) => l.map(([c, t]) => `<option value="${c}" ${c === v ? 'selected' : ''}>${t}</option>`).join('');
+    const bouton = (attrs, icone, titre, court, desactive = false) => `<button type="button" class="outil-ruban" ${attrs} ${desactive ? 'disabled' : ''} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
     return `
-      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. L'échelle est celle du plan (1:${plan().echelle ?? ECHELLE_PAPIER}).</p>
+      <div class="groupe-ruban" role="group" aria-label="Présentation">
+        <label class="champ-bande" title="Présentation : les réglages de la feuille gardés sous un nom (se mettent à jour toutes seules)"><span>Présentation</span>
+          <select data-presentation="choisir" aria-label="Présentation"><option value="">— réglages libres —</option>${liste.map((x) => `<option value="${echapper(x.id)}" ${x.id === active?.id ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>
+        ${bouton('data-action="pres-nouvelle"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages actuels comme nouvelle présentation', 'Enreg.')}
+        ${bouton('data-action="pres-dupliquer"', '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M4 16V5A1 1 0 0 1 5 4H16"/>', 'Dupliquer la présentation choisie', 'Dupliquer', !active)}
+        ${bouton('data-action="pres-renommer"', '<path d="M4 20H8L19 9L15 5L4 16Z"/>', 'Renommer la présentation choisie', 'Renommer', !active)}
+        ${bouton('data-action="pres-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer la présentation choisie', 'Supprimer', !active)}
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Feuille">
+        <label class="champ-bande"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
+        <label class="champ-bande"><span>Sens</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
+        <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
+        <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
+      </div>
+      <div class="groupe-ruban" role="group" aria-label="Sortie">
+        ${bouton('data-action="feuille-centrer"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Recentrer la feuille sur les éléments', 'Recentrer')}
+        <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>
+      </div>`;
+  }
+
+  /** Remet la bande du bas de l'onglet Feuille à jour (liste des présentations, valeurs). */
+  function majBandeFeuille() {
+    if (etat.ecran !== 'feuille') return;
+    bandeDessin = htmlBandeFeuille();
+    page.majBandePage?.();
+  }
+
+  function htmlFeuille() {
+    bandeDessin = htmlBandeFeuille();
+    return `
+      <p class="consigne-calage">Glisser sur la feuille = déplacer le plan dans le cadre. Présentation, format, échelle et PDF : bande du bas.</p>
       <div class="travail-chantier">
         <div class="vue-calage vue-feuille">
           <div class="toile-feuille" data-feuille><canvas></canvas></div>
@@ -1211,12 +1251,9 @@ export function ouvrirPlansChantier({
     const r = reglagesFeuille(p);
     const options = (liste, valeur) => liste.map(([v, t]) => `<option value="${v}" ${v === valeur ? 'selected' : ''}>${t}</option>`).join('');
     const nomPdf = `${nomFichier()}.pdf`;
+    majBandeFeuille();
     zone.innerHTML = `
       <h3>Feuille ${bulle('feuilleChantier')}</h3>
-      <label class="champ-calage"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
-      <label class="champ-calage"><span>Orientation</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
-      <label class="champ-calage"><span>Échelle 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle"></label>
-      <button type="button" class="lien-calage" data-action="feuille-centrer">Recentrer sur les éléments</button>
       <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
@@ -1257,7 +1294,7 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
       ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}
       <h3>Enregistrer</h3>
-      <div class="actions-chantier"><button type="button" class="bouton" data-action="feuille-pdf">PDF</button><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div>
+      <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div><p class="aide-calage">Le PDF et le cadrage sont dans la bande du bas.</p>
       <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomPdf)}</span></p>`;
   }
 
@@ -1294,6 +1331,39 @@ export function ouvrirPlansChantier({
       enregistrer();
       majPanneauFeuille();
       return dessinerApercu();
+    }
+    if (b.dataset.action === 'pres-nouvelle') {
+      const nom = await demanderTexte({ titre: 'Nouvelle présentation', valeur: `Présentation ${presentationsDe(p).length + 1}` });
+      if (nom === null || !avantChangement()) return;
+      creerPresentation(p, nom);
+      enregistrer();
+      message(`Présentation « ${presentationActive(p).nom} » enregistrée : elle se met à jour toute seule.`, 4000, { ok: true });
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-dupliquer') {
+      if (!presentationActive(p) || !avantChangement()) return;
+      const c = dupliquerPresentation(p);
+      enregistrer();
+      message(`« ${c.nom} » créée et choisie : modifiez-la, l'originale reste comme elle était.`, 5000, { ok: true });
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-renommer') {
+      const a = presentationActive(p);
+      if (!a) return;
+      const nom = await demanderTexte({ titre: 'Renommer la présentation', valeur: a.nom });
+      if (nom === null || !avantChangement()) return;
+      renommerPresentation(p, a.id, nom);
+      enregistrer();
+      return majFeuille();
+    }
+    if (b.dataset.action === 'pres-supprimer') {
+      const a = presentationActive(p);
+      if (!a) return;
+      const choix = await demanderChoix({ titre: `Supprimer « ${a.nom} » ?`, texte: 'Les réglages actuels de la feuille restent comme ils sont ; seule la présentation enregistrée disparaît.', boutons: [{ cle: 'non', texte: 'Garder', principal: true }, { cle: 'oui', texte: 'Supprimer' }] });
+      if (choix !== 'oui' || !avantChangement()) return;
+      supprimerPresentation(p, a.id);
+      enregistrer();
+      return majFeuille();
     }
     if (b.dataset.action === 'feuille-logo') return choisirLogo(p);
     if (b.dataset.action === 'feuille-pdf') {
@@ -1401,6 +1471,14 @@ export function ouvrirPlansChantier({
       etat.reglageEnCours = false;
       return;
     }
+    if (c.dataset.presentation === 'choisir') {
+      if (!avantChangement()) return majBandeFeuille();
+      if (c.value) appliquerPresentation(p, c.value);
+      else quitterPresentation(p);
+      enregistrer();
+      majFeuille();
+      return vue?.redessiner();
+    }
     if (c.dataset.situation) {
       if (!avantChangement()) return majPanneauFeuille();
       const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? nombreDe(c) : c.value;
@@ -1418,8 +1496,8 @@ export function ouvrirPlansChantier({
     else if (c.dataset.fond) p.fond[cle] = c.checked;
     else if (c.dataset.feuilleCase) p.feuille = { ...(p.feuille ?? {}), [cle]: c.checked };
     else if (cle === 'echelle') {
-      const v = nombreDe(c);
-      if (v === null) return majPanneauFeuille();
+      const v = Number(String(c.value).replace(/^\s*1\s*:\s*/, '').replace(',', '.').trim());
+      if (!Number.isFinite(v) || v < 1 || v > 10000) { message('Échelle : un nombre entre 1 et 10000 (ex. 200 pour le 1:200).', 3500); return majPanneauFeuille(); }
       p.echelle = v;
     } else p.feuille = { ...(p.feuille ?? {}), [cle]: c.value.trim() };
     enregistrer();
