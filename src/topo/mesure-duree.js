@@ -1,5 +1,5 @@
 // Mesure de durée d'un point (0.214.0, demande du 12.11, maquette 5 B) : pour gagner en précision, la position est lue
-// chaque seconde pendant 5, 15 ou 30 secondes, puis on garde la MOYENNE (Est, Nord, altitude : moyenne arithmétique des lectures).
+// chaque seconde pendant 5, 15 ou 30 secondes, puis on garde la MÉDIANE (Est, Nord, altitude ; 0.322.0, avant : moyenne).
 // Chaque lecture est vérifiée comme un point normal (RTK fixe, inclinaison prête, corrections de moins de 2 s) :
 // si une seule lecture est refusée (RTK perdu…), toute la mesure est refusée, aucun point n'est gardé.
 // Coordonnées MN95 en mètres.
@@ -37,6 +37,14 @@ export function lectureDeMesure({ lire, secours, etat }) {
 }
 
 const moyenne = (valeurs) => valeurs.reduce((t, v) => t + v, 0) / valeurs.length;
+/** Médiane (valeur du milieu, moyenne des deux du milieu si pair) : une lecture isolée fausse ne la fait pas bouger. */
+const mediane = (valeurs) => {
+  const t = [...valeurs].sort((a, b) => a - b);
+  const m = Math.floor(t.length / 2);
+  return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2;
+};
+/** Écart maximal (en plan, m) d'une lecture à la médiane au-delà duquel on prévient (valeur proposée, à valider). */
+export const DISPERSION_ALERTE_M = 0.02;
 const limites = (valeurs) => ({ min: Math.min(...valeurs), max: Math.max(...valeurs) });
 
 /**
@@ -45,8 +53,9 @@ const limites = (valeurs) => ({ min: Math.min(...valeurs), max: Math.max(...vale
  * H / V des lectures, et mesureDuree : { dureeS, lectures, ecartMaxPlan } (écart maximal d'une lecture à la moyenne, en plan, m).
  */
 export function moyennerPoints(lectures, dureeS) {
-  const est = moyenne(lectures.map((p) => p.est));
-  const nord = moyenne(lectures.map((p) => p.nord));
+  // 0.322.0 : MÉDIANE au lieu de la moyenne (décision du 26.11) ; la moyenne reste donnée à côté.
+  const est = mediane(lectures.map((p) => p.est));
+  const nord = mediane(lectures.map((p) => p.nord));
   const avecAltitude = lectures.every((p) => p.altitude != null && Number.isFinite(p.altitude));
   const pire = (cle) => {
     const valeurs = lectures.map((p) => p[cle]).filter((v) => Number.isFinite(v));
@@ -57,7 +66,7 @@ export function moyennerPoints(lectures, dureeS) {
     ...dernier,
     est,
     nord,
-    altitude: avecAltitude ? moyenne(lectures.map((p) => p.altitude)) : null,
+    altitude: avecAltitude ? mediane(lectures.map((p) => p.altitude)) : null,
     precisionH: pire('precisionH'),
     precisionV: pire('precisionV'),
     pdop: pire('pdop'), // 0.220.0 : le plus mauvais PDOP des lectures (null si le récepteur n'en donne pas)
@@ -65,6 +74,8 @@ export function moyennerPoints(lectures, dureeS) {
       dureeS,
       lectures: lectures.length,
       ecartMaxPlan: Math.max(...lectures.map((p) => Math.hypot(p.est - est, p.nord - nord))),
+      moyenne: { est: moyenne(lectures.map((p) => p.est)), nord: moyenne(lectures.map((p) => p.nord)), altitude: avecAltitude ? moyenne(lectures.map((p) => p.altitude)) : null },
+      dispersion: Math.max(...lectures.map((p) => Math.hypot(p.est - est, p.nord - nord))) > DISPERSION_ALERTE_M,
       // 0.229.0 : plus petite et plus grande valeur lues (m), pour la fenêtre de résultat (altitude : null si une lecture n'en a pas).
       limites: {
         est: limites(lectures.map((p) => p.est)),

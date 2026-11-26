@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.321.0)
+## Fonctionnalités (état à la 0.322.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -100,6 +100,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Bande du bas** : bouton application | sous-application, zone du milieu (`infoAppli`, `contenuBande`, `RELAIS_BANDE` : les gros boutons touchent les vrais boutons cachés). Lever : cadre `.cadre-levee` (photo | Levé en cours | « + »), Enreg. fixe ; Implanter : nom / altitude du point ou de la ligne guidée + « Enreg. » ; Contrôle : « Enregistrer le contrôle » ; Réseaux : « Enregistrer le réseau » ; Mesure rapide : + Point GNSS. **Un seul mot « Enreg. »**. Un bouton grisé reste touchable et **dit pourquoi** (`aria-disabled`, `raisonBoutonGrise`).
 - **En-tête** : nom du projet, pyramide, aide, **Drive = nuage + symbole + couleur**, main Drive ; barre du récepteur (APK : FIXE / FLOTTANT / AUTONOME, Z, canne, inclinaison) ; **pastille « Contrôle à refaire »** (récepteur connecté, seulement s'il y a des points de contrôle).
 - **Messages** : tous **en haut**, sous l'en-tête, laissent passer le toucher (`afficherMessage(texte, durée, { ok })`, `.message-fermable` si durée `null`) ; « Point … pris » en vert avec précision et satellites.
+- **Récepteur** : H ou V > 3,5 cm = AUTONOME + prise refusée (`topo/seuil-precision.js`) ; mesure de durée = médiane ; boussole de la tablette si l'inclinaison est perdue.
 - **Mode téléphone** : écran < 500 px (`LARGEUR_TELEPHONE`), `.t-long` / `.t-court`. **Clavier ouvert** : plan caché (`body.clavier-ouvert`).
 - **Thèmes** : Normal / Sombre (« Plein soleil » supprimé). Noms lisibles en sombre sur le fond photo.
 

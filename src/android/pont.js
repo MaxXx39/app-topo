@@ -4,6 +4,7 @@
 // écrites en Kotlin (android/app/src/main/java/ch/apptopo/PontAndroid.kt).
 // Dans un navigateur normal, cet objet n'existe pas et rien ne change.
 // Plus tard, c'est aussi par ici que passera la position du récepteur Emlid (Bluetooth).
+import { appliquerSeuilPrecision } from '../topo/seuil-precision.js';
 import { correctionsTropAnciennes, LIMITE_AGE_CORRECTIONS_S } from '../topo/age-corrections.js';
 
 /** Vrai si la page tourne dans l'APK Android. */
@@ -70,7 +71,8 @@ export function recepteurDisponible() {
  * erreurConversion, autorise, raison }.
  */
 export function ecouterRecepteur(fonction) {
-  window.recevoirEtatRecepteur = fonction;
+  // 0.322.0 : précision H ou V > 3,5 cm = AUTONOME (partout : affichage et refus de la prise de point).
+  window.recevoirEtatRecepteur = (etat) => fonction(appliquerSeuilPrecision(etat));
 }
 
 export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();

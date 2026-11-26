@@ -166,7 +166,7 @@ import { avertissementHorsZone } from './topo/zone-ge-vd.js';
 import { nomFichierExport } from './outils/nom-fichier.js';
 import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
 import { PREFIXE_IMPORT } from './topo/doublons.js';
-import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
+import { htmlAnnotation, htmlBandeauAnnotation, dateHeure, ICONES_SOURCE } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
 import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques, lignesDuCalque } from './topo/calque-sous-doigt.js';
@@ -320,6 +320,7 @@ const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, lign
 // Mode Contrôler (autocontrôle) : point de contrôle vers lequel on guide ({ id, nom, est, nord, altitude }) ou null.
 const autocontrole = { cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
+let capBoussoleTablette = null; // 0.322.0 : dernier cap de la boussole de la tablette (° ou null)
 
 function lireReglagesTerrain() {
   try {
@@ -984,27 +985,29 @@ function raisonTabletteAnnotation() {
  * (grisés avec la raison écrite dessous quand ils ne sont pas utilisables). Enreg. point est dans le bandeau.
  */
 function annotationBande() {
-  const bouton = (cle, classe, titre, raison) => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${raison ? 'disabled' : ''}>
-      <span>${echapper(titre)}</span>${raison ? `<small>${echapper(raison)}</small>` : ''}</button>`;
+  const bouton = (cle, classe, titre, raison, icone = '') => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${raison ? 'disabled' : ''} aria-pressed="${classe.includes('actif')}">
+      <span>${icone}${echapper(titre)}</span>${raison ? `<small>${echapper(raison)}</small>` : ''}</button>`;
   return `<div class="boutons-bande-mesure boutons-bande-annotation">
-    ${bouton('annotation-manuel', annotationEtat.mode === 'loupe' ? 'manuel actif' : 'manuel', 'Manuel', '')}
-    ${bouton('annotation-gnss', 'gnss', 'GNSS', raisonGnssAnnotation())}
-    ${bouton('annotation-tablette', 'tablette', 'GPS tablette', raisonTabletteAnnotation())}
+    ${bouton('annotation-manuel', annotationEtat.mode === 'loupe' ? 'manuel actif' : 'manuel', 'Manuel', '', ICONES_SOURCE.loupe)}
+    ${bouton('annotation-gnss', annotationEtat.mode === 'gnss' ? 'gnss actif' : 'gnss', 'GNSS', raisonGnssAnnotation(), ICONES_SOURCE.gnss)}
+    ${bouton('annotation-tablette', annotationEtat.mode === 'tablette' ? 'tablette actif' : 'tablette', 'GPS tablette', raisonTabletteAnnotation(), ICONES_SOURCE.tablette)}
   </div>`;
 }
 
 /** Bouton de la bande touché : Manuel (loupe), GNSS ou GPS tablette. */
 function agirAnnotation(cle) {
   lireBandeauAnnotation();
-  if (cle === 'annotation-manuel') {
-    annotationEtat.mode = 'loupe';
-    afficherAnnotation();
-  } else if (cle === 'annotation-gnss') {
-    annotationEtat.mode = null;
-    prendreGnssAnnotation();
-  } else if (cle === 'annotation-tablette') {
-    annotationEtat.mode = null;
-    prendreTabletteAnnotation();
+  // 0.322.0 : le mode actif est toujours connu (loupe / gnss / tablette) et une position prise autrement est oubliée :
+  // « Enreg. point » ne montre jamais « GNSS » quand on est en Manuel (retour du 26.11).
+  const source = { 'annotation-manuel': 'loupe', 'annotation-gnss': 'gnss', 'annotation-tablette': 'tablette' }[cle];
+  if (!source) return;
+  if (annotationEtat.position?.source !== source) annotationEtat.position = null;
+  annotationEtat.mode = source;
+  if (cle === 'annotation-manuel') afficherAnnotation();
+  else {
+    if (cle === 'annotation-gnss') prendreGnssAnnotation();
+    else prendreTabletteAnnotation();
+    afficherAnnotation(); // le mode actif est montré même si la prise est refusée
   }
 }
 
@@ -1050,7 +1053,7 @@ function afficherAnnotation() {
     tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste, reglages: annotationEtat.reglages, tri: annotationEtat.tri,
   })}${htmlBandeauAnnotation({
     nom: annotationEtat.nom, remarque: annotationEtat.remarque, photos: annotationEtat.photos.length,
-    position: annotationEtat.position, dernier: dernier?.nom ?? '',
+    position: annotationEtat.position, dernier: dernier?.nom ?? '', mode: annotationEtat.mode,
   })}`;
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -1769,8 +1772,8 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ouvrirPartieProjet('points');
   },
   applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() && !estDansAppliWindows() }) // 0.320.14 : Topo Tablette (Windows, avec souris) montre aussi Plans de chantier, Plateformes, Comparer, Matériel
-    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
-    .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
+    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile. Sauf Topo Tablette (Windows, 0.322.0 : le plan se choisit comme une appli).
+    .filter((a) => a.cle !== 'plan' || estDansAppliWindows() || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
   titre: titreAppli,
   sousApplis,
@@ -4236,6 +4239,32 @@ function travailAGarder() {
 
 // 0.138.0 : la cible prend le haut (plan en encart) ou le rend : le plan se recadre sur le point et la canne.
 document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
+
+// 0.322.0 (photo CC180 du 26.11) : sous Windows, le mini-plan d'Implanter › Point se place SOUS le texte (sa hauteur = la place restante)
+// au lieu de le recouvrir.
+function placerEncartPlan() {
+  const b = document.body;
+  if (!b.classList.contains('appli-windows') || !b.classList.contains('cible-en-haut') || b.classList.contains('cible-inversee')) return;
+  const zone = document.querySelector('.panneau[data-onglet="terrain"] .vue-guidage');
+  if (!zone) return;
+  let bas = 0;
+  for (const el of zone.children) {
+    if (el.hidden || getComputedStyle(el).position === 'fixed') continue;
+    bas = Math.max(bas, el.getBoundingClientRect().bottom);
+  }
+  const bande = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hauteur-bande')) || 0;
+  const libre = window.innerHeight - bande - 16 - (bas + 8);
+  b.style.setProperty('--encart-plan', `${Math.max(100, Math.min(220, Math.round(libre)))}px`);
+}
+let encartEnAttente = false;
+function demanderEncartPlan() {
+  if (encartEnAttente) return;
+  encartEnAttente = true;
+  requestAnimationFrame(() => { encartEnAttente = false; placerEncartPlan(); });
+}
+document.addEventListener('cible-en-haut', demanderEncartPlan);
+window.addEventListener('resize', demanderEncartPlan);
+new MutationObserver(demanderEncartPlan).observe(document.body, { subtree: true, childList: true, characterData: true });
 // 0.151.0 : bouton « Implanter » en bas à droite du plan (point ou ligne choisi).
 creerBoutonImplanterPlan(document.querySelector('.panneau-plan'), document.querySelector('#leve-direct'));
 // 0.166.2 : sur téléphone (Lever, dès Intermédiaire) le Δ est un bouton rond du plan ; il touche le vrai bouton « Δ ».
@@ -7844,6 +7873,7 @@ function calculerControle(etat, orientation) {
 {
   let capEnAttente = null;
   ecouterBoussole((cap) => {
+    capBoussoleTablette = cap;
     if (capEnAttente === null) {
       requestAnimationFrame(() => {
         ecranLeve?.mettreAJourBoussole(capEnAttente);
@@ -7880,7 +7910,7 @@ if (recepteurDisponible()) {
     if (vientDeSeConnecter) proposerControleApresDelai();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
-    const orientation = suiviOrientation.ajouter(etat, performance.now());
+    const orientation = suiviOrientation.ajouter(etat, performance.now(), capBoussoleTablette);
     if (terrain.plusProche && aAcces('expert')) viserLePlusProche();
     const enPoint = enImplantationDePoint();
     const enLigne = enImplantationDeLigne();

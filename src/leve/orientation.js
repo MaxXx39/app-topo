@@ -26,10 +26,12 @@ export function creerSuiviOrientation(source = 'rx2') {
     },
     /**
      * Nouvel état du récepteur (voir android/pont.js) reçu à "temps" (ms).
-     * Renvoie { azimut (° ou null), source ('rx2', 'marche' ou null), cap, marche } : cap et marche
+     * 0.322.0 : « capBoussole » (° ou null) = boussole de la tablette ; elle remplace le cap du GNSS quand l'inclinaison est perdue
+     * (le cap du GNSS n'est plus fiable), avant la direction de marche. Nord MAGNÉTIQUE, non corrigé (à valider avec l'utilisateur).
+     * Renvoie { azimut (° ou null), source ('rx2', 'boussole', 'marche' ou null), cap, marche } : cap et marche
      * sont les deux valeurs brutes (°, ou null), affichées pour contrôler le cap sur le terrain.
      */
-    ajouter(etat, temps) {
+    ajouter(etat, temps, capBoussole = null) {
       const position = etat?.connecte && etat.recu ? etat.position : null;
       if (position) historique.push({ est: position.est, nord: position.nord, temps });
       while (historique.length > 0 && temps - historique[0].temps > DUREE_HISTORIQUE) historique.shift();
@@ -38,6 +40,7 @@ export function creerSuiviOrientation(source = 'rx2') {
 
       let actuelle = null;
       if (source === 'rx2' && cap != null) actuelle = { azimut: cap, source: 'rx2' };
+      else if (source === 'rx2' && typeof capBoussole === 'number') actuelle = { azimut: capBoussole, source: 'boussole' };
       else if (marche != null) actuelle = { azimut: marche, source: 'marche' };
       if (actuelle) derniere = { ...actuelle, temps };
       else if (derniere && temps - derniere.temps <= DUREE_GARDEE) actuelle = derniere;

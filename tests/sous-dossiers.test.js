@@ -31,13 +31,13 @@ const projet = () => ({
 describe('liste des sous-dossiers', () => {
   it('départ : les 12 dossiers du 16.11 + PIC + Autre (en bas), chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'Autre']);
+    expect(liste.map((d) => d.nom)).toEqual(['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'BORDURE', 'Autre']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(13);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(14);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
-    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux', 'Autre']); // « Autre » toujours en bas
+    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux', 'BORDURE', 'Autre']); // BORDURE toujours proposé, « Autre » toujours en bas
     expect(couleurDuSousDossier('Inconnu', liste)).toBe('#6b7280');
   });
   it('un dossier déjà utilisé par un élément du projet est toujours proposé', () => {

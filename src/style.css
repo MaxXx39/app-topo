@@ -14082,7 +14082,7 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
     bottom: calc(var(--hauteur-bande, 0px) + 16px);
     width: calc(var(--largeur-panneau) - 32px);
     max-width: 420px;
-    height: 220px;
+    height: var(--encart-plan, 220px);
     z-index: 13;
     border: 3px solid #0d9488;
     border-radius: 12px;
@@ -14207,8 +14207,8 @@ body.appli-windows .ligne-case { display: none; }
     position: fixed;
     display: grid;
     place-items: center;
-    left: calc(min(var(--largeur-panneau) - 32px, 420px) + 16px - 48px);
-    bottom: calc(var(--hauteur-bande, 0px) + 16px + 220px + 6px);
+    left: calc(min(var(--largeur-panneau) - 32px, 420px) + 16px - 48px - 6px);
+    bottom: calc(var(--hauteur-bande, 0px) + 16px + var(--encart-plan, 220px) - 44px - 8px);
     width: 48px;
     height: 44px;
     z-index: 30;
@@ -15123,3 +15123,22 @@ dialog.page-chantier[open], dialog.page-plateformes[open] { padding-bottom: 0; }
 }
 .grille-appli-page { display: grid; grid-template-columns: repeat(2, 7px); gap: 3px; }
 .grille-appli-page i { width: 7px; height: 7px; border-radius: 2px; background: #ffffff; }
+
+/* 0.322.0 (photos CC180 du 26.11) : applis plein écran sous Windows (1280 × 800) : moins de hauteur perdue, ruban de calage en entier. */
+body.appli-windows .bandeau-projet-page { min-height: 26px; padding: 2px 12px; }
+body.appli-windows .bande-bas-page { height: 48px; padding-bottom: 0; }
+body.appli-windows .bouton-appli-page { min-width: 120px; padding: 0 14px; }
+body.appli-windows .entete-calage { padding: 4px 12px; gap: 4px 10px; }
+body.appli-windows .entete-calage h2 { font-size: 0.9rem; }
+body.appli-windows .etapes-calage button { padding: 3px 10px; }
+body.appli-windows .entete-calage .retour-reglages { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+body.appli-windows .page-calage .ruban-calage { flex-wrap: wrap; overflow: visible; gap: 4px; padding: 4px; }
+body.appli-windows .page-calage .ruban-calage .groupe-ruban { flex-shrink: 1; }
+body.appli-windows .contenu-calage { padding: 6px 12px 8px; gap: 6px; }
+body.appli-windows .carte-calage { padding: 8px 12px; gap: 6px; }
+
+/* 0.322.0 : Annotation : icônes des modes Manuel / GNSS / GPS tablette, mode actif en ambre, source écrite sous « Enreg. point ». */
+.ico-source { width: 1.1em; height: 1.1em; vertical-align: -0.2em; margin-right: 0.3em; flex: none; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure.actif { background: var(--ambre); color: #1b2b36; box-shadow: inset 0 -4px 0 #1b2b36; }
+.invite-annotation .ico-source { width: 1.3em; height: 1.3em; }
+.bouton-enreg-annotation small { display: inline-flex; align-items: center; }

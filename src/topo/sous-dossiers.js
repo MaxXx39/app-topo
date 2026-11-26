@@ -10,11 +10,14 @@ import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-p
 
 // Liste de départ réorganisée le 17.11 (TER., CANA, TS, AMEX, BAT, SITU, PIC, PERRIN1, PERRIN2, GEOOFF, GEOPERRIN, OLD, Autre), une couleur différente chacune.
 // 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
-export const SOUS_DOSSIERS_DEPART = ['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'Autre'];
+export const SOUS_DOSSIERS_DEPART = ['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'BORDURE', 'Autre'];
 /** Dossier « Autre » (0.261.0) : toujours le dernier de la liste (remplace la puce « Sans dossier »). */
 export const DOSSIER_AUTRE = 'Autre';
 // 15 couleurs distinctes (0.271.0 : choix de l'utilisateur pour les 13 premiers), dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
 const COULEURS = ['#a0480d', '#5347f5', '#eb9c2d', '#03ab24', '#ff5900', '#84cc16', '#0ea5e9', '#ffcf24', '#fee567', '#ec3636', '#0a008f', '#dedede', '#666666', '#0369a1', '#65a30d'];
+
+/** Couleurs qui ne dépendent pas de la place dans la liste (BORDURE : marron foncé, demande du 26.11 ; Autre garde son gris). */
+const COULEURS_FIXES = { BORDURE: '#5c3a1e', Autre: '#666666' };
 
 /** Anciens types de plans (avant les dossiers) → nom du dossier de départ qui les remplace (comparaison sans tenir compte des majuscules). */
 const ANCIENS_NOMS = { ter: 'TER.', 'bât': 'BAT', 'bat': 'BAT', 'bât radier': 'BAT-Rad.', 'bât/ss': 'BAT-SS', 'bât/rez': 'BAT-REZ' };
@@ -45,12 +48,14 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
   // 0.272.1 : dossiers créés dans CE projet (jamais envoyés aux autres projets) ; puis ceux déjà utilisés par des éléments.
   for (const nom of [...nettoyerSousDossiers(projet?.sousDossiersPropres ?? []), ...sousDossiersUtilises(projet)]) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
+  // 0.322.0 : BORDURE (marron) est toujours proposé, même si la liste partagée sur Drive ne l'a pas encore.
+  if (!noms.some((n) => n.toLowerCase() === 'bordure')) noms.push('BORDURE');
   // « Autre » toujours en bas de la liste.
   const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
   noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
   // 0.272.3 : couleur choisie pour un dossier réservé à ce projet (projet.couleursDossiers), sinon celle de la palette.
   const choisies = projet?.couleursDossiers ?? {};
-  return noms.map((nom, i) => ({ nom, couleur: choisies[nom] ?? COULEURS[i % COULEURS.length] }));
+  return noms.map((nom, i) => ({ nom, couleur: choisies[nom] ?? COULEURS_FIXES[nom] ?? COULEURS[i % COULEURS.length] }));
 }
 
 /** Couleurs proposées pour un dossier réservé au projet (les 13 de départ + 2 de rechange). */
