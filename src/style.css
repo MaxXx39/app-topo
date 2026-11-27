@@ -15369,3 +15369,7 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 /* 0.344.0 : pastille d'affaire dans le bandeau des applis plein écran */
 .bandeau-projet-page .pastille-affaire-page { margin-left: 10px; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 999px; background: #1d4ed8; color: #fff; font: inherit; font-size: 0.9rem; padding: 2px 12px; cursor: pointer; }
 .bandeau-projet-page .pastille-affaire-page[hidden] { display: none; }
+
+/* 0.344.0 : longues listes (fusion de projets) : la fenêtre défile ; pastille d'affaire plus petite sur téléphone */
+.fenetre-choix { max-height: 90vh; overflow-y: auto; }
+body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; padding: 2px 8px; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

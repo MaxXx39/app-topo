@@ -9281,9 +9281,9 @@ async function ouvrirMenuAffaires() {
       modifie();
       mettreAJourEtatEntete();
     } else if (reponse === 'fusionner') {
-      const autres = (await stockage.listerProjets()).filter((p) => p.id !== projet.id);
+      const autres = (await stockage.listerProjets()).filter((p) => p.id !== projet.id).sort((a, b) => titreProjet(a).localeCompare(titreProjet(b), 'fr'));
       if (autres.length === 0) return afficherMessage('Aucun autre projet sur cet appareil.', 4000);
-      const idSource = await demanderChoix({ titre: 'Quel projet fusionner ici ?', texte: 'Il devient une affaire de ce projet ; le projet d\'origine reste sur l\'appareil.', boutons: autres.slice(0, 12).map((p) => ({ cle: p.id, texte: titreProjet(p) })) });
+      const idSource = await demanderChoix({ titre: 'Quel projet fusionner ici ?', texte: 'Tous les projets de cet appareil. Le projet choisi devient une affaire de ce projet ; l\'original reste sur l\'appareil.', boutons: autres.map((p) => ({ cle: p.id, texte: titreProjet(p) })) });
       if (!idSource) return;
       const source = autres.find((p) => p.id === idSource);
       const { affaire, nombre } = fusionnerProjet(projet, source);
