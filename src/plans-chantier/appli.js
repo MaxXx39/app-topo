@@ -1168,7 +1168,7 @@ export function ouvrirPlansChantier({
     const options = (l, v) => l.map(([c, t]) => `<option value="${c}" ${c === v ? 'selected' : ''}>${t}</option>`).join('');
     const boutonRuban = null; // (les boutons de présentation sont maintenant dans le bandeau du haut)
     const bouton = (attrs, icone, titre, court, desactive = false) => `<button type="button" class="outil-ruban" ${attrs} ${desactive ? 'disabled' : ''} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
-    enteteOutils = `<div class="groupe-ruban" role="group" aria-label="Présentation">
+    enteteOutils = `<div class="groupe-ruban groupe-tete tete-presentation" role="group" aria-label="Présentation"><span class="mini-titre">Présentation</span>
         <label class="champ-bande" title="Présentation : les réglages de la feuille gardés sous un nom (se mettent à jour toutes seules)"><span>Présentation</span>
           <select data-presentation="choisir" aria-label="Présentation"><option value="">— réglages libres —</option>${liste.map((x) => `<option value="${echapper(x.id)}" ${x.id === active?.id ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>
         ${bouton('data-action="pres-nouvelle"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages actuels comme nouvelle présentation', 'Enreg.')}
@@ -1176,17 +1176,17 @@ export function ouvrirPlansChantier({
         ${bouton('data-action="pres-renommer"', '<path d="M4 20H8L19 9L15 5L4 16Z"/>', 'Renommer la présentation choisie', 'Renommer', !active)}
         ${bouton('data-action="pres-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer la présentation choisie', 'Supprimer', !active)}
       </div>
-      <div class="groupe-ruban" role="group" aria-label="Feuille">
+      <div class="groupe-ruban groupe-tete tete-feuille" role="group" aria-label="Feuille"><span class="mini-titre">Feuille</span>
         <label class="champ-bande" title="Format de la feuille"><span>Format</span><select data-feuille="format">${options(FORMATS_FEUILLE, r.format)}</select></label>
         <label class="champ-bande" title="Sens de la feuille"><span>Sens</span><select data-feuille="orientation">${options([['paysage', 'Paysage'], ['portrait', 'Portrait']], r.orientation)}</select></label>
         <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
         <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
       </div>
-      <span class="groupe-gabarit"><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
+      <span class="groupe-gabarit groupe-tete tete-gabarit"><span class="mini-titre">Gabarit</span><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
           <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).map((g) => `<option value="${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</select></label>
         ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit du projet', 'Gabarit +')}
         ${bouton('data-action="gabarit-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le gabarit choisi (les présentations déjà créées restent)', 'Suppr. gab.')}</span>
-      <span class="reglages-entete"><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
+      <span class="reglages-entete groupe-tete tete-affichage"><span class="mini-titre">Affichage</span><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
         <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4"></label></span>
       <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>`;
     return `
@@ -2074,7 +2074,7 @@ export function ouvrirPlansChantier({
   /** Outils de l'onglet Dessin posés dans le bandeau du haut (sélection, annuler, tout voir) : libère le ruban. */
   function htmlOutilsDessinEntete() {
     const bt = (attrs, icone, titre, court) => `<button type="button" class="outil-ruban" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
-    return `<span class="reglages-entete"><label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${plan()?.echelle ?? ECHELLE_PAPIER}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label></span>${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
+    return `<span class="reglages-entete groupe-tete tete-affichage"><span class="mini-titre">Affichage</span><label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${plan()?.echelle ?? ECHELLE_PAPIER}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label></span>${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
       ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer', 'Effacer')}
       ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)', 'Annuler')}
       ${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir', 'Tout')}`;
@@ -2084,7 +2084,7 @@ export function ouvrirPlansChantier({
   function htmlPhasesEntete() {
     const p = plan();
     if (!p) return '';
-    return `<span class="phases-entete"><label class="champ-bande" title="Phase dans laquelle on dessine"><span>Phase</span>
+    return `<span class="phases-entete groupe-tete tete-phase"><span class="mini-titre">Phase</span><label class="champ-bande" title="Phase dans laquelle on dessine"><span>Phase</span>
       <select data-phase-select>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === p.phaseActive ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
       <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button></span>`;
   }

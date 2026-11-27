@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.340.0 — Plans de chantier : petits titres, nom du projet dans le bandeau, fond de l'échelle, 3D / texte en Présentation
+Lire seulement la section utile : `grep -n '^## 0.341.0 — Plans de chantier : groupes titrés compacts dans le bandeau et les outils
+- Titres de groupe **verticaux** (texte tourné, ~10 px de large, aucune hauteur) sur les groupes d'outils de Dessin (TRACER, ANNOTER, SYMBOLES, CONSTRUCTION, COUPE) et sur les groupes du bandeau (PHASE, PRÉSENTATION, FEUILLE, GABARIT, AFFICHAGE, chacun d'une teinte).
+- Nom du plan masqué dans le bandeau (le nom du projet y est déjà). Dessin : bandeau sur une seule ligne. **Présentation reste sur 2 lignes à 1280 px** (trop de groupes) : à revoir si gênant (idée : Gabarit dans la bande du bas).
+- Vérifié en Playwright (captures Dessin et Présentation).
+
+## 0.340.0 — Plans de chantier : petits titres, nom du projet dans le bandeau, fond de l'échelle, 3D / texte en Présentation
 - Petits titres (MINI TITRE) sur les groupes d'outils de Dessin.
 - Nom du projet déplacé dans le bandeau Gestion / Dessin / Présentation ; le bandeau du haut de la page est masqué dans Plans de chantier (hauteur inchangée).
 - Échelle : case « Fond blanc derrière l'échelle » (`barreFond`, défaut oui).

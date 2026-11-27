@@ -15296,3 +15296,22 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .page-chantier > .bandeau-projet-page { display: none; }
 .nom-projet-entete { font-size: 0.8rem; font-weight: 700; color: #fde68a; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ruban-chantier .groupe-ruban .mini-titre { display: block; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; line-height: 1; padding: 0 0 2px; white-space: nowrap; }
+
+/* 0.341.0 : titres de groupe verticaux, étroits (ne prennent plus de hauteur ni beaucoup de largeur) */
+.ruban-chantier .groupe-ruban .mini-titre, .outils-entete .mini-titre { display: block; writing-mode: vertical-rl; transform: rotate(180deg); align-self: stretch; text-align: center; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1; padding: 0 2px 0 0; color: #64748b; white-space: nowrap; }
+.outils-entete .mini-titre { color: #cbd5e1; }
+.outils-entete .groupe-tete { padding: 2px 6px 2px 2px; border-radius: 8px; border-right: 0; background: rgba(255, 255, 255, 0.08); }
+.outils-entete .tete-phase { background: rgba(250, 204, 21, 0.18); }
+.outils-entete .tete-presentation { background: rgba(96, 165, 250, 0.2); }
+.outils-entete .tete-feuille { background: rgba(167, 139, 250, 0.2); }
+.outils-entete .tete-gabarit { background: rgba(74, 222, 128, 0.18); }
+.outils-entete .tete-affichage { background: rgba(251, 146, 60, 0.2); }
+.outils-entete .groupe-tete { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; }
+.page-chantier .entete-chantier .nom-plan-chantier { display: none; }
+.outils-entete .tete-gabarit .champ-bande > span:not(.mini-titre), .outils-entete .tete-phase .champ-bande > span { display: none; }
+.outils-entete .tete-presentation [data-presentation], .outils-entete .tete-gabarit select { max-width: 84px; }
+.outils-entete .tete-feuille select { max-width: 70px; }
+.outils-entete .tete-feuille input[data-feuille="echelle"] { width: 50px; }
+.outils-entete .groupe-tete .outil-ruban { min-width: 34px; height: 36px; padding: 0 4px; }
+.outils-entete .tete-affichage input[type="number"] { width: 46px; }
+.outils-entete .bouton { min-height: 36px; padding: 0 10px; }
