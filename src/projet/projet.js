@@ -44,6 +44,7 @@ import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 import { retirerDessins } from './retrait-dessins.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
+import { numeroAffaireActif, affairesDe, migrerAffaires } from '../topo/affaires.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -101,7 +102,8 @@ export function ajouterLeve(projet, nomFichier, points) {
  * sinon son nom, sinon « Projet sans nom ».
  */
 export function titreProjet(projet) {
-  const affaireLieu = [projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
+  // 0.344.0 : le numéro d'affaire est celui de l'affaire choisie sur cette tablette
+  const affaireLieu = [affairesDe(projet).length > 1 ? numeroAffaireActif(projet) : projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
   return affaireLieu || (projet.nom ?? '').trim() || projet.nomAuto || 'Projet sans nom';
 }
 
@@ -175,6 +177,7 @@ export function completerProjet(projet) {
   const vide = creerProjet(projet.nom ?? '');
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
+  migrerAffaires(complet); // 0.346.0 : l'affaire d'un élément devient une pastille de catégorie
   complet.plansDxf ??= [];
   complet.archives ??= []; // éléments archivés (0.119.0)
   complet.aImplanter ??= [];
@@ -253,6 +256,7 @@ export function resumerProjet(projet) {
     modifieLe: projet.modifieLe,
     nombreLeves: projet.leves.length,
     nombreSurfaces: projet.surfaces.length,
+    affaires: (projet.affaires ?? []).length > 0 ? affairesDe(projet).map((a) => ({ id: a.id, numero: a.numero, categorie: a.categorie })) : [], // 0.346.0 : une ligne par affaire dans « Ouvrir »
     centre: centreDuProjet(projet), // 0.216.0 : pour la carte des projets (null si rien en Suisse)
   };
 }

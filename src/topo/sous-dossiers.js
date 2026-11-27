@@ -7,6 +7,7 @@
 //   rangés dans ce sous-dossier sont montrés (plan, pages du projet, choix de surfaces). Voir / choisir : tous les modes ;
 //   créer, ranger, déplacer : Expert.
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
+import { dansAffaire, affaireChoisie } from './affaires.js';
 
 // Liste de départ réorganisée le 17.11 (TER., CANA, TS, AMEX, BAT, SITU, PIC, PERRIN1, PERRIN2, GEOOFF, GEOPERRIN, OLD, Autre), une couleur différente chacune.
 // 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
@@ -259,6 +260,7 @@ export function suffixeDossiers(projet, element, genre = '') {
 
 /** L'élément est-il montré avec le sous-dossier choisi (celui de cette tablette par défaut) ? */
 export function estMontre(projet, element, genre = '', choix = choisi) {
+  if (!dansAffaire(projet, element, genre)) return false; // 0.344.0 : l'affaire choisie filtre toujours, quel que soit le mode
   // 0.259.0 : dans les applications, seul le mode Base est filtré par le dossier ; Intermédiaire et Expert listent tout (avec la pastille du dossier).
   if (!filtreApplications) return true;
   // 0.260.0 : un levé ou une liste d'annotations sans dossier reste montré (ils n'ont pas de dossier de base).
@@ -268,13 +270,14 @@ export function estMontre(projet, element, genre = '', choix = choisi) {
 
 /** Vrai si l'élément est rangé dans le dossier `choix` (Tout : oui), quel que soit le mode : sert à cocher / décocher l'affichage. */
 export function estDansSousDossier(projet, element, genre = '', choix = choisi) {
+  if (!dansAffaire(projet, element, genre)) return false;
   return dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
 }
 
 /** Identifiants des éléments cachés par le sous-dossier choisi (vide si « Tout »), à ajouter aux listes décochées. */
 export function idsHorsSousDossier(projet, choix = choisi) {
   const ids = new Set();
-  if (!choix) return ids;
+  if (!choix && !affaireChoisie()) return ids;
   for (const { genre, element } of elementsRangeables(projet)) if (!estMontre(projet, element, genre, choix)) ids.add(element.id);
   return ids;
 }

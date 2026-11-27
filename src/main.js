@@ -15,6 +15,7 @@ import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
+import { affairesDe, aPlusieursAffaires, ajouterAffaire, modifierAffaire, retirerAffaire, affaireChoisie, definirAffaire, rangerNouveauxDansAffaire, definirPastilles, pastillesDe, fusionnerProjet, numeroDeLAffaire, cartoucheActif, elementsDesAffaires, retenirAffaire, lireAffaireRetenue, categoriesAffaires, enregistrerCategoriesAffaires, nettoyerCategories, PRINCIPALE } from './topo/affaires.js';
 import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, changerCouleurSousDossierProjet, retirerSousDossierProjet, estDossierDuProjet, COULEURS_CHOIX, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF, precisionPdf } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
@@ -1660,7 +1661,7 @@ function exporterMesureRapide() {
       const { pdfMesureRapide, dxfMesureRapide } = await import('./export/mesure-rapide.js');
       if (format === 'pdf') {
         const fond = choix.photo || choix.plans ? await fondDuCroquisMesure(mesure, { photo: choix.photo, plans: choix.plans }) : null;
-        return { blob: pdfMesureRapide({ mesure, fond, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
+        return { blob: pdfMesureRapide({ mesure, fond, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: cartoucheActif(projet).affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
       }
       return { blob: new Blob([octetsDxf(dxfMesureRapide(mesure))], { type: 'application/dxf' }), nom: `${base}.dxf` };
     },
@@ -1935,7 +1936,7 @@ document.querySelector('.titre-partie-projet').addEventListener('click', (evenem
 });
 // Page « Ouvrir projet » : sa flèche ← ramène à la page Applications (il n'y a plus de page Projet entière).
 document.querySelector('#projets').addEventListener('click', (evenement) => {
-  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour[data-panneau="projets"]')) navigation.ouvrirPage();
+  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour-partie[data-panneau="projets"]')) navigation.ouvrirPage();
 });
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
@@ -4074,7 +4075,7 @@ function exporterListe(type, id) {
           titre,
           points,
           roles,
-          cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') },
+          cartouche: { affaire: cartoucheActif(projet).affaire ?? '', date: new Date().toLocaleDateString('fr-CH') },
           photos: choix.photos ? await photosAvecDessins(photos) : [],
         });
         return { blob, nom: `${base}.pdf` };
@@ -8102,6 +8103,16 @@ const actionsProjet = {
   // Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
   // « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet.
   nouveauProjet: () => creerNouveauProjet(),
+  // 0.346.0 : une ligne d'« Ouvrir » par affaire : l'affaire est retenue pour cette tablette, puis le projet s'ouvre (ou reste ouvert).
+  ouvrirAffaire: (id, idAffaire) => {
+    retenirAffaire(id, idAffaire);
+    if (projet?.id === id) {
+      choisirAffaire(idAffaire);
+      navigation?.ouvrirPage?.();
+      return undefined;
+    }
+    return actionsProjet.ouvrirProjet(id);
+  },
   ouvrirProjet: (id) => avecChargement(async () => {
     const lu = await stockage.lireProjet(id);
     if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
@@ -8749,7 +8760,7 @@ creerEcranExport(moduleExport.zone('plan'), {
       // Photos des surfaces cochées (case « Photos » de l'export).
       // Photo rattachée à un point (0.96.0) : le nom du point devant la légende.
       photos: affichees.flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom, legende: [photo.point, photo.legende].filter(Boolean).join(' · ') }))),
-      cartouche: projet.cartouche,
+      cartouche: cartoucheActif(projet),
       // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
       coupes: projet.coupes
         .filter((coupe) => coupe.dansPdf && coupe.debut && coupe.fin)
@@ -9035,6 +9046,8 @@ function modifie(options) {
   synchroniserTalusSurfaces();
   prefixerNoms(projet);
   rangerNouveauxDansLeSousDossier();
+  if (elementsAffaires === null) elementsAffaires = new Set(elementsDesAffaires(projet).map(({ element }) => element.id));
+  rangerNouveauxDansAffaire(projet, elementsAffaires);
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);
@@ -9045,6 +9058,7 @@ function modifie(options) {
 
 
 // --- Sous-dossiers (0.251.0, voir topo/sous-dossiers.js) ---
+let elementsAffaires = null; // 0.344.0 : ids déjà rangés par affaire (un nouvel élément prend l'affaire choisie)
 let elementsConnus = null; // ids des éléments déjà là : un nouvel élément est rangé dans le sous-dossier choisi
 
 /** Un élément créé alors qu'un sous-dossier est choisi y est rangé d'office (sous « Tout » : sans dossier). */
@@ -9147,7 +9161,7 @@ function appliquerDossierALAffichage() {
   const cachees = new Set(projet.listesCachees ?? []);
   // « Tout » (0.265.0 / 0.266.0, demandes du 17.11) : l'affichage de départ revient (comme un projet ouvert pour la première fois
   // sur la tablette, voir projet/affichage-appareil.js) : tout est coché SAUF les points du cadastre et les surfaces importées.
-  if (!choix) {
+  if (!choix && !affaireChoisie()) {
     projet.listesCachees = [...listesCadastre(projet), ...listesSurfacesImportees(projet)];
     for (const plan of projet.plansDxf ?? []) plan.visible = true;
     return;
@@ -9174,6 +9188,15 @@ async function choisirDossiersDeLElement(id) {
   if (!trouve) return;
   const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
   const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
+  // 0.346.0 : projet à plusieurs affaires : l'Expert peut aussi régler les pastilles (catégories) de l'élément.
+  if (aPlusieursAffaires(projet) && aAcces('expert')) {
+    const quoi = await demanderChoix({ titre: `« ${cible.nom ?? 'cet élément'} »`, boutons: [
+      { cle: 'dossiers', texte: 'Changer les dossiers', principal: true },
+      { cle: 'pastilles', texte: `Changer les pastilles d'affaire (${pastillesDe(projet, trouve.element, trouve.genre).join(', ') || 'aucune : visible partout'})` },
+    ] });
+    if (!quoi) return;
+    if (quoi === 'pastilles') return changerPastillesDeLElement(trouve.element, trouve.genre);
+  }
   const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
   const cochees = await demanderCases({
     titre: `Dossiers de « ${cible.nom ?? 'cet élément'} »`,
@@ -9183,6 +9206,154 @@ async function choisirDossiersDeLElement(id) {
   cible.sousDossiers = cochees;
   modifie();
 }
+
+// --- Affaires (0.344.0, refait en 0.346.0, voir topo/affaires.js) ---
+
+/** Pastilles (catégories d'affaire) d'un élément : Expert. Aucune pastille = visible dans toutes les affaires. */
+async function changerPastillesDeLElement(element, genre) {
+  const cible = (genre === 'surface' || genre === 'autre') && element.leveId ? projet.leves.find((l) => l.id === element.leveId) ?? element : element;
+  const actuelles = new Set(pastillesDe(projet, cible, genre));
+  const cochees = await demanderCases({
+    titre: `Pastilles de « ${cible.nom ?? 'cet élément'} » (aucune = visible partout)`,
+    options: affairesDe(projet).filter((a) => a.categorie).map((a) => ({ cle: a.categorie, texte: `${a.categorie} (${a.numero})`, coche: actuelles.has(a.categorie) })),
+  });
+  if (!cochees) return;
+  if (definirPastilles(projet, cible.id, cochees)) {
+    modifie();
+    choisirAffaire(affaireChoisie()); // l'élément peut disparaître de la vue (ou apparaître)
+  }
+}
+
+/** Choisit l'affaire de cette tablette pour ce projet (« » = Toutes, Expert seulement) et redessine tout. */
+function choisirAffaire(id) {
+  definirAffaire(id);
+  retenirAffaire(projet.id, id);
+  appliquerDossierALAffichage();
+  recalculer({ recadrer: false });
+  enregistrerBientot();
+  navigation?.mettreAJour?.();
+  mettreAJourEtatEntete();
+}
+
+/**
+ * Pastille de l'en-tête : l'affaire choisie. Visible dès que le projet a plusieurs affaires, ou en Expert pour en ajouter.
+ * Base / Intermédiaire : elle montre l'affaire sans pouvoir la changer (on change d'affaire par « Ouvrir »).
+ */
+function mettreAJourPastilleAffaire() {
+  const pastille = document.querySelector('#pastille-affaire');
+  if (!pastille) return;
+  const expert = aAcces('expert');
+  const visible = aPlusieursAffaires(projet) || expert;
+  pastille.hidden = !visible;
+  if (!visible) return;
+  const choix = affaireChoisie();
+  const a = choix ? affairesDe(projet).find((x) => x.id === choix) : null;
+  pastille.textContent = `📋 ${a ? a.categorie || a.numero : 'Toutes'}${expert ? ' ▾' : ''}`;
+  pastille.title = expert ? 'Affaire choisie : touche pour en changer' : `Affaire ${a?.numero ?? ''} : on change d'affaire par « Ouvrir »`;
+  pastille.classList.toggle('pastille-fixe', !expert);
+  // Les applis plein écran (Calage, Matériel, Plans de chantier…) recopient cette pastille dans leur bandeau.
+  document.dispatchEvent(new CustomEvent('topo-affaire-changee'));
+}
+
+/** Choix d'une catégorie parmi celles qui ne sont pas déjà prises par une autre affaire (ou celle qu'on modifie). */
+async function choisirCategorie(titre, idAffaire = null) {
+  const prises = new Set(affairesDe(projet).filter((a) => a.id !== idAffaire && a.categorie).map((a) => a.categorie));
+  const libres = categoriesAffaires().filter((c) => !prises.has(c));
+  if (libres.length === 0) {
+    afficherMessage('Toutes les catégories sont prises : l\'Expert peut en ajouter (« Modifier la liste des catégories »).', 5000);
+    return null;
+  }
+  return demanderChoix({ titre, boutons: libres.map((c) => ({ cle: c, texte: c })) });
+}
+
+/** Menu des affaires (Expert) : choisir, ajouter, modifier, fusionner, retirer, liste des catégories. */
+async function ouvrirMenuAffaires() {
+  if (!aAcces('expert')) return; // Base / Intermédiaire : une seule affaire, choisie par « Ouvrir »
+  const choix = affaireChoisie();
+  const multiple = aPlusieursAffaires(projet);
+  const boutons = [
+    ...(multiple ? [{ cle: 'toutes', texte: `Toutes les affaires${choix === '' ? ' ✓' : ''}`, principal: choix === '' }] : []),
+    ...(multiple ? affairesDe(projet).map((a) => ({ cle: `a:${a.id}`, texte: `${a.categorie || '—'} · ${a.numero}${a.id === choix ? ' ✓' : ''}`, principal: a.id === choix })) : []),
+    { cle: 'ajouter', texte: '＋ Ajouter une affaire…' },
+    { cle: 'modifier', texte: 'Changer le numéro / la catégorie d\'une affaire…' },
+    { cle: 'fusionner', texte: 'Fusionner un autre projet ici…' },
+    ...(multiple ? [{ cle: 'retirer', texte: 'Retirer une affaire sans élément…' }] : []),
+    { cle: 'categories', texte: 'Modifier la liste des catégories…' },
+  ];
+  const reponse = await demanderChoix({ titre: 'Affaires du projet', texte: multiple ? '' : 'Ce projet n\'a qu\'une affaire. Ajoutez-en une pour y ranger un autre lot (même désignation, autre numéro, autre catégorie).', boutons });
+  if (!reponse) return;
+  if (reponse === 'toutes') return choisirAffaire('');
+  if (reponse.startsWith('a:')) return choisirAffaire(reponse.slice(2));
+  if (refuserEnLectureSeule()) return;
+  const choisirUne = async (titre) => demanderChoix({ titre, boutons: affairesDe(projet).map((a) => ({ cle: a.id, texte: `${a.categorie || '—'} · ${a.numero}` })) });
+  try {
+    if (reponse === 'ajouter') {
+      // L'affaire de départ doit avoir une catégorie avant qu'on en ajoute une autre.
+      const principale = affairesDe(projet)[0];
+      if (!principale.categorie) {
+        const c0 = await choisirCategorie(`Catégorie de l'affaire ${principale.numero} (celle qui existe déjà)`, PRINCIPALE);
+        if (!c0) return;
+        modifierAffaire(projet, PRINCIPALE, principale.numero, c0);
+      }
+      const numero = await demanderTexte({ titre: 'Numéro de la nouvelle affaire (ex. 10 203)' });
+      if (!numero) return;
+      const categorie = await choisirCategorie('Catégorie de la nouvelle affaire');
+      if (!categorie) return;
+      const a = ajouterAffaire(projet, numero, categorie);
+      modifie();
+      choisirAffaire(a.id);
+    } else if (reponse === 'modifier') {
+      const id = await choisirUne('Quelle affaire ?');
+      if (!id) return;
+      const actuelle = affairesDe(projet).find((x) => x.id === id);
+      const numero = await demanderTexte({ titre: 'Numéro d\'affaire', valeur: actuelle.numero });
+      if (!numero) return;
+      const categorie = await choisirCategorie('Catégorie de l\'affaire', id);
+      if (!categorie) return;
+      modifierAffaire(projet, id, numero, categorie);
+      modifie();
+      mettreAJourEtatEntete();
+    } else if (reponse === 'retirer') {
+      const id = await choisirUne('Retirer quelle affaire (sans élément) ?');
+      if (!id) return;
+      const erreur = retirerAffaire(projet, id);
+      if (erreur) return afficherMessage(erreur, 5000);
+      if (affaireChoisie() === id) choisirAffaire('');
+      modifie();
+      mettreAJourEtatEntete();
+    } else if (reponse === 'categories') {
+      const texte = await demanderTexte({ titre: 'Catégories d\'affaire (séparées par des virgules)', valeur: categoriesAffaires().join(', ') });
+      if (texte == null) return;
+      const noms = nettoyerCategories(texte);
+      if (noms.length === 0) return afficherMessage('Il faut au moins une catégorie.', 4000);
+      enregistrerCategoriesAffaires(noms);
+      afficherMessage('Catégories enregistrées (partagées par Drive)', 3000);
+    } else if (reponse === 'fusionner') {
+      const autres = (await stockage.listerProjets()).filter((p) => p.id !== projet.id).sort((a, b) => titreProjet(a).localeCompare(titreProjet(b), 'fr'));
+      if (autres.length === 0) return afficherMessage('Aucun autre projet sur cet appareil.', 4000);
+      const idSource = await demanderChoix({ titre: 'Quel projet fusionner ici ?', texte: 'Tous les projets de cet appareil. Le projet choisi devient une affaire de ce projet ; l\'original reste sur l\'appareil.', boutons: autres.map((p) => ({ cle: p.id, texte: titreProjet(p) })) });
+      if (!idSource) return;
+      const source = autres.find((p) => p.id === idSource);
+      const principale = affairesDe(projet)[0];
+      if (!principale.categorie) {
+        const c0 = await choisirCategorie(`Catégorie de l'affaire ${principale.numero} (celle de ce projet)`, PRINCIPALE);
+        if (!c0) return;
+        modifierAffaire(projet, PRINCIPALE, principale.numero, c0);
+      }
+      const numero = await demanderTexte({ titre: 'Numéro d\'affaire du projet fusionné', valeur: String(source.cartouche?.affaire ?? '').trim() });
+      if (!numero) return;
+      const categorie = await choisirCategorie('Catégorie de l\'affaire fusionnée');
+      if (!categorie) return;
+      const { affaire, nombre } = fusionnerProjet(projet, source, numero, categorie);
+      modifie();
+      choisirAffaire(affaire.id);
+      afficherMessage(`${titreProjet(source)} fusionné : affaire ${affaire.numero} ${affaire.categorie} (${nombre} éléments)`, 5000, { ok: true });
+    }
+  } catch (erreur) {
+    afficherMessage(erreur.message, 6000);
+  }
+}
+document.querySelector('#pastille-affaire')?.addEventListener('click', () => ouvrirMenuAffaires());
 
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
 function choisirSousDossier(nom) {
@@ -9299,6 +9470,7 @@ function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
   mettreAJourPastilleDossier();
+  mettreAJourPastilleAffaire();
 
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
@@ -9660,6 +9832,11 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   appliquerAffichage(projet);
   // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
   definirSousDossier(lireChoix(projet));
+  // 0.346.0 : Expert = « Toutes » au départ ; Base / Intermédiaire = toujours dans UNE affaire (celle de la ligne ouverte, sinon la 1re).
+  let affaireDeDepart = lireAffaireRetenue(projet);
+  if (aPlusieursAffaires(projet) && !aAcces('expert') && !affaireDeDepart) affaireDeDepart = affairesDe(projet)[0].id;
+  definirAffaire(affaireDeDepart);
+  elementsAffaires = new Set(elementsDesAffaires(projet).map(({ element }) => element.id));
   elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);

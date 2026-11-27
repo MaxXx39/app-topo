@@ -7,6 +7,15 @@
  */
 import { echapper } from '../outils/echapper.js';
 
+/** Recopie la pastille d'affaire de l'en-tête dans le bandeau de la page. */
+function majAffaire(haut) {
+  const source = document.querySelector('#pastille-affaire');
+  const bouton = haut.querySelector('.pastille-affaire-page');
+  if (!bouton || !source) return;
+  bouton.hidden = source.hidden;
+  bouton.textContent = source.textContent;
+}
+
 /** Nom du projet affiché dans l'en-tête de l'appli (vide si rien). */
 function nomDuProjet() {
   return document.querySelector('#titre-projet')?.textContent?.trim() || 'Projet';
@@ -21,8 +30,11 @@ export function habillerPage(page, { couleur, titre, contenuBande = null }) {
     if (!page.querySelector(':scope > .bandeau-projet-page')) {
       const haut = document.createElement('div');
       haut.className = 'bandeau-projet-page';
-      haut.innerHTML = `<span class="projet-page-nom">${echapper(nomDuProjet())}</span>`;
+      haut.innerHTML = `<span class="projet-page-nom">${echapper(nomDuProjet())}</span><button type="button" class="pastille-affaire-page" hidden></button>`;
       page.prepend(haut);
+      // 0.344.0 : l'affaire choisie se voit et se change aussi dans les applis plein écran (même menu que l'en-tête).
+      haut.querySelector('.pastille-affaire-page').addEventListener('click', () => document.querySelector('#pastille-affaire')?.click());
+      majAffaire(haut);
     }
     if (!page.querySelector(':scope > .bande-page')) {
       // 0.323.0 : même bouton que la bande des autres applis (Contrôle…) : « ☰ Nom », sans bandeau sombre derrière.
@@ -46,7 +58,18 @@ export function habillerPage(page, { couleur, titre, contenuBande = null }) {
   });
   observateur.observe(page, { childList: true });
   poser();
-  return () => observateur.disconnect();
+  const surAffaire = () => {
+    const haut = page.querySelector(':scope > .bandeau-projet-page');
+    if (!haut) return;
+    majAffaire(haut);
+    const nom = haut.querySelector('.projet-page-nom');
+    if (nom) nom.textContent = nomDuProjet();
+  };
+  document.addEventListener('topo-affaire-changee', surAffaire);
+  return () => {
+    observateur.disconnect();
+    document.removeEventListener('topo-affaire-changee', surAffaire);
+  };
 }
 
 const DUREE_APPUI_LONG = 500; // ms, comme la bande des autres applis

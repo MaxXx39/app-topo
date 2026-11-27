@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, multi = () => [], saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -161,6 +161,10 @@ export function creerVueChantier(conteneur, options) {
       dessinerObjets(d, visibles);
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
+      for (const id of multi()) { // plusieurs éléments choisis (Ctrl + clic)
+        const autre = visibles.find((o) => o.id === id);
+        if (autre) dessinerChoix(ctx, autre);
+      }
       // Symbole à poser (0.289.0) : aperçu transparent sous la souris.
       const fantome = curseur ? apercu() : null;
       if (fantome) {

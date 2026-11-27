@@ -55,6 +55,15 @@ function ouAujourdhui(parc, article, jour = aujourdhui()) {
   return article.statut === 'actif' ? 'Dépôt' : '';
 }
 
+/** Liste déroulante d'une marque / d'un modèle : les valeurs du parc + « ＋ Nouvelle… » (0.343.0). */
+function listeDeroulante(nom, titre, valeurs, courante, article) {
+  const c = String(courante ?? '').trim();
+  const toutes = c && !valeurs.some((x) => x.toLowerCase() === c.toLowerCase()) ? [...valeurs, c] : valeurs;
+  return `<label class="champ-materiel"><span>${titre}</span><select name="${nom}" data-liste-nouvelle="${echapper(article)}">
+    <option value="">—</option>${toutes.map((x) => `<option value="${echapper(x)}" ${x.toLowerCase() === c.toLowerCase() ? 'selected' : ''}>${echapper(x)}</option>`).join('')}
+    <option value="__nouveau__">＋ Nouvelle…</option></select></label>`;
+}
+
 /**
  * Ouvre la page Matériel. materiel : accès Drive (partage.materiel, voir partage.js) ou null ;
  * nomsProjets() : noms des projets connus (appareil et Drive), pour relier chantiers et projets ;
@@ -370,23 +379,21 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     return `
       <div class="entete-fiche">
         <button type="button" class="bouton-secondaire" data-action="retour-parc">← Parc</button>
-        <h3>${article ? `Article ${echapper(article.numero)}` : 'Nouvel article'}</h3>
+        <h3 data-zone="titre-fiche">${article ? `Article ${echapper(article.numero)}` : 'Nouvel article'}</h3>
       </div>
       <form class="fiche-materiel" data-zone="fiche" autocomplete="off">
-        <fieldset><legend>Désignation</legend>
-          <label class="champ-materiel"><span>Marque</span><input type="text" name="marque" list="liste-marques" value="${echapper(v.marque ?? '')}" placeholder="ex. Emlid" /></label>
-          <label class="champ-materiel"><span>Modèle</span><input type="text" name="modele" list="liste-modeles" value="${echapper(v.modele ?? '')}" placeholder="ex. Reach RX2" /></label>
-          <label class="champ-materiel large"><span>Autre</span><input type="text" name="autre" value="${echapper(v.autre ?? '')}" placeholder="ex. Canne GPS" /></label>
-          <datalist id="liste-marques">${marquesDuParc(parc).map((m) => `<option value="${echapper(m)}"></option>`).join('')}</datalist>
-          <datalist id="liste-modeles">${modelesDuParc(parc, v.marque).map((m) => `<option value="${echapper(m)}"></option>`).join('')}</datalist>
+        <fieldset class="serre"><legend>Désignation</legend>
+          ${champ('numero', 'Numéro * (= n° de la tablette)', { attributs: 'required placeholder="ex. 953"' })}
+          ${listeDeroulante('marque', 'Marque', marquesDuParc(parc), v.marque, 'une marque')}
+          ${listeDeroulante('modele', 'Modèle', modelesDuParc(parc, v.marque), v.modele, 'un modèle')}
+          <label class="champ-materiel"><span>Autre</span><input type="text" name="autre" value="${echapper(v.autre ?? '')}" placeholder="ex. Canne GPS" /></label>
           <p class="champ-materiel large apercu-designation"><span>Désignation</span><strong data-zone="apercu-designation">${echapper(designationArticle(v) || '—')}</strong></p>
         </fieldset>
-        <fieldset><legend>Identité</legend>
+        <fieldset class="serre"><legend>Identité</legend>
           <label class="champ-materiel"><span>Catégorie *</span><span class="ligne-categorie"><select name="categorieId">
             ${categoriesTriees(parc).map((c) => `<option value="${echapper(c.id)}" ${c.id === v.categorieId ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('')}</select><button type="button" class="bouton-secondaire petit" data-action="categorie-fiche" title="Nouvelle catégorie">＋</button></span></label>
           <label class="champ-materiel"><span>Statut</span><select name="statut">
             ${STATUTS.map(([c, t]) => `<option value="${c}" ${c === v.statut ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-          ${champ('numero', 'N° interne * (= n° de la tablette)', { attributs: 'required placeholder="ex. 953"' })}
           ${champ('codeCompta', 'Code compta (N° MS, à facturer)', { attributs: 'placeholder="ex. 112"' })}
           <label class="champ-materiel large"><span>Accessoire de</span><select name="parentId"><option value="">— aucun —</option>
             ${principaux.map((a) => `<option value="${echapper(a.id)}" ${a.id === v.parentId ? 'selected' : ''}>${echapper(a.numero)} ${echapper(a.designation)}</option>`).join('')}</select></label>
@@ -396,13 +403,13 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
               <input type="color" name="couleur" value="${couleur.toLowerCase()}" aria-label="Autre couleur" />
             </div></div>
         </fieldset>
-        <fieldset><legend>Achat et garantie</legend>
+        <fieldset class="serre"><legend>Achat et garantie</legend>
           ${champ('numeroSerie', 'N° de série')}${champ('fournisseur', 'Fournisseur')}
           ${champ('dateAchat', 'Date d\'achat', { attributs: 'placeholder="JJ.MM.AAAA"' })}
           ${champ('prixChf', 'Prix (CHF)', { attributs: 'inputmode="decimal" placeholder="0.00"' })}
           ${champ('finGarantie', 'Fin de garantie', { attributs: 'placeholder="JJ.MM.AAAA"' })}
         </fieldset>
-        <fieldset><legend>Téléphone et swipos</legend>
+        <fieldset class="serre"><legend>Téléphone et swipos</legend>
           ${champ('telephone', 'N° de téléphone (carte SIM)', { type: 'tel', attributs: 'placeholder="ex. 079 123 45 67"' })}
           ${champ('swiposNumero', 'N° swipos')}
           <div class="champ-materiel"><span>Mot de passe swipos</span>
@@ -413,10 +420,10 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
                  <button type="button" class="bouton-secondaire" data-action="voir-mdp">Voir / modifier</button></div>`}
           </div>
         </fieldset>
-        <label class="champ-materiel large"><span>Notes</span><textarea name="notes" rows="3">${echapper(v.notes ?? '')}</textarea></label>
+        <label class="champ-materiel large"><span>Notes</span><textarea name="notes" rows="2">${echapper(v.notes ?? '')}</textarea></label>
         <div class="boutons-fiche">
-          <button type="submit" class="bouton" data-action="enregistrer-article">Enregistrer</button>
-          <button type="button" class="bouton-secondaire" data-action="enregistrer-et-nouveau">Enregistrer et ajouter un autre</button>
+          <span class="aide" data-zone="etat-enregistrement">${article ? 'Enregistrement automatique' : 'Enregistré dès que le numéro est rempli'}</span>
+          <button type="button" class="bouton-secondaire" data-action="enregistrer-et-nouveau">＋ Autre article</button>
           ${article ? `<button type="button" class="bouton-secondaire" data-action="dupliquer">Dupliquer</button>
             <button type="button" class="bouton-secondaire bouton-danger" data-action="supprimer-article">Supprimer</button>` : ''}
         </div>
@@ -458,6 +465,37 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
   function champsDeLaFiche() {
     const formulaire = page.querySelector('[data-zone="fiche"]');
     return Object.fromEntries(new FormData(formulaire).entries());
+  }
+
+  // 0.343.0 : enregistrement automatique de la fiche (plus de bouton « Enregistrer »). Les enregistrements se suivent un par un.
+  let fileEnregistrement = Promise.resolve();
+  function enregistrerAuto() {
+    fileEnregistrement = fileEnregistrement.then(async () => {
+      if (!fiche || !page.querySelector('[data-zone="fiche"]')) return;
+      const champs = champsDeLaFiche();
+      if (!String(champs.numero ?? '').trim()) return; // le numéro est obligatoire : on attend
+      const { ok, resultat } = await changer((p) => (fiche.id ? modifierArticle(p, fiche.id, champs) : ajouterArticle(p, champs)));
+      const etatZone = page.querySelector('[data-zone="etat-enregistrement"]');
+      if (!ok) { if (etatZone) etatZone.textContent = '⚠ Pas enregistré'; return; }
+      fiche.id = resultat.id;
+      const titre = page.querySelector('[data-zone="titre-fiche"]');
+      if (titre) titre.textContent = `Article ${resultat.numero}`;
+      if (etatZone) etatZone.textContent = '✓ Enregistré';
+      rafraichirListesDeroulantes();
+    });
+    return fileEnregistrement;
+  }
+
+  /** Remet à jour les listes Marque / Modèle (elles grandissent avec le parc) sans redessiner la fiche. */
+  function rafraichirListesDeroulantes() {
+    for (const [nom, valeurs] of [['marque', marquesDuParc(parc)], ['modele', modelesDuParc(parc, page.querySelector('[name="marque"]')?.value)]]) {
+      const liste = page.querySelector(`select[name="${nom}"]`);
+      if (!liste) continue;
+      const courante = liste.value;
+      const toutes = courante && !valeurs.some((x) => x.toLowerCase() === courante.toLowerCase()) ? [...valeurs, courante] : valeurs;
+      liste.innerHTML = `<option value="">—</option>${toutes.map((x) => `<option value="${echapper(x)}">${echapper(x)}</option>`).join('')}<option value="__nouveau__">＋ Nouvelle…</option>`;
+      liste.value = courante;
+    }
   }
 
   async function enregistrerFiche(ensuite = null) {
@@ -713,7 +751,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       const article = parc.articles.find((a) => a.id === fiche.id);
       fiche = { id: null, brouillon: champsDupliques(article), mdpVisible: false, couleurChoisie: true };
       dessiner();
-      return message('Copie : donnez-lui un n° interne, puis Enregistrer.', 5000);
+      return message('Copie : donnez-lui un numéro : il s\'enregistre tout seul.', 5000);
     }
     if (action === 'supprimer-article') {
       const article = parc.articles.find((a) => a.id === fiche.id);
@@ -733,6 +771,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       fiche.couleurChoisie = true;
       page.querySelector('[name="couleur"]').value = bouton.dataset.couleur.toLowerCase();
       for (const t of page.querySelectorAll('.teinte')) t.classList.toggle('choisie', t === bouton);
+      enregistrerAuto();
       return;
     }
     if (action === 'voir-mdp') {
@@ -919,8 +958,21 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       for (const t of page.querySelectorAll('.teinte')) t.classList.remove('choisie');
     }
   });
-  page.addEventListener('change', (evenement) => {
+  page.addEventListener('focusin', (evenement) => {
+    if (evenement.target.dataset?.listeNouvelle !== undefined) evenement.target.dataset.precedent = evenement.target.value;
+  });
+  page.addEventListener('change', async (evenement) => {
     const cible = evenement.target;
+    // « ＋ Nouvelle… » d'une liste Marque / Modèle : on tape la valeur, elle rejoint la liste.
+    if (cible.dataset?.listeNouvelle !== undefined && cible.value === '__nouveau__') {
+      const texte = await demanderTexte({ titre: `Nouvelle valeur : ${cible.dataset.listeNouvelle}` });
+      if (!texte) { cible.value = cible.dataset.precedent ?? ''; return; }
+      const option = document.createElement('option');
+      option.value = texte;
+      option.textContent = texte;
+      cible.insertBefore(option, cible.lastElementChild);
+      cible.value = texte;
+    }
     if (cible.name === 'categorieId' && fiche && !fiche.id && !fiche.couleurChoisie) {
       // Nouvel article : la couleur proposée suit la catégorie tant qu'on n'en a pas choisi une.
       const couleur = couleurProposee(parc, cible.value);
@@ -932,6 +984,11 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     } else if (cible.dataset.fichier === 'photo' && cible.files[0]) ajouterPhoto(fiche.id, cible.files[0]);
     else if (cible.dataset.fichier === 'documents' && cible.files.length) ajouterDocuments(fiche.id, [...cible.files]);
     else if (cible.dataset.fichier === 'restaurer' && cible.files[0]) restaurer(cible.files[0]).catch((erreur) => message(`Restauration impossible : ${erreur.message}`, 8000));
+    // Fiche d'article : chaque changement s'enregistre tout seul.
+    if (cible.closest?.('[data-zone="fiche"]') && cible.type !== 'file') {
+      if (cible.name === 'marque') rafraichirListesDeroulantes();
+      enregistrerAuto();
+    }
   });
   page.addEventListener('cancel', (evenement) => {
     evenement.preventDefault();

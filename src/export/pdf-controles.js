@@ -1,6 +1,7 @@
 // PDF des autocontrôles (Terrain › Contrôle) : une feuille A4 paysage, le tableau des contrôles à
 // gauche (dans le cadre du plan), à droite les tolérances, un résumé et le cartouche. Autant de
 // feuilles que nécessaire si les contrôles ne tiennent pas sur une seule.
+import { cartoucheActif } from '../topo/affaires.js';
 import { jsPDF } from 'jspdf';
 import { formaterNombre } from '../topo/format.js';
 import { dateHeure } from '../topo/controle.js';
@@ -28,7 +29,7 @@ export function pdfControles(projet) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const controles = [...projet.controles].sort((a, b) => (a.le < b.le ? -1 : 1));
   const cartouche = {
-    affaire: projet.cartouche?.affaire,
+    affaire: cartoucheActif(projet).affaire,
     lieu: projet.cartouche?.lieu,
     date: dateHeure(new Date().toISOString()).slice(0, 10),
     dessinePar: '',

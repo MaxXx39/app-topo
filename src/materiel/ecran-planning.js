@@ -435,7 +435,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       ${g.articles.map(({ article, barres }) => {
         const pale = etat.reperer.trim() && !repere(article.numero, article.designation) && !barres.some((b) => repere(b.principal, b.responsable));
         return `<div class="ligne-pl${pale ? ' pale' : ''}${article.statut !== 'actif' ? ' inactif' : ''}" data-article="${echapper(article.id)}">
-          <div class="nom-pl">${svgLogo(g.categorie.logo)}<span class="pastille-article" style="background:${article.couleur};color:${texteSurCouleur(article.couleur)}">${echapper(article.numero)}</span><span class="designation-pl">${echapper(article.designation)}</span></div>
+          <div class="nom-pl">${svgLogo(g.categorie.logo)}<span class="pastille-article" style="background:${article.couleur};color:${texteSurCouleur(article.couleur)}">${echapper(article.designation || article.numero)}</span></div>
           ${d.jours.map((x) => {
             const r = comparaison ? resultatDuJour(comparaison, article.id, x.iso) : null;
             if (!r) return `<div class="${classesJour(x)}" data-j="${x.j}" style="grid-column:${colonne(x.j)}"></div>`;

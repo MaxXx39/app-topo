@@ -13926,6 +13926,8 @@ body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
 .puce-dossier i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
 .puce-dossier.actif { background: var(--sombre, #1b2b36); border-color: var(--sombre, #1b2b36); color: #ffffff; }
 body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); border-color: var(--ambre, #f6ab07); color: #1b2b36; }
+.pastille-entete.pastille-affaire { background: #1d4ed8; color: #fff; font-size: 0.95rem; padding: 5px 14px; max-width: 45vw; border: 2px solid rgba(255, 255, 255, 0.85); }
+.entete-pastilles .pastille-entete.pastille-affaire[hidden] { display: none; }
 .pastille-entete.pastille-dossier { font-size: 0.95rem; padding: 5px 14px; max-width: 55vw; border: 2px solid rgba(255, 255, 255, 0.85); }
 .pastille-pastel-dossier { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; margin: 2px 4px 2px 0; }
 #menu-dossiers { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
@@ -14337,6 +14339,13 @@ dialog.page-materiel[open] {
   background: var(--surface);
 }
 .fiche-materiel legend { padding: 0 6px; font-weight: 700; }
+/* 0.343.0 : fiche d'article serrée pour tenir sur une page sans défilement. */
+.fiche-materiel { gap: 6px; }
+.fiche-materiel fieldset.serre { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; padding: 4px 10px 8px; }
+.fiche-materiel fieldset.serre .champ-materiel { gap: 1px; }
+.fiche-materiel fieldset.serre :is(input, select) { padding: 4px 8px; }
+.fiche-materiel .apercu-designation { margin: 0; }
+.fiche-materiel .boutons-fiche { align-items: center; }
 .champ-materiel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .champ-materiel > span { font-size: 0.85rem; color: var(--gris); }
 .champ-materiel.large { grid-column: 1 / -1; }
@@ -15356,3 +15365,19 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .bande-page .zone-bande-page .groupe-ruban.type-gabarit .champ-bande > span:not(.titre-groupe) { display: none; }
 .bande-page .zone-bande-page .groupe-ruban.type-gabarit select { max-width: 110px; }
 .bande-page .zone-bande-page .groupe-ruban.type-affichage .champ-bande input { width: 44px; }
+
+/* 0.344.0 : pastille d'affaire dans le bandeau des applis plein écran */
+.bandeau-projet-page .pastille-affaire-page { margin-left: 10px; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 999px; background: #1d4ed8; color: #fff; font: inherit; font-size: 0.9rem; padding: 2px 12px; cursor: pointer; }
+.bandeau-projet-page .pastille-affaire-page[hidden] { display: none; }
+
+/* 0.344.0 : longues listes (fusion de projets) : la fenêtre défile ; pastille d'affaire plus petite sur téléphone */
+.fenetre-choix { max-height: 90vh; overflow-y: auto; }
+body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; padding: 2px 8px; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 0.345.0 : pastille d'affaire dans l'en-tête de Plans de chantier (le bandeau commun y est caché) */
+.pastille-affaire-chantier { margin-left: 4px; font: inherit; font-size: 0.8rem; font-weight: 700; padding: 3px 12px; white-space: nowrap; background: #1d4ed8; color: #fff; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 999px; cursor: pointer; }
+.pastille-affaire-chantier[hidden] { display: none; }
+/* 0.346.0 : affaires par catégorie */
+.etiquette-affaire { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 999px; background: #1d4ed8; color: #fff; font-size: 0.72rem; font-weight: 700; }
+.pastille-entete.pastille-affaire.pastille-fixe { cursor: default; }
+/* 0.347.0 : planning des articles : la désignation seule, dans la pastille de couleur (plus de numéro en double) */
+.nom-pl .pastille-article { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 0.8rem; }

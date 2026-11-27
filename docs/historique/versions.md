@@ -1,6 +1,35 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
+Lire seulement la section utile : `grep -n '^## 0.347.0 — Matériel : planning des articles, la désignation seule
+- Le numéro était écrit deux fois (pastille + désignation, qui contient déjà le numéro). Maintenant la désignation seule, dans la pastille de couleur. La vue année garde le numéro seul.
+
+## 0.346.0 — Affaires par catégorie et pastilles (refonte du 27.11)
+- **Modèle** (`topo/affaires.js`, 10 tests) : chaque affaire = numéro + UNE catégorie (ACQ, BÂT, GC, NAT, T/R, Autres ; liste partagée par Drive, partie `categoriesAffaires`, modifiable par l'Expert ; « BÂT » avec accent car le sous-dossier BAT existe). Une seule affaire par catégorie dans un projet. Un élément porte des **pastilles** (`pastilles: ['GC','BÂT']`) : sans pastille = visible dans toutes les affaires ; avec = seulement dans les affaires de ces catégories. Une surface / liste d'un levé suit son levé. `affaireId` de la 0.344.0 est migré en pastille (`migrerAffaires` dans `completerProjet`).
+- **Qui voit quoi** : l'Expert a « Toutes » ou une affaire (pastille 📋 ▾ cliquable), règle les pastilles d'un élément (dossiers de l'élément › « Changer les pastilles d'affaire »), ajoute / modifie / retire / fusionne. Base et Intermédiaire sont dans UNE affaire fixée par la ligne d'« Ouvrir » (un projet à plusieurs affaires apparaît une fois par affaire) ; pastille non cliquable.
+- Création et fusion : numéro + catégorie ; l'affaire de départ reçoit sa catégorie au 1er ajout. Un nouvel élément reçoit la pastille de l'affaire choisie (« Toutes » : aucune).
+- **À essayer** : lignes d'« Ouvrir » par affaire sur tablette ; Base / Intermédiaire ; pastille dans les applis plein écran ; plans de chantier et plateformes pas encore filtrés dans leur liste.
+
+## 0.345.0 — Plans de chantier : pastille d'affaire, Couleurs près des phases (demandes du 27.11)
+- La pastille d'affaire était cachée dans Plans de chantier (son bandeau commun y est masqué) : elle est maintenant dans son en-tête, à côté du nom du projet, et ouvre le même menu. Fusion de projets : tous les projets de l'appareil sont listés ; pastille plus petite sur téléphone.
+- Le choix « Couleurs : celles des objets / une par phase » quitte le panneau Élément et passe dans le bandeau du haut, à côté des phases.
+
+## 0.344.0 — Un projet, plusieurs affaires ; Présentation comme Dessin (demandes du 27.11)
+- **Affaires** (`src/topo/affaires.js`, 11 tests) : un projet peut avoir plusieurs affaires (même désignation, autre numéro). La 1re = celle du cartouche (`principale`), les autres dans `projet.affaires`. Levés, surfaces, listes « autres », plans DXF / PDF, dessins, réseaux, plans de chantier, plateformes portent `affaireId` (sans = principale ; surface / liste d'un levé = suit son levé). L'affaire choisie est un réglage de CHAQUE tablette (`topo-affaire`), « Toutes » au départ. Elle filtre comme le sous-dossier (`estMontre`, `estDansSousDossier`, `idsHorsSousDossier`).
+- **Pastille 📋 dans l'en-tête** (`#pastille-affaire`) et recopiée dans le bandeau de chaque appli plein écran (`cadre-page.js`). Menu : choisir (tous les modes), ajouter / changer le numéro / fusionner un autre projet / retirer une affaire vide (Expert). Un nouvel élément prend l'affaire choisie. Changer un élément d'affaire : pastille de dossier de l'élément → « Changer d'affaire ».
+- Le numéro d'affaire du cartouche, des PDF, du titre et des noms de fichiers suit l'affaire choisie (`cartoucheActif`).
+- **Fusion** : le projet choisi devient une affaire (ses éléments sont copiés, l'original reste sur l'appareil) ; refus si des identifiants sont déjà pris (copie).
+- **Pas fait / à essayer** : filtrage dans toutes les applis (testé : pastille et menu seulement) ; changer d'affaire un plan de chantier ou une plateforme depuis leur appli ; Drive (un seul fichier pour tout le projet, rien de changé) ; points de contrôle / implantations non filtrés.
+- **Présentation comme Dessin** : le menu Plan de Présentation est le même que celui de Dessin (couleurs, calques, transparence) et change les mêmes réglages dans les deux écrans ; plus de bouton « Répliquer » (les réglages de plans propres à la feuille ne sont plus lus).
+
+## 0.343.0 — Demandes du 27.11 : retour d'Ouvrir, nom du projet, Matériel, Plateformes (altitudes en direct, arc), Plans de chantier (couleur / phase avant dessin, Espace, Ctrl + clic)
+- **Retour d'« Ouvrir »** : la flèche ← de la page Ouvrir projet ramenait à une page vide (le code cherchait `.bouton-retour`, le bouton est `.bouton-retour-partie`) ; elle ramène maintenant à la page Applications.
+- **Nom du projet (Plans de chantier)** : l'en-tête affiche « affaire - désignation » (`titreProjet`), plus « Projet sans nom ».
+- **Matériel, fiche d'article** : « Numéro » en tête du bloc Désignation (N° interne retiré), Marque et Modèle en listes déroulantes à jour (« ＋ Nouvelle… » ajoute une valeur), enregistrement automatique (plus de bouton Enregistrer ; un nouvel article s'enregistre dès que le numéro est rempli), champs resserrés. **Pas vérifié sur tablette : la fiche tient-elle sans défilement ?**
+- **Plateformes** : pendant la création, l'altitude tapée dans la bulle s'écrit sur le plan à mesure qu'on tape, avec les pentes entre points ; appui un peu long sur le « + » d'un côté puis glisser = arc (16 facettes, `courberCoteEnArc`, `src/topo/plateforme.js`), poignée ronde orange au milieu pour le recourber ; points de facette cachés (plan et tableau). Pas d'arc sur un côté partagé avec une autre plateforme.
+- **Plans de chantier** : couleur et phase réglables AVANT de dessiner (panneau de l'outil) ; **Espace** = valider le tracé en cours, sinon relancer le dernier outil ; **Ctrl + clic** = sélection multiple (déplacer, effacer, copier / coller, changer phase / couleur / type de tous).
+- Pas fait (questions posées) : Présentation avec ses propres couleurs / calques + « Répliquer » complet ; lier plusieurs projets (maquette d'abord, mode : voir Base, créer Expert).
+
+## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
 - Demande du 27.11 : les titres verticaux de la 0.341.0 étaient « horribles » (rien à la même hauteur). Maintenant : petit titre horizontal AU-DESSUS de chaque groupe (grille CSS : titre en ligne 1, contenu en ligne 2), tous les groupes à la même hauteur.
 - **Bandeau du haut sur UNE ligne** en Dessin et en Présentation : groupes PHASE, AFFICHAGE (échelle, effet 3D), ÉDITION (Dessin) ; PHASE, PRÉSENTATION, FEUILLE + PDF (Présentation). **Gabarit et Affichage (Effet 3D, Texte) de Présentation sont passés dans la bande du bas.**
 - **Bande du bas de Présentation** : 5 groupes titrés (VUE, ROTATION, DÉTAILS, GABARIT, AFFICHAGE) ; boutons en icônes seules (l'info-bulle dit le détail) ; la bande est un peu plus haute. Elle défile horizontalement si l'écran est étroit (largeur 1098 / 1070 px à 1280).

@@ -2,6 +2,7 @@
 // l'écran (dessin.js), à l'échelle de la feuille : fond swisstopo pâli, plans du projet, surfaces, points, éléments ;
 // puis cadre, nord, barre d'échelle, légende et cartouche avec logo. Dans le PDF (jsPDF), l'image de la feuille est
 // posée en entier et les textes de la légende et du cartouche sont écrits en vrai texte (nets à l'impression).
+import { cartoucheActif } from '../topo/affaires.js';
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { versEcran, versTerrain } from '../plan/vue.js';
 import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
@@ -53,7 +54,7 @@ export function preparerPage(donnees, page, pxParMm) {
   const vue = vueDuCadre(plan, mise.cadre, pxParMm, centre, r.rotation);
   const format = FORMATS_FEUILLE.find(([c]) => c === r.format)?.[1] ?? 'A3';
   const champs = {
-    affaire: nomChantierCartouche(donnees.projet?.cartouche, donnees.projet?.nom, r.chantier), // « affaire - désignation », modifiable (0.329.0)
+    affaire: nomChantierCartouche(donnees.projet ? cartoucheActif(donnees.projet) : undefined, donnees.projet?.nom, r.chantier), // « affaire - désignation », modifiable (0.329.0)
     projet: '',
     titre: r.titre || plan.nom,
     phase: page.titre ? `Phase : ${page.titre}${datesDePhase(plan.phases.find((p) => p.id === page.phase)) ? ` (${datesDePhase(plan.phases.find((p) => p.id === page.phase))})` : ''}` : '',
