@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
+Lire seulement la section utile : `grep -n '^## 0.343.0 — Demandes du 27.11 : retour d'Ouvrir, nom du projet, Matériel, Plateformes (altitudes en direct, arc), Plans de chantier (couleur / phase avant dessin, Espace, Ctrl + clic)
+- **Retour d'« Ouvrir »** : la flèche ← de la page Ouvrir projet ramenait à une page vide (le code cherchait `.bouton-retour`, le bouton est `.bouton-retour-partie`) ; elle ramène maintenant à la page Applications.
+- **Nom du projet (Plans de chantier)** : l'en-tête affiche « affaire - désignation » (`titreProjet`), plus « Projet sans nom ».
+- **Matériel, fiche d'article** : « Numéro » en tête du bloc Désignation (N° interne retiré), Marque et Modèle en listes déroulantes à jour (« ＋ Nouvelle… » ajoute une valeur), enregistrement automatique (plus de bouton Enregistrer ; un nouvel article s'enregistre dès que le numéro est rempli), champs resserrés. **Pas vérifié sur tablette : la fiche tient-elle sans défilement ?**
+- **Plateformes** : pendant la création, l'altitude tapée dans la bulle s'écrit sur le plan à mesure qu'on tape, avec les pentes entre points ; appui un peu long sur le « + » d'un côté puis glisser = arc (16 facettes, `courberCoteEnArc`, `src/topo/plateforme.js`), poignée ronde orange au milieu pour le recourber ; points de facette cachés (plan et tableau). Pas d'arc sur un côté partagé avec une autre plateforme.
+- **Plans de chantier** : couleur et phase réglables AVANT de dessiner (panneau de l'outil) ; **Espace** = valider le tracé en cours, sinon relancer le dernier outil ; **Ctrl + clic** = sélection multiple (déplacer, effacer, copier / coller, changer phase / couleur / type de tous).
+- Pas fait (questions posées) : Présentation avec ses propres couleurs / calques + « Répliquer » complet ; lier plusieurs projets (maquette d'abord, mode : voir Base, créer Expert).
+
+## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
 - Demande du 27.11 : les titres verticaux de la 0.341.0 étaient « horribles » (rien à la même hauteur). Maintenant : petit titre horizontal AU-DESSUS de chaque groupe (grille CSS : titre en ligne 1, contenu en ligne 2), tous les groupes à la même hauteur.
 - **Bandeau du haut sur UNE ligne** en Dessin et en Présentation : groupes PHASE, AFFICHAGE (échelle, effet 3D), ÉDITION (Dessin) ; PHASE, PRÉSENTATION, FEUILLE + PDF (Présentation). **Gabarit et Affichage (Effet 3D, Texte) de Présentation sont passés dans la bande du bas.**
 - **Bande du bas de Présentation** : 5 groupes titrés (VUE, ROTATION, DÉTAILS, GABARIT, AFFICHAGE) ; boutons en icônes seules (l'info-bulle dit le détail) ; la bande est un peu plus haute. Elle défile horizontalement si l'écran est étroit (largeur 1098 / 1070 px à 1280).

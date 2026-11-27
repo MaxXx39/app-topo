@@ -14337,6 +14337,13 @@ dialog.page-materiel[open] {
   background: var(--surface);
 }
 .fiche-materiel legend { padding: 0 6px; font-weight: 700; }
+/* 0.343.0 : fiche d'article serrée pour tenir sur une page sans défilement. */
+.fiche-materiel { gap: 6px; }
+.fiche-materiel fieldset.serre { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; padding: 4px 10px 8px; }
+.fiche-materiel fieldset.serre .champ-materiel { gap: 1px; }
+.fiche-materiel fieldset.serre :is(input, select) { padding: 4px 8px; }
+.fiche-materiel .apercu-designation { margin: 0; }
+.fiche-materiel .boutons-fiche { align-items: center; }
 .champ-materiel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .champ-materiel > span { font-size: 0.85rem; color: var(--gris); }
 .champ-materiel.large { grid-column: 1 / -1; }

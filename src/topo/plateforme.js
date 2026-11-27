@@ -19,6 +19,7 @@
 //    ou l'autre selon que la plateforme est au-dessous ou au-dessus de la surface de référence ;
 //  - berme plate : talus ① (pente du côté) jusqu'à « hauteur » sous / sur le bord, berme de « largeur », puis talus ③.
 // Coordonnées MN95 (m).
+import { arcSurCote } from './plan-chantier.js';
 
 export const TALUS_DEFAUT = { on: true, deb: '3:2', rem: '2:1' };
 export const BERME_DEFAUT = { on: false, hauteur: 3, largeur: 2, deb: '3:2', rem: '2:1' };
@@ -817,4 +818,82 @@ export function coteOuvrageProche(o, p) {
     if (d < meilleur.d) meilleur = { i, d };
   }
   return meilleur.i;
+}
+
+// --- Arcs (0.343.0, demande du 27.11) : un côté devient un arc de cercle, remplacé par de petites facettes ---
+// Pour la triangulation il n'y a pas le choix : un arc = une suite de petits côtés droits (16 facettes). Les points
+// d'une facette sont de vrais angles de la plateforme (altitude répartie le long de l'arc selon la longueur) ; ils sont
+// cachés sur le plan (le « + » et le carré ne s'affichent pas) et gardés en mémoire dans `pf.arcs`.
+
+/** Nombre de facettes d'un arc. */
+export const FACETTES_ARC = 16;
+
+/** Arcs encore valables (leurs facettes sont toujours là, à la suite, entre le début et la fin). */
+export function arcsValides(pf) {
+  const noms = pf.sommets.map((s) => s.nom);
+  return (pf.arcs ?? []).filter((a) => {
+    const i = noms.indexOf(a.debut);
+    if (i < 0 || a.noms.length === 0) return false;
+    const n = noms.length;
+    return a.noms.every((x, k) => noms[(i + 1 + k) % n] === x) && noms[(i + 1 + a.noms.length) % n] === a.fin;
+  });
+}
+
+/** Noms des points de facette (cachés sur le plan). */
+export function facettesDArcs(pf) {
+  return new Set(arcsValides(pf).flatMap((a) => a.noms));
+}
+
+/** Poignées rondes des arcs : le point du milieu de chaque arc, [{ debut, fin, nom }]. */
+export function poigneesArcsPf(pf) {
+  return arcsValides(pf).map((a) => ({ debut: a.debut, fin: a.fin, nom: a.noms[Math.floor(a.noms.length / 2)] }));
+}
+
+/** Copie de ce qu'un arc change (sommets, talus, arcs), pour pouvoir recommencer à chaque déplacement de la souris. */
+export function baseArc(pf) {
+  return { sommets: pf.sommets.map((s) => ({ ...s })), talus: JSON.parse(JSON.stringify(pf.talus ?? {})), arcs: JSON.parse(JSON.stringify(pf.arcs ?? [])) };
+}
+
+/**
+ * Le côté « debut → fin » passe par le point m (est, nord) : il est remplacé par un arc de cercle de FACETTES_ARC côtés.
+ * `base` = baseArc(pf) pris AVANT le geste (on repart toujours de lui). Le talus du début est copié sur chaque facette,
+ * l'altitude suit la longueur entre les deux bouts (sans altitude : vide). Renvoie null si c'est fait, sinon un texte d'erreur.
+ * Un côté partagé avec une autre plateforme n'est pas courbé (les deux plateformes devraient suivre).
+ */
+export function courberCoteEnArc(plateformes, pf, debut, fin, m, base) {
+  pf.sommets = base.sommets.map((s) => ({ ...s }));
+  pf.talus = JSON.parse(JSON.stringify(base.talus));
+  pf.arcs = JSON.parse(JSON.stringify(base.arcs));
+  // L'ancien arc de ce côté s'en va (les facettes disparaissent avec leur talus).
+  const ancien = pf.arcs.findIndex((a) => a.debut === debut && a.fin === fin);
+  if (ancien >= 0) {
+    for (const nom of pf.arcs[ancien].noms) delete pf.talus[nom];
+    pf.sommets = pf.sommets.filter((s) => !pf.arcs[ancien].noms.includes(s.nom));
+    pf.arcs.splice(ancien, 1);
+  }
+  const i = pf.sommets.findIndex((s) => s.nom === debut);
+  const n = pf.sommets.length;
+  if (i < 0 || pf.sommets[(i + 1) % n]?.nom !== fin) return 'côté introuvable';
+  if (cotePartage(plateformes, pf, i)) return 'côté partagé avec une autre plateforme : pas d\'arc pour l\'instant';
+  const res = sommetsResolus(pf, plateformes);
+  const a = res[i];
+  const b = res[(i + 1) % n];
+  const pts = arcSurCote([[a.est, a.nord], [b.est, b.nord]], 0, m, false, FACETTES_ARC);
+  if (pts.length <= 2) return 'trois points alignés : pas d\'arc';
+  // Longueur cumulée le long de l'arc → altitude répartie entre les deux bouts.
+  const cumul = [0];
+  for (let k = 1; k < pts.length; k += 1) cumul.push(cumul[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  const total = cumul.at(-1) || 1;
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  const talusDebut = pf.talus[debut] ?? TALUS_DEFAUT;
+  const noms = [];
+  for (let k = 1; k < pts.length - 1; k += 1) {
+    const nom = prochainNom(pf);
+    const alt = a.alt != null && b.alt != null ? r3(a.alt + ((b.alt - a.alt) * cumul[k]) / total) : null;
+    pf.sommets.splice(i + k, 0, { nom, est: pts[k][0], nord: pts[k][1], alt, calc: alt != null });
+    pf.talus[nom] = { ...talusDebut };
+    noms.push(nom);
+  }
+  pf.arcs.push({ debut, fin, noms, m: [r3(m[0]), r3(m[1])] });
+  return null;
 }

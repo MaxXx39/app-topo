@@ -12,13 +12,14 @@
 import { habillerPage } from '../navigation/cadre-page.js';
 import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
+import { titreProjet } from '../projet/projet.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
 import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroche.js';
 import { deplacer, versTerrain, versEcran } from '../plan/vue.js';
 import { MAX_DETAILS, FONDS_DETAIL, COULEURS_BORD, ECHELLES_DETAIL, nouveauDetail, redimensionnerBoite, poigneesDeBoite, poigneeSousLePoint } from '../topo/details-feuille.js';
 import {
-  GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
+  GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet as ajouterObjetBrut, retirerObjet, objetsVisibles, objetSousLePoint,
   deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
   LARGEUR_FLECHE, OPACITE_ZONE, ECHELLE_PAPIER, epaisseurLigneMm, contourZoneMm, dimensionsFleche, coteDuPoint,
   decalerPolyligne, ligneProcheAvecOrigine,
@@ -153,7 +154,7 @@ export function ouvrirPlansChantier({
   page.showModal();
 
   const etat = {
-    ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, accroches: new Set(['point', 'sommet']),
+    ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, multi: new Set(), couleurOutil: '', phaseOutil: '', dernierOutil: '', accroches: new Set(['point', 'sommet']),
     categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null, cadreTexte: 'arrondi', styleCote: 'sur', flecheCote: 'fleche', tailleFlecheCote: 2.6, coteTexte: 'fin', arrondi: 'peu',
     // Réglages de l'outil (valeurs données aux éléments dessinés ensuite) : null = celle du genre.
     opacite: OPACITE_ZONE, contourMm: null, afficherSurface: false, epaisseurMm: null, echelleMotif: 1,
@@ -187,6 +188,15 @@ export function ouvrirPlansChantier({
   });
 
   const plan = () => liste().find((x) => x.id === etat.planId) ?? null;
+  /**
+   * 0.343.0 : ce qu'on a réglé AVANT de dessiner (couleur, phase : panneau de l'outil) est donné à l'élément créé.
+   * Ce que l'élément porte déjà (copie collée, construction…) reste prioritaire.
+   */
+  function ajouterObjet(pl, objet) {
+    const avecCouleur = etat.couleurOutil && !etat.collage && ['zone', 'ligne', 'piste', 'fleche', 'texte', 'cotation'].includes(objet.type);
+    const phaseOk = etat.phaseOutil && !etat.collage && pl.phases.some((ph) => ph.id === etat.phaseOutil);
+    return ajouterObjetBrut(pl, { ...(avecCouleur ? { couleur: etat.couleurOutil } : {}), ...(phaseOk ? { phase: etat.phaseOutil } : {}), ...objet });
+  }
   // 0.296.1 : plans montrés dessous PAR PHASE (plan.fond.plansParPhase[idPhase] = ids), sinon le choix général (plansCaches)
   const plansMontres = (idPhase = plan()?.phaseActive) => {
     const fond = plan()?.fond;
@@ -251,7 +261,10 @@ export function ouvrirPlansChantier({
       etat.collage = false;
       return message('Collage annulé.', 2000);
     }
-    if (etat.orienter) {
+    if (etat.multi.size) { // plusieurs éléments choisis : Échap ne les garde plus
+      etat.multi.clear();
+      majTout();
+    } else if (etat.orienter) {
       etat.orienter = null;
       majTout();
     } else if (etat.attenteRepere) {
@@ -294,6 +307,11 @@ export function ouvrirPlansChantier({
     }
     if (etat.ecran !== 'dessin') return;
     if ((ev.ctrlKey || ev.metaKey) && !ev.target.matches('input, select, textarea')) { // 0.338.0 : copier / coller
+      if (ev.key.toLowerCase() === 'c' && etat.multi.size >= 2) {
+        etat.presse = plan().objets.filter((x) => etat.multi.has(x.id) && x.type !== 'cotation').map((x) => JSON.parse(JSON.stringify(x)));
+        message(`${etat.presse.length} éléments copiés : Ctrl+V puis cliquez où coller (Échap = annuler).`, 3000, { ok: true });
+        return;
+      }
       if (ev.key.toLowerCase() === 'c' && etat.choisi) {
         const o = plan().objets.find((x) => x.id === etat.choisi);
         if (o && o.type !== 'cotation') { etat.presse = JSON.parse(JSON.stringify(o)); message('Copié : Ctrl+V puis cliquez où coller (Échap = annuler).', 3000, { ok: true }); }
@@ -320,6 +338,14 @@ export function ouvrirPlansChantier({
       placerParSaisie();
       return;
     }
+    // 0.343.0 : Espace = valider le tracé en cours (comme Entrée) ; sinon relancer le dernier outil utilisé.
+    if (ev.key === ' ' && !ev.ctrlKey && !ev.metaKey && !ev.target.matches('input, select, textarea')) {
+      ev.preventDefault();
+      ev.target.blur?.();
+      if (etat.saisie) return finirSaisie();
+      if (etat.outil === 'choisir' && etat.dernierOutil) page.querySelector(`[data-outil="${etat.dernierOutil}"]`)?.click();
+      return;
+    }
     // Un chiffre tapé pendant le dessin va tout de suite dans « Longueur » (comme la saisie directe d'AutoCAD).
     if (!dansChamp && etat.saisie?.points?.length && etat.saisie.outil !== 'decaler' && etat.saisie.outil !== 'mesure' && /^[0-9.,]$/.test(ev.key) && !ev.ctrlKey && !ev.metaKey) {
       const champ = page.querySelector('[data-saisie="longueur"]:not([hidden])') && !page.querySelector('[data-zone="saisie"]').hidden ? page.querySelector('[data-saisie="longueur"]') : null;
@@ -329,7 +355,7 @@ export function ouvrirPlansChantier({
     if (ev.key === 'Enter' && !dansChamp && etat.saisie) {
       ev.preventDefault();
       finirSaisie();
-    } else if ((ev.key === 'Delete' || ev.key === 'Backspace') && !dansChamp && etat.choisi) {
+    } else if ((ev.key === 'Delete' || ev.key === 'Backspace') && !dansChamp && (etat.choisi || etat.multi.size >= 2)) {
       ev.preventDefault();
       supprimerChoisi();
     } else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && !dansChamp) {
@@ -365,7 +391,7 @@ export function ouvrirPlansChantier({
       <header class="entete-calage entete-chantier">
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <span class="aide-entete-chantier">${bulle('plansChantier')}</span>
-        <span class="nom-projet-entete" title="Projet ouvert">${echapper(leProjet().nom || 'Projet sans nom')}</span>
+        <span class="nom-projet-entete" title="Projet ouvert">${echapper(titreProjet(leProjet()))}</span>
         <nav class="etapes-calage" aria-label="Parties">
           <button type="button" data-ecran="liste" class="${etat.ecran === 'liste' ? 'actif' : ''}">Gestion</button>
           <button type="button" data-ecran="dessin" class="${etat.ecran === 'dessin' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Dessin</button>
@@ -496,6 +522,7 @@ export function ouvrirPlansChantier({
       points: () => (pointsMontres()),
       planChantier: plan,
       choisi: () => etat.choisi,
+      multi: () => [...etat.multi],
       saisie: saisieVue,
       selection: () => etat.selCalques?.elements.map((e) => e.forme) ?? [],
       bibliotheque: bib,
@@ -520,6 +547,14 @@ export function ouvrirPlansChantier({
         // 0.287.0 : sur une poignée (sommet) de l'élément choisi = déplacer ce sommet (avec l'accroche) ; ailleurs sur
         // l'élément = le déplacer en entier.
         debut: (p, tol) => {
+          // Plusieurs éléments choisis : en glisser un = les déplacer tous.
+          if (etat.outil === 'choisir' && etat.multi.size >= 2 && !etat.orienter) {
+            const touche = objetSous(p, tol);
+            if (!touche || !etat.multi.has(touche.id)) return false;
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'multi' };
+            return true;
+          }
           if (etat.outil !== 'choisir' || !etat.choisi || etat.orienter) return false;
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return false;
@@ -595,6 +630,10 @@ export function ouvrirPlansChantier({
           return true;
         },
         deplacer: (de, dn, point) => {
+          if (etat.glisse?.type === 'multi') {
+            for (const x of plan().objets) if (etat.multi.has(x.id) && !x.verrou) deplacerObjet(x, de, dn);
+            return;
+          }
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return;
           if (etat.glisse?.type === 'etiquette') {
@@ -892,15 +931,22 @@ export function ouvrirPlansChantier({
     return [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
   }
   function collerA(p) {
-    const modele = etat.presse;
-    const c = centreDe(modele);
-    if (!c || !avantChangement()) return;
-    const copie = deplacerCopie(JSON.parse(JSON.stringify(modele)), p[0] - c[0], p[1] - c[1]);
-    delete copie.id;
-    copie.phase = plan().phaseActive;
-    const o = ajouterObjet(plan(), copie);
+    const modeles = Array.isArray(etat.presse) ? etat.presse : [etat.presse];
+    // Le centre du groupe = le centre de tous les points ; chaque élément garde sa place par rapport aux autres.
+    const tous = modeles.flatMap((m) => pointsDe(m));
+    if (!tous.length || !avantChangement()) return;
+    const c = [tous.reduce((a, q) => a + q[0], 0) / tous.length, tous.reduce((a, q) => a + q[1], 0) / tous.length];
+    const crees = modeles.map((modele) => {
+      const copie = deplacerCopie(JSON.parse(JSON.stringify(modele)), p[0] - c[0], p[1] - c[1]);
+      delete copie.id;
+      copie.phase = plan().phaseActive;
+      return ajouterObjet(plan(), copie);
+    });
     etat.collage = false;
-    etat.choisi = o.id;
+    etat.multi.clear();
+    if (crees.length > 1) crees.forEach((x) => etat.multi.add(x.id));
+    const o = crees[0];
+    etat.choisi = crees.length > 1 ? null : o.id;
     etat.outil = 'choisir';
     enregistrer();
     majTout();
@@ -936,7 +982,18 @@ export function ouvrirPlansChantier({
     if (etat.orienter) return toucherOrientation(p, tolerance);
     if (etat.outil === 'decaler') return toucherDecalage(p, tolerance);
     if (etat.outil === 'choisir') {
-      etat.choisi = objetSous(p, tolerance)?.id ?? null;
+      const sous = objetSous(p, tolerance);
+      // 0.343.0 : Ctrl (ou ⌘) + clic = ajouter / retirer l'élément de la sélection (plusieurs éléments à la fois).
+      if ((ev?.ctrlKey || ev?.metaKey) && sous) {
+        if (!etat.multi.size && etat.choisi) etat.multi.add(etat.choisi);
+        if (etat.multi.has(sous.id)) etat.multi.delete(sous.id); else etat.multi.add(sous.id);
+        etat.orienter = null;
+        if (etat.multi.size <= 1) { etat.choisi = [...etat.multi][0] ?? null; etat.multi.clear(); } else etat.choisi = null;
+        majTout();
+        return;
+      }
+      etat.multi.clear();
+      etat.choisi = sous?.id ?? null;
       etat.orienter = null;
       majTout();
       return;
@@ -1146,6 +1203,13 @@ export function ouvrirPlansChantier({
   }
 
   function supprimerChoisi() {
+    if (etat.multi.size >= 2) {
+      if (!avantChangement()) return;
+      for (const id of etat.multi) if (!plan().objets.find((x) => x.id === id)?.verrou) retirerObjet(plan(), id);
+      etat.multi.clear();
+      enregistrer();
+      return majTout();
+    }
     if (!etat.choisi || !avantChangement()) return;
     retirerObjet(plan(), etat.choisi);
     etat.choisi = null;
@@ -2454,7 +2518,7 @@ export function ouvrirPlansChantier({
     const o = p.objets.find((x) => x.id === etat.choisi);
     const mmLigne = (cle) => (etat.epaisseurMm ?? styleLigne(cle).epaisseurMm);
     // Réglages de l'outil : donnés aux éléments dessinés ensuite.
-    const reglages = {
+    let reglages = {
       zone: `${selectGenresOutil('zone', etat.categorie)}
         ${champCurseur('Transparence du fond (opacité)', 'reglage', 'opacite', etat.opacite)}
         ${champNombre('Épaisseur du contour', 'reglage', 'contourMm', etat.contourMm ?? (etat.categorie === 'emprise' ? 0.7 : 0.35), 0.05, 5, 0.05, 'mm')}
@@ -2485,8 +2549,24 @@ export function ouvrirPlansChantier({
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
         ${selectGenresOutil('ligne', etat.style)}`,
     }[['rectangle', 'rond'].includes(etat.outil) ? 'zone' : etat.outil] ?? '';
+    // 0.343.0 : couleur et phase choisies AVANT de dessiner (en plus du type de chaque outil).
+    if (['zone', 'ligne', 'piste', 'fleche', 'texte', 'cotation', 'rectangle', 'rond'].includes(etat.outil)) {
+      const phaseActive = p.phases.find((ph) => ph.id === p.phaseActive);
+      reglages += `<label class="champ-calage"><span>Couleur de ce qu'on dessine</span><span class="ligne-couleur-outil"><input type="color" value="${etat.couleurOutil || '#64748b'}" data-reglage="couleurOutil">${etat.couleurOutil ? '<button type="button" class="bouton-secondaire petit" data-action="couleur-outil-origine" title="Couleur d\'origine du type">↺</button>' : '<small>(celle du type)</small>'}</span></label>
+        <label class="champ-calage"><span>Phase</span><select data-reglage="phaseOutil"><option value="">Phase active (${echapper(phaseActive?.nom ?? '')})</option>${p.phases.map((ph) => `<option value="${ph.id}" ${etat.phaseOutil === ph.id ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>`;
+    }
     let choisi = '';
     let propreHtml = '';
+    // 0.343.0 : plusieurs éléments choisis (Ctrl + clic) : on règle phase, couleur et type de tous en une fois.
+    if (etat.multi.size >= 2) {
+      const lot = p.objets.filter((x) => etat.multi.has(x.id));
+      choisi = `<h3>${lot.length} éléments choisis</h3>
+        <p class="aide-calage">Glisser l'un d'eux = les déplacer tous ; Suppr = tous les effacer ; Ctrl+C / Ctrl+V = les copier ; Ctrl + clic = en ajouter ou en retirer ; Échap = ne plus les choisir.</p>
+        <label class="champ-calage"><span>Phase de tous</span><select data-multi="phase"><option value="">— (ne pas changer)</option>${p.phases.map((ph) => `<option value="${ph.id}">${echapper(ph.nom)}</option>`).join('')}</select></label>
+        <label class="champ-calage"><span>Couleur de tous</span><span class="ligne-couleur-outil"><input type="color" value="#64748b" data-multi="couleur"><button type="button" class="bouton-secondaire petit" data-action="multi-couleur-origine" title="Couleur d'origine de chacun">↺</button></span></label>
+        ${lot.some((x) => x.type === 'zone') ? `<label class="champ-calage"><span>Type des zones</span><select data-multi="categorie"><option value="">— (ne pas changer)</option>${CATEGORIES_ZONE.map((c) => `<option value="${c.cle}">${echapper(c.nom)}</option>`).join('')}</select></label>` : ''}
+        ${lot.some((x) => x.type === 'ligne') ? `<label class="champ-calage"><span>Type des lignes</span><select data-multi="style"><option value="">— (ne pas changer)</option>${STYLES_LIGNE.map((c) => `<option value="${c.cle}">${echapper(c.nom)}</option>`).join('')}</select></label>` : ''}`;
+    }
     if (o) {
       const propre = {
         construction: `<label class="champ-calage"><span>Couleur</span><select data-prop="couleur">${COULEURS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.couleur ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -2998,6 +3078,8 @@ export function ouvrirPlansChantier({
     if (b.dataset.outil) {
       etat.coupeProchaine = false;
       etat.outil = b.dataset.outil;
+      if (etat.outil !== 'choisir') etat.dernierOutil = etat.outil; // touche Espace : relancer le dernier outil
+      etat.multi.clear();
       etat.saisie = null;
       etat.attenteRepere = null;
       if (etat.outil !== 'choisir') etat.choisi = null;
@@ -3015,6 +3097,16 @@ export function ouvrirPlansChantier({
       etat.saisie = null;
       etat.choisi = b.dataset.choisir;
       return majTout();
+    }
+    if (b.dataset.action === 'multi-couleur-origine') {
+      if (!avantChangement()) return;
+      for (const x of p.objets) if (etat.multi.has(x.id)) delete x.couleur;
+      enregistrer();
+      return majTout();
+    }
+    if (b.dataset.action === 'couleur-outil-origine') {
+      etat.couleurOutil = '';
+      return majPanneau();
     }
     if (b.dataset.action === 'couleur-origine') {
       const o = p.objets.find((x) => x.id === etat.choisi);
@@ -3201,6 +3293,18 @@ export function ouvrirPlansChantier({
     const p = plan();
     if (!p) return;
     if (etat.ecran === 'feuille' && !['rendu3d', 'tailleTexteMm'].includes(c.dataset.champ)) return changeFeuille(c, p);
+    if (c.dataset.multi) {
+      if (c.value === '' || !avantChangement()) return;
+      for (const x of p.objets) {
+        if (!etat.multi.has(x.id)) continue;
+        if (c.dataset.multi === 'phase') x.phase = c.value;
+        else if (c.dataset.multi === 'couleur' && x.type !== 'symbole' && !estPose(x)) x.couleur = c.value;
+        else if (c.dataset.multi === 'categorie' && x.type === 'zone') x.categorie = c.value;
+        else if (c.dataset.multi === 'style' && x.type === 'ligne') x.style = c.value;
+      }
+      enregistrer();
+      return majTout();
+    }
     if (c.dataset.coupeSurface !== undefined) {
       if (c.checked) etat.coupe.cachees.delete(c.dataset.coupeSurface); else etat.coupe.cachees.add(c.dataset.coupeSurface);
       return majCoupe();

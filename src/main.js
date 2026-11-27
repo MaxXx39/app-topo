@@ -1935,7 +1935,7 @@ document.querySelector('.titre-partie-projet').addEventListener('click', (evenem
 });
 // Page « Ouvrir projet » : sa flèche ← ramène à la page Applications (il n'y a plus de page Projet entière).
 document.querySelector('#projets').addEventListener('click', (evenement) => {
-  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour[data-panneau="projets"]')) navigation.ouvrirPage();
+  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour-partie[data-panneau="projets"]')) navigation.ouvrirPage();
 });
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.

@@ -21,12 +21,13 @@ import {
   nouvellePlateforme, prochainNom, sommetsResolus, changerAltitude, penteCote, altitudeParPente, interpolerContour,
   bandeRemblai, coteOuvrageProche,
   ajouterPointMilieu, appliquerDeltaZ, cotePartage, trianglesPlateforme, talusPlateforme, trianglesTalus, reglageDuCote,
-  pointsEtFaces, TALUS_DEFAUT, lireHV, retirerPoint,
+  pointsEtFaces, TALUS_DEFAUT, lireHV, retirerPoint, courberCoteEnArc, baseArc, facettesDArcs, poigneesArcsPf,
   unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin, COULEURS_PLATEFORMES,
   altitudesAuto, empriseOuvrage, hautOuvrage, contreUnOuvrage, traverseesOuvrage,
 } from '../topo/plateforme.js';
 
 const COULEUR_APPLI = '#6d28d9';
+const DELAI_ARC = 150; // ms : appui sur le « + » avant que glisser courbe le côté (comme dans Plans de chantier)
 const MAX_ANNULER = 50;
 const f3 = (v) => (v == null || !Number.isFinite(v) ? '' : (Math.abs(v) < 0.0005 ? 0 : v).toFixed(3));
 const f2 = (v) => (v == null || !Number.isFinite(v) ? '' : (Math.abs(v) < 0.005 ? 0 : v).toFixed(2));
@@ -513,7 +514,10 @@ export function ouvrirPlateformes({
     const alts = resultats().get(pf.id)?.altitudesAuto;
     const sommetsAffiches = pf.auto?.mode && alts ? s.map((x) => ({ ...x, alt: alts.get(x.nom) ?? x.alt })) : s;
     const lignes = [];
+    const facettesTab = facettesDArcs(pf);
+    const arcsTab = poigneesArcsPf(pf);
     s.forEach((p, i) => {
+      if (facettesTab.has(p.nom)) return; // les points d'une facette d'arc ne sont pas listés
       const src = pf.sommets[i];
       const partage = Boolean(src.lien) || tous.some((q) => q !== pf && q.sommets.some((x) => x.lien?.id === pf.id && x.nom === p.nom));
       lignes.push(`<tr class="ligne-point ${etat.selPoint === p.nom ? 'choisi' : ''}">
@@ -522,14 +526,16 @@ export function ouvrirPlateformes({
         <td class="centre">${src.lien ? `<button type="button" class="bouton-lien ${src.detache ? 'detache' : ''}" data-lien="${i}" title="${src.detache ? 'Détaché : altitude propre (marche). Toucher = relier' : 'Lié : même altitude que l\'autre plateforme. Toucher = détacher'}">${src.detache ? '✂' : '🔗'}</button>` : partage ? '<span title="Angle partagé par une plateforme accrochée">🔗</span>' : ''}</td>
         <td class="sep" colspan="4"></td>
         <td class="centre">${pf.sommets.length > 3 ? `<button type="button" class="bouton-lien" data-retirer-point="${echapper(p.nom)}" title="Retirer l'angle ${echapper(p.nom)}">✕</button>` : ''}</td></tr>`);
-      const j = (i + 1) % s.length;
+      const arcDuCote = arcsTab.find((x) => x.debut === p.nom);
+      // Arc : le côté va du début à la fin de l'arc (pente d'ensemble, en lecture seule ; changer le talus change tout l'arc).
+      const j = arcDuCote ? s.findIndex((x) => x.nom === arcDuCote.fin) : (i + 1) % s.length;
       if (s.length < 2 || (s.length === 2 && i === 1)) return;
-      const pente = penteCote(s, i);
+      const pente = arcDuCote ? penteCote([s[i], s[j]], 0) : penteCote(s, i);
       const t = pf.talus[src.nom] ?? TALUS_DEFAUT;
       const coteP = cotePartage(tous, pf, i);
       lignes.push(`<tr class="ligne-cote ${etat.selCote === i ? 'choisi' : ''}">
-        <td>↳ ${echapper(p.nom)} → ${echapper(s[j].nom)}</td><td></td><td></td>
-        <td class="sep"><input type="text" inputmode="text" class="calc" value="${f2(pf.auto?.mode ? penteCote(sommetsAffiches, i) : pente)}" data-pente="${i}" ${pf.auto?.mode ? 'readonly title="Pente des altitudes calculées (verrouillée)"' : ''} aria-label="Pente de ${echapper(p.nom)} à ${echapper(s[j].nom)}"></td>
+        <td>↳ ${echapper(p.nom)} → ${echapper(s[j].nom)}${arcDuCote ? ' <small>(arc)</small>' : ''}</td><td></td><td></td>
+        <td class="sep"><input type="text" inputmode="text" class="calc" value="${f2(pf.auto?.mode && !arcDuCote ? penteCote(sommetsAffiches, i) : pente)}" data-pente="${i}" ${pf.auto?.mode || arcDuCote ? 'readonly title="Pente des altitudes calculées (verrouillée)"' : ''} aria-label="Pente de ${echapper(p.nom)} à ${echapper(s[j].nom)}"></td>
         ${coteP ? '<td colspan="3" class="centre"><small>côté partagé : pas de talus</small></td>'
     : `<td class="centre"><input type="checkbox" data-talus-on="${echapper(src.nom)}" ${t.on ? 'checked' : ''} aria-label="Talus de ${echapper(p.nom)} à ${echapper(s[j].nom)}"></td>
         <td><input type="text" class="hv" value="${echapper(t.deb)}" data-talus-deb="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en déblai (H:V)"></td>
@@ -920,6 +926,19 @@ export function ouvrirPlateformes({
       ctx.stroke();
       ctx.setLineDash([]);
       for (const p of s.points) carre(ctx, ecran(p), '#ffffff', COULEUR_APPLI);
+      // 0.343.0 : altitudes et pentes écrites au fur et à mesure du dessin (pas seulement une fois la plateforme finie).
+      if (etat.outil === 'plateforme') {
+        s.points.forEach((p, i) => {
+          const q = ecran(p);
+          if (p.alt != null) texte(ctx, f3(p.alt), q.x + 8, q.y - 8, COULEUR_APPLI, 11, true);
+          const suivant = s.points[i + 1];
+          if (suivant && p.alt != null && suivant.alt != null) {
+            const longueur = Math.hypot(suivant.est - p.est, suivant.nord - p.nord);
+            const r = ecran(suivant);
+            if (longueur > 0 && Math.hypot(r.x - q.x, r.y - q.y) > 40) texte(ctx, `${(((suivant.alt - p.alt) / longueur) * 100).toFixed(2)} %`, (q.x + r.x) / 2 + 4, (q.y + r.y) / 2 - 6, '#1b2b36', 10);
+          }
+        });
+      }
     }
     if ((etat.outil === 'construction' && s?.debut) && etat.curseur) {
       const a = ecran(s.debut);
@@ -1073,6 +1092,8 @@ export function ouvrirPlateformes({
     }
     // Côtés partagés : tirets foncés ; pentes ; « + »
     const n = s.length;
+    const facettesArc = facettesDArcs(pf);
+    const arcsPf = poigneesArcsPf(pf);
     for (let i = 0; i < (n >= 3 ? n : n - 1); i += 1) {
       const a = pts[i];
       const b = pts[(i + 1) % n];
@@ -1120,7 +1141,7 @@ export function ouvrirPlateformes({
         ctx.restore();
         if (estChoisie) zonesToucher.push({ type: 'pente', i, x: cx, y: cy });
       }
-      if (estChoisie && n >= 2) {
+      if (estChoisie && n >= 2 && !facettesArc.has(s[i].nom) && !facettesArc.has(s[(i + 1) % n].nom) && !(arcsPf.some((x) => x.debut === s[i].nom && x.fin === s[(i + 1) % n].nom))) {
         const mx = (a.x + b.x) / 2;
         const my = (a.y + b.y) / 2;
         ctx.fillStyle = '#ffffff';
@@ -1140,8 +1161,25 @@ export function ouvrirPlateformes({
       }
     }
     // Angles (carrés) et points intérieurs (ronds), avec noms et altitudes
+    // Poignée ronde au milieu de chaque arc : la glisser = courber de nouveau.
+    if (estChoisie) {
+      for (const h of arcsPf) {
+        const idx = s.findIndex((x) => x.nom === h.nom);
+        if (idx < 0) continue;
+        const q = pts[idx];
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#ea580c';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 7, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        zonesToucher.push({ type: 'arc', debut: h.debut, fin: h.fin, x: q.x, y: q.y });
+      }
+    }
     s.forEach((p, i) => {
       const q = pts[i];
+      if (facettesArc.has(p.nom)) return; // point d'une facette d'arc : caché
       carre(ctx, q, etat.selPoint === p.nom && estChoisie ? COULEUR_APPLI : '#ffffff', '#1b2b36');
       etiquette(ctx, p, q);
       if (p.detache && estChoisie) texte(ctx, 'détaché', q.x + 8, q.y + 12, '#dc2626', 10);
@@ -1222,7 +1260,9 @@ export function ouvrirPlateformes({
     if (!pf) return null;
     for (const z of zonesToucher) if (Math.hypot(z.x - x, z.y - y) <= t) return z;
     const s = sommetsResolus(pf, liste());
+    const facettes = facettesDArcs(pf);
     for (let i = 0; i < s.length; i += 1) {
+      if (facettes.has(s[i].nom)) continue;
       const q = ecran(s[i]);
       if (Math.hypot(q.x - x, q.y - y) <= t) return { type: 'sommet', i, nom: s[i].nom };
     }
@@ -1247,7 +1287,7 @@ export function ouvrirPlateformes({
     }
     const { x, y } = pts[0];
     const cible = etat.outil === 'choisir' ? sousLaSouris(x, y) : null;
-    geste = { x, y, vue, glisse: false, cible };
+    geste = { x, y, vue, glisse: false, cible, t0: Date.now() };
   }
 
   function pointerMove(ev) {
@@ -1272,12 +1312,18 @@ export function ouvrirPlateformes({
     if (!geste.glisse && Math.hypot(p.x - geste.x, p.y - geste.y) > 5) {
       geste.glisse = true;
       // Glisser un angle, un point intérieur ou un « + » (= nouveau point qui suit la souris).
-      if (geste.cible && ['sommet', 'interieur', 'plus', 'bout-coupe'].includes(geste.cible.type)) {
+      if (geste.cible && ['sommet', 'interieur', 'plus', 'arc', 'bout-coupe'].includes(geste.cible.type)) {
         if (!avantChangement()) {
           geste.cible = null;
+        } else if (geste.cible.type === 'plus' && Date.now() - geste.t0 >= DELAI_ARC) {
+          // 0.343.0 : appui un peu long sur le « + » puis glisser = courber le côté en arc (facettes).
+          const sn = choisie().sommets;
+          geste.cible = { type: 'arc', debut: sn[geste.cible.i].nom, fin: sn[(geste.cible.i + 1) % sn.length].nom, base: baseArc(choisie()) };
         } else if (geste.cible.type === 'plus') {
           const nom = ajouterPointMilieu(liste(), choisie(), geste.cible.i);
           geste.cible = { type: 'sommet', i: geste.cible.i + 1, nom, insere: true };
+        } else if (geste.cible.type === 'arc') {
+          geste.cible = { ...geste.cible, base: baseArc(choisie()) };
         }
         if (geste.cible) geste.deplace = true;
       }
@@ -1321,6 +1367,12 @@ export function ouvrirPlateformes({
       const k = coupes().find((x) => x.id === cible.id);
       if (k) k[cible.bout] = [m(a.est), m(a.nord)];
       majOnglets();
+      return;
+    }
+    if (cible.type === 'arc') {
+      const erreur = courberCoteEnArc(liste(), pf, cible.debut, cible.fin, [a.est, a.nord], cible.base);
+      if (erreur && erreur !== cible.derniereErreur) message(`Arc : ${erreur}.`, 3000);
+      cible.derniereErreur = erreur;
       return;
     }
     if (cible.type === 'interieur') {
@@ -1427,6 +1479,15 @@ export function ouvrirPlateformes({
         ouvrirBulle({
           x: ecran(point).x, y: ecran(point).y, titre: `Angle ${s.points.length} : altitude (m)`, valeur: f3(point.alt),
           pente: dernier?.alt != null ? { titre: 'ou pente depuis le point d\'avant (%)' } : null,
+          apercu: (texte, textePente) => {
+            const pc = String(textePente).trim() !== '' ? nombre(String(textePente).replace('%', '')) : null;
+            if (pc !== null && dernier?.alt != null) point.alt = Math.round((dernier.alt + (pc / 100) * Math.hypot(point.est - dernier.est, point.nord - dernier.nord)) * 1000) / 1000;
+            else if (String(textePente).trim() === '') {
+              const v = nombre(texte);
+              if (v !== null) point.alt = v;
+            }
+            majTout();
+          },
           valider: (texte, textePente) => {
             // Pente tapée : altitude = celle du point d'avant + pente × longueur en plan (−2 % = descend).
             if (String(textePente).trim() !== '' && dernier?.alt != null) {
@@ -1618,7 +1679,7 @@ export function ouvrirPlateformes({
 
   let bulleOuverte = null; // { el, valider, input }
   /** Ouvre une bulle sur le plan en (x, y) (px de la toile) : titre, valeur, valider(texte) ; supprimer() facultatif. */
-  function ouvrirBulle({ x, y, titre, valeur = '', valider, supprimer = null, pente = null }) {
+  function ouvrirBulle({ x, y, titre, valeur = '', valider, supprimer = null, pente = null, apercu = null }) {
     fermerBulle(false);
     const el = document.createElement('div');
     el.className = 'bulle-plateforme';
@@ -1645,6 +1706,8 @@ export function ouvrirPlateformes({
         supprimer();
       }
     });
+    // 0.343.0 : « apercu(texte, pente) » = ce qui est tapé se voit tout de suite sur le plan, avant même de valider.
+    if (apercu) el.querySelectorAll('input').forEach((champ) => champ.addEventListener('input', () => apercu(input.value, el.querySelector('[data-bulle-champ="pente"]')?.value ?? '')));
     el.querySelectorAll('input').forEach((champ) => champ.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter') {
         ev.preventDefault();
@@ -2029,6 +2092,8 @@ export function ouvrirPlateformes({
       if (c.dataset.talusDeb) t.deb = c.value.trim();
       if (c.dataset.talusRem) t.rem = c.value.trim();
       pf.talus[nom] = t;
+      // Début d'un arc : toutes ses facettes prennent le même talus.
+      for (const a of pf.arcs ?? []) if (a.debut === nom) for (const f of a.noms) pf.talus[f] = { ...t };
       return enregistrer();
     }
     // 0.303.0 : altitudes automatiques, ouvrages
