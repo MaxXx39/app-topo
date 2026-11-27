@@ -15315,3 +15315,44 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .outils-entete .groupe-tete .outil-ruban { min-width: 34px; height: 36px; padding: 0 4px; }
 .outils-entete .tete-affichage input[type="number"] { width: 46px; }
 .outils-entete .bouton { min-height: 36px; padding: 0 10px; }
+
+/* 0.342.0 : titres de groupe AU-DESSUS (petits), tous les groupes à la même hauteur, bandeau sur une ligne */
+.ruban-chantier .groupe-ruban, .outils-entete .groupe-tete,
+.bande-page .zone-bande-page .groupe-ruban.type-vue, .bande-page .zone-bande-page .groupe-ruban.type-rotation, .bande-page .zone-bande-page .groupe-ruban.type-details,
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit, .bande-page .zone-bande-page .groupe-ruban.type-affichage {
+  display: grid; grid-auto-flow: column; grid-template-rows: auto auto; align-items: center; align-content: center; column-gap: 3px; row-gap: 1px; align-self: stretch;
+}
+.ruban-chantier .groupe-ruban .mini-titre, .outils-entete .mini-titre,
+.bande-page .zone-bande-page .groupe-ruban.type-vue .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-rotation .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-details .titre-groupe,
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-affichage .titre-groupe {
+  grid-row: 1; grid-column: 1 / span 30; writing-mode: horizontal-tb; transform: none; text-align: left; font-size: 8px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1; padding: 1px 2px 0; align-self: start; color: #64748b;
+}
+.outils-entete .mini-titre { color: #cbd5e1; }
+.outils-entete { flex-wrap: nowrap; }
+.outils-entete .tete-edition { background: rgba(255, 255, 255, 0.08); }
+.outils-entete .groupe-tete .outil-ruban { height: 34px; min-width: 34px; }
+.outils-entete .tete-presentation [data-presentation], .outils-entete .tete-gabarit select { max-width: 130px; }
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit { background: #dcfce7; border-radius: 8px; }
+.bande-page .zone-bande-page .groupe-ruban.type-affichage { background: #ffedd5; border-radius: 8px; }
+.bande-page .zone-bande-page .groupe-ruban .champ-bande span, .bande-page .zone-bande-page .groupe-ruban .case-bande span { font-size: 0.75rem; }
+.bande-page .zone-bande-page .groupe-ruban .outil-ruban { height: 36px; }
+.ruban-chantier .groupe-ruban .mini-titre { display: block; }
+.bande-page:has(.type-vue), .bande-page:has(.type-vue) .zone-bande-page, .bande-page:has(.type-vue) .bouton-appli { height: auto; min-height: 62px; }
+.bande-page .zone-bande-page .groupe-ruban.type-vue .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-rotation .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-details .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-gabarit .outil-ruban { height: 40px; padding: 2px 4px; }
+.bande-page .zone-bande-page .groupe-ruban.type-vue, .bande-page .zone-bande-page .groupe-ruban.type-rotation, .bande-page .zone-bande-page .groupe-ruban.type-details,
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit, .bande-page .zone-bande-page .groupe-ruban.type-affichage { grid-template-rows: auto auto !important; padding: 1px 6px 2px !important; }
+.bande-page .zone-bande-page .groupe-ruban.type-vue .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-rotation .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-details .titre-groupe,
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit .titre-groupe, .bande-page .zone-bande-page .groupe-ruban.type-affichage .titre-groupe { display: block !important; }
+.bande-page:has(.type-vue), .bande-page:has(.type-vue) .zone-bande-page, .bande-page:has(.type-vue) .bouton-appli { min-height: 56px; }
+.bande-page:has(.type-vue) .zone-bande-page { overflow-x: auto; overflow-y: hidden; }
+/* bande du bas de Présentation : icônes seules (le titre du groupe dit ce qu'il fait ; l'info-bulle donne le détail) pour que tout tienne */
+.bande-page .zone-bande-page .groupe-ruban.type-vue .outil-ruban span, .bande-page .zone-bande-page .groupe-ruban.type-details .outil-ruban span, .bande-page .zone-bande-page .groupe-ruban.type-gabarit .outil-ruban span { display: none; }
+.bande-page .zone-bande-page .groupe-ruban.type-vue .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-details .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-gabarit .outil-ruban, .bande-page .zone-bande-page .groupe-ruban.type-rotation .outil-ruban { min-width: 40px; }
+.bande-page .zone-bande-page .groupe-ruban.type-rotation .outil-ruban span { font-size: 0.65rem; }
+/* le titre s'étale sur beaucoup de colonnes : pas d'écart entre colonnes (sinon le groupe s'élargit) */
+.ruban-chantier .groupe-ruban, .outils-entete .groupe-tete, .bande-page .zone-bande-page .groupe-ruban.type-vue, .bande-page .zone-bande-page .groupe-ruban.type-rotation, .bande-page .zone-bande-page .groupe-ruban.type-details,
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit, .bande-page .zone-bande-page .groupe-ruban.type-affichage { column-gap: 0 !important; }
+.ruban-chantier .groupe-ruban > :not(.mini-titre), .outils-entete .groupe-tete > :not(.mini-titre), .bande-page .zone-bande-page .groupe-ruban[class*="type-"] > :not(.titre-groupe) { margin-inline: 2px; }
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit .champ-bande > span:not(.titre-groupe) { display: none; }
+.bande-page .zone-bande-page .groupe-ruban.type-gabarit select { max-width: 110px; }
+.bande-page .zone-bande-page .groupe-ruban.type-affichage .champ-bande input { width: 44px; }

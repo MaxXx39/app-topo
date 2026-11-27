@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.341.0 — Plans de chantier : groupes titrés compacts dans le bandeau et les outils
+Lire seulement la section utile : `grep -n '^## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
+- Demande du 27.11 : les titres verticaux de la 0.341.0 étaient « horribles » (rien à la même hauteur). Maintenant : petit titre horizontal AU-DESSUS de chaque groupe (grille CSS : titre en ligne 1, contenu en ligne 2), tous les groupes à la même hauteur.
+- **Bandeau du haut sur UNE ligne** en Dessin et en Présentation : groupes PHASE, AFFICHAGE (échelle, effet 3D), ÉDITION (Dessin) ; PHASE, PRÉSENTATION, FEUILLE + PDF (Présentation). **Gabarit et Affichage (Effet 3D, Texte) de Présentation sont passés dans la bande du bas.**
+- **Bande du bas de Présentation** : 5 groupes titrés (VUE, ROTATION, DÉTAILS, GABARIT, AFFICHAGE) ; boutons en icônes seules (l'info-bulle dit le détail) ; la bande est un peu plus haute. Elle défile horizontalement si l'écran est étroit (largeur 1098 / 1070 px à 1280).
+- Vérifié en Playwright (captures Dessin et Présentation). Pas vérifié : écrans plus étroits.
+
+## 0.341.0 — Plans de chantier : groupes titrés compacts dans le bandeau et les outils
 - Titres de groupe **verticaux** (texte tourné, ~10 px de large, aucune hauteur) sur les groupes d'outils de Dessin (TRACER, ANNOTER, SYMBOLES, CONSTRUCTION, COUPE) et sur les groupes du bandeau (PHASE, PRÉSENTATION, FEUILLE, GABARIT, AFFICHAGE, chacun d'une teinte).
 - Nom du plan masqué dans le bandeau (le nom du projet y est déjà). Dessin : bandeau sur une seule ligne. **Présentation reste sur 2 lignes à 1280 px** (trop de groupes) : à revoir si gênant (idée : Gabarit dans la bande du bas).
 - Vérifié en Playwright (captures Dessin et Présentation).

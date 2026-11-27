@@ -1182,12 +1182,6 @@ export function ouvrirPlansChantier({
         <label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${p.echelle ?? ECHELLE_PAPIER}" data-feuille="echelle" size="6" autocomplete="off"></label>
         <datalist id="echelles-chantier">${[50, 100, 200, 250, 500, 1000, 2000].map((x) => `<option value="${x}"></option>`).join('')}</datalist>
       </div>
-      <span class="groupe-gabarit groupe-tete tete-gabarit"><span class="mini-titre">Gabarit</span><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
-          <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).map((g) => `<option value="${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</select></label>
-        ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit du projet', 'Gabarit +')}
-        ${bouton('data-action="gabarit-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le gabarit choisi (les présentations déjà créées restent)', 'Suppr. gab.')}</span>
-      <span class="reglages-entete groupe-tete tete-affichage"><span class="mini-titre">Affichage</span><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
-        <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4"></label></span>
       <button type="button" class="bouton" data-action="feuille-pdf" title="Fabriquer le PDF de la feuille">PDF</button>`;
     return `
       <div class="groupe-ruban type-vue" role="group" aria-label="Vue"><span class="titre-groupe">Vue</span>
@@ -1206,7 +1200,13 @@ export function ouvrirPlansChantier({
         ${bouton(`data-action="feuille-detail-nouveau" aria-pressed="${etat.feuilleMode === 'detail-nouveau'}"`, '<rect x="3" y="5" width="12" height="10" rx="1"/><rect x="11" y="11" width="10" height="8" rx="1" fill="#ffffff"/><path d="M17 3V7M15 5H19"/>', `Ajouter un cadre de détail (${MAX_DETAILS} au plus) : cliquez ensuite sur le plan, à l'endroit à montrer`, 'Détail', r.details.length >= MAX_DETAILS).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-nouveau' ? ' actif' : ''}"`)}
         ${bouton(`data-action="feuille-detail-centre" aria-pressed="${etat.feuilleMode === 'detail-centre'}"`, '<circle cx="12" cy="12" r="3"/><path d="M12 3V7M12 17V21M3 12H7M17 12H21"/>', 'Changer l\'endroit montré par le cadre de détail choisi : cliquez sur le plan', 'Lieu', !etat.detailChoisi).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-centre' ? ' actif' : ''}"`)}
         ${bouton('data-action="feuille-detail-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le cadre de détail choisi', 'Suppr. détail', !etat.detailChoisi)}
-      </div>`;
+      </div>
+      <div class="groupe-ruban type-gabarit" role="group" aria-label="Gabarit"><span class="titre-groupe">Gabarit</span><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
+          <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).map((g) => `<option value="${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</select></label>
+        ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit du projet', 'Gabarit +')}
+        ${bouton('data-action="gabarit-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le gabarit choisi (les présentations déjà créées restent)', 'Suppr. gab.')}</div>
+      <div class="groupe-ruban type-affichage" role="group" aria-label="Affichage"><span class="titre-groupe">Affichage</span><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
+        <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4"></label></div>`;
   }
 
   /** Remet la bande du bas de l'onglet Feuille à jour (liste des présentations, valeurs). */
@@ -2074,10 +2074,10 @@ export function ouvrirPlansChantier({
   /** Outils de l'onglet Dessin posés dans le bandeau du haut (sélection, annuler, tout voir) : libère le ruban. */
   function htmlOutilsDessinEntete() {
     const bt = (attrs, icone, titre, court) => `<button type="button" class="outil-ruban" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court}</span></button>`;
-    return `<span class="reglages-entete groupe-tete tete-affichage"><span class="mini-titre">Affichage</span><label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${plan()?.echelle ?? ECHELLE_PAPIER}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label></span>${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
+    return `<span class="reglages-entete groupe-tete tete-affichage"><span class="mini-titre">Affichage</span><label class="champ-bande" title="Échelle d'impression 1 : (choisis dans la liste ou tape-la)"><span>Échelle 1 :</span><input type="text" inputmode="numeric" list="echelles-chantier" value="${plan()?.echelle ?? ECHELLE_PAPIER}" data-champ="echelle" aria-label="Échelle d'impression" size="6" autocomplete="off"></label><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${plan()?.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label></span><span class="groupe-tete tete-edition"><span class="mini-titre">Édition</span>${bt('data-outil="choisir"', ICONE_CHOISIR, 'Sélectionner', 'Choisir')}
       ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer', 'Effacer')}
       ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)', 'Annuler')}
-      ${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir', 'Tout')}`;
+      ${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir', 'Tout')}</span>`;
   }
 
   /** Phase active (liste) + ⚙ qui ouvre la liste des phases (montrer, couleur, nom, supprimer, ajouter) : dans le bandeau du haut (0.337.0). */
