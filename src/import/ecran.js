@@ -27,6 +27,7 @@ import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
 import { lireSousDossiers, sousDossiersEffectifs, pastilleSousDossier } from '../topo/sous-dossiers.js';
+import { pastillesAffaireHtml, pastillesDe } from '../topo/affaires.js';
 import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
@@ -470,7 +471,7 @@ function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a
   // 0.251.0 : dossiers de la ligne : pastilles (tous les modes) et, dans le menu ⚙, cases pour la ranger (Expert).
   const dossiers = projet && element ? sousDossiersEffectifs(projet, element, genre) : [];
   const liste = projet && element ? lireSousDossiers(projet) : [];
-  const pastilles = dossiers.map((nom) => pastilleSousDossier(nom, liste)).join('');
+  const pastilles = pastillesAffaireHtml(projet && element ? pastillesDe(projet, element, genre) : []) + dossiers.map((nom) => pastilleSousDossier(nom, liste)).join('');
   // 0.252.0 : liste déroulante (bouton « Dossiers : Canalo, Terrassement ▾ ») avec une case à cocher par dossier ; reste ouverte tant qu'on coche.
   const cleListe = `dos:${cle}`;
   const listeOuverte = ouverts.has(cleListe);
@@ -846,7 +847,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <strong class="nom-plan-dxf">${echapper(plan.nom)}</strong>
           <span class="pastille-gerer" style="background: ${plan.couleur ?? '#64748b'}" title="Couleur du plan"></span>
         </div>
-        ${(plan.sousDossiers ?? []).length > 0 ? `<div class="ligne-type-dxf">${plan.sousDossiers.map((nom) => pastilleSousDossier(nom, dossiersListe)).join('')}</div>` : ''}
+        ${(plan.sousDossiers ?? []).length > 0 || (plan.pastilles ?? []).length > 0 ? `<div class="ligne-type-dxf">${pastillesAffaireHtml(plan.pastilles)}${(plan.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, dossiersListe)).join('')}</div>` : ''}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

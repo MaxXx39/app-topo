@@ -13929,8 +13929,8 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 .pastille-entete.pastille-affaire { background: #1d4ed8; color: #fff; font-size: 0.95rem; padding: 5px 14px; max-width: 45vw; border: 2px solid rgba(255, 255, 255, 0.85); }
 .entete-pastilles .pastille-entete.pastille-affaire[hidden] { display: none; }
 .pastille-entete.pastille-dossier { font-size: 0.95rem; padding: 5px 14px; max-width: 55vw; border: 2px solid rgba(255, 255, 255, 0.85); }
-.pastille-pastel-dossier { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; margin: 2px 4px 2px 0; }
-#menu-dossiers { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.pastille-pastel-dossier { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 500; margin: 2px 4px 2px 0; }
+#menu-dossiers, #menu-affaires { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
 .ligne-menu-dossiers { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-weight: 700; font-size: 1.05rem; text-align: left; }
 .ligne-menu-dossiers i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
 .ligne-menu-dossiers span { flex: 1; }
@@ -14003,7 +14003,7 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
 
 /* 0.260.0 (demandes du 17.11) : dossiers un tout petit peu moins hauts (liste du plan, en-tête, page Applications) ; pastilles touchables ; bouton « Ouvrir » de l'encadré du projet plus visible ; bandeau « Hors ligne » dans la barre du récepteur. */
 .dossiers-cliquables { display: inline-flex; flex-wrap: wrap; align-items: center; cursor: pointer; }
-.dossiers-cliquables .pastille-pastel-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; font-size: 0.8rem; }
+.dossiers-cliquables .pastille-pastel-dossier { padding: 1px 7px; margin: 1px 3px 1px 0; font-size: 0.64rem; font-weight: 500; }
 .dossiers-cliquables.ajout-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; border: 1px dashed currentColor; border-radius: 999px; font-size: 0.8rem; font-weight: 700; opacity: 0.75; }
 .cases-fenetre { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; padding: 4px 2px 10px; }
 .cases-fenetre .case { min-height: 40px; font-size: 1.05rem; }
@@ -15381,3 +15381,28 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .pastille-entete.pastille-affaire.pastille-fixe { cursor: default; }
 /* 0.347.0 : planning des articles : la désignation seule, dans la pastille de couleur (plus de numéro en double) */
 .nom-pl .pastille-article { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 0.8rem; }
+/* 0.347.1 : les listes déroulantes de l'en-tête (affaires, dossiers) passent au-dessus des pages (Applications…) */
+#menu-affaires, #menu-dossiers { z-index: 1000; }
+
+/* 0.348.0 : pastille d'affaire d'un élément = un petit rond avec un petit texte (catégorie) */
+.pastille-affaire-el { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; border-radius: 50%; margin: 1px 4px 1px 0; color: #fff; font-size: 0.55rem; font-weight: 500; line-height: 1; letter-spacing: -0.2px; vertical-align: middle; }
+
+/* 0.349.0 : menus Fond / Plan / Points / Surface plus serrés (moins d'espace entre les lignes) */
+.menu-plans-dxf, .menu-calques { padding: 2px 8px; font-size: 0.85rem; }
+.menu-plans-dxf .ligne-menu-plan, .menu-calques .ligne-menu-plan { padding: 1px 0; gap: 6px; }
+.menu-plans-dxf .reglette-transparence { margin: 0; padding: 2px 8px; gap: 2px; }
+.menu-plans-dxf .calques-dxf-menu { gap: 0; margin: 0 0 3px 24px; }
+.menu-plans-dxf .case, .menu-calques .case { min-height: 0; padding: 1px 0; }
+.menu-listes-points .categorie-affichage { margin: 3px 0; }
+.menu-listes-points .categorie-affichage > summary { min-height: 34px; }
+.menu-listes-points .liste-depliable > summary { min-height: 34px; }
+.menu-listes-points .reglages-liste { padding: 2px 6px; gap: 0; }
+.menu-listes-points .couleur-liste-menu { margin: 2px 0; }
+.ligne-trans-calques { display: flex; align-items: center; gap: 4px; flex: 1 1 100%; min-width: 0; }
+.ligne-trans-calques .reglette-transparence { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.ligne-trans-calques .reglette-transparence input { flex: 1 1 0; min-width: 0; width: auto; }
+.ligne-trans-calques .fleche-calques-dxf { min-width: 26px; font-size: 1rem; padding: 0; }
+/* Points : le nom du levé en haut (un peu remonté), sa nature dessous, texte plus petit et non gras */
+.bloc-nom-liste { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1 1 auto; line-height: 1.15; margin-top: -2px; }
+.bloc-nom-liste .nom-liste-menu { font-size: 0.8rem; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bloc-nom-liste .etiquette-nature { margin: 1px 0 0; font-size: 0.52rem; font-weight: 600; padding: 0 4px; }
