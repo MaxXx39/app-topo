@@ -9,7 +9,8 @@
 // une page par phase), PDF et DXF.
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
-import { cartoucheActif } from '../topo/affaires.js';
+import { cartoucheActif, dansAffaire, pastillesAffaireCliquables, aPlusieursAffaires, affaireChoisie } from '../topo/affaires.js';
+import { aAcces } from '../reglages/reglages.js';
 import { habillerPage } from '../navigation/cadre-page.js';
 import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
@@ -226,11 +227,30 @@ export function ouvrirPlansChantier({
     const nom = page.querySelector('.nom-projet-entete');
     if (nom) nom.textContent = titreProjet(leProjet());
   }
-  page.addEventListener('click', (ev) => { if (ev.target.closest('[data-affaire-chantier]')) document.querySelector('#pastille-affaire')?.click(); });
+  page.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-affaire-chantier]')) document.querySelector('#pastille-affaire')?.click();
+    const aff = ev.target.closest('[data-affaire-de]');
+    if (aff) {
+      ev.stopPropagation();
+      document.dispatchEvent(new CustomEvent('topo-choisir-affaires', { detail: { id: aff.dataset.affaireDe } }));
+    }
+  }, true);
+  // Après un changement d'affaire ou de pastille, la liste des plans se redessine.
+  // (seulement si l'affaire choisie ou les pastilles des plans ont changé : l'en-tête prévient à chaque mise à jour)
+  const signatureAffaires = () => `${affaireChoisie()}#${liste().map((x) => `${x.id}:${(x.pastilles ?? []).join('+')}`).join('|')}`;
+  let derniereSignatureAffaires = signatureAffaires();
+  const rafraichirListeAffaire = () => {
+    const sig = signatureAffaires();
+    if (sig === derniereSignatureAffaires) return;
+    derniereSignatureAffaires = sig;
+    if (etat.ecran === 'liste' && !fermee) dessiner();
+  };
+  document.addEventListener('topo-affaire-changee', rafraichirListeAffaire);
   document.addEventListener('topo-affaire-changee', majPastilleAffaire);
 
   function fermer() {
     document.removeEventListener('topo-affaire-changee', majPastilleAffaire);
+    document.removeEventListener('topo-affaire-changee', rafraichirListeAffaire);
     fermee = true;
     vue?.detruire();
     feuille?.observateur?.disconnect();
@@ -427,14 +447,15 @@ export function ouvrirPlansChantier({
   // ---------------------------------------------------------------- Liste des plans
 
   function htmlListe() {
-    const tries = [...liste()].sort((a, b) => String(b.modifieLe).localeCompare(String(a.modifieLe)));
+    // 0.351.0 : seulement les plans de chantier de l'affaire choisie (et ceux sans pastille)
+    const tries = liste().filter((x) => dansAffaire(leProjet(), x, 'planChantier')).sort((a, b) => String(b.modifieLe).localeCompare(String(a.modifieLe)));
     const genre = (g) => GENRES.find(([c]) => c === g)?.[1] ?? '';
     return `
       <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Nouveau plan</button></div>
       ${tries.length ? `<div class="cadre-tableau-calage"><table class="tableau-calage">
         <thead><tr><th>Plan</th><th>Genre</th><th>Phases</th><th>Objets</th><th>Modifié</th><th></th></tr></thead>
         <tbody>${tries.map((p) => `<tr>
-          <td><strong>${echapper(p.nom)}</strong></td><td>${echapper(genre(p.genre))}</td>
+          <td><strong>${echapper(p.nom)}</strong> ${pastillesAffaireCliquables(p.id, p.pastilles, aPlusieursAffaires(leProjet()) && aAcces('expert'))}</td><td>${echapper(genre(p.genre))}</td>
           <td class="chiffre">${p.phases.length}</td><td class="chiffre">${p.objets.length}</td><td>${dateCourte(p.modifieLe)}</td>
           <td class="actions-chantier"><button type="button" class="bouton" data-ouvrir="${echapper(p.id)}">Ouvrir</button>
             <button type="button" class="bouton-secondaire" data-renommer="${echapper(p.id)}">Renommer</button>

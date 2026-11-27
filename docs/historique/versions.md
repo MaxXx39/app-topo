@@ -1,6 +1,15 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.350.0 — Toucher une pastille = la changer directement ; menu Plan à jour (demandes du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.351.0 — Revue complète des affaires (projets liés), simulée de A à Z (Expert, Intermédiaire, Base)
+Simulations Playwright sur un vrai projet (2 affaires GC 8114 / BÂT 10203, 3 plans, 2 levés) + un 2e projet à fusionner. Corrigé :
+- **« Ouvrir »** : chaque ligne d'affaire prenait le numéro de l'affaire ouverte (« 10203 - Paris » sur les deux lignes) : chaque ligne a maintenant SON numéro (« 8114 - Paris GC », « 10203 - Paris BÂT ») et la ligne ouverte est marquée « ouvert ». Le titre du projet dans les listes / la carte : « 8114 / 10203 - Paris » (`resumerProjet`, champ `lieu`). En « Toutes » (Expert), l'en-tête montre aussi tous les numéros.
+- **Éléments d'une autre affaire** : avant, seulement décochés (on pouvait les recocher, même en Base) ; maintenant **ni listés ni dessinés** dans une affaire : menus Plan / Points / Surface, pages du projet (Liste de points, Plans, Gérer : `projetDeLAffaire`), plans de fond des applis plein écran (`plansDuProjet`), liste de Calage, liste de Plans de chantier, surfaces de Plateformes. En « Toutes » : tout.
+- **Liste déroulante des affaires dans une appli plein écran** : elle s'ouvrait DERRIÈRE la page (impossible à toucher) ; elle s'ouvre maintenant dans la page, sous sa pastille.
+- **Plans de chantier** : liste filtrée par affaire, pastilles d'affaire sur chaque plan (touchables, Expert), liste redessinée quand on change d'affaire. Calage : liste redessinée aussi.
+- Vérifié : nouveau plan de chantier créé dans BÂT = pastille BÂT, absent en GC ; fusion (numéro proposé, catégories libres seulement) ; changer la catégorie renomme les pastilles ; retrait d'une affaire non vide refusé avec message ; Base : affaire fixe, pastille non touchable, « Seul l'Expert… » en touchant un rond, aucune trace des autres affaires ; Expert démarre en « Toutes ».
+- Pas filtré (volontairement) : Plateformes entre elles (angles liés d'une plateforme à l'autre), Comparer des PDF, Matériel (pas lié aux affaires).
+
+## 0.350.0 — Toucher une pastille = la changer directement ; menu Plan à jour (demandes du 27.11)
 - Toucher un **rond d'affaire** d'un élément ouvre tout de suite ses cases d'affaires (Expert ; plus de fenêtre « dossiers ou affaires ? ») ; toucher une **pastille de dossier** ouvre tout de suite ses cases de dossiers. Vaut dans le menu Plan / Points / Surface du plan ET dans la page Plans / Gérer du projet. Élément sans pastille d'affaire (projet à plusieurs affaires, Expert) : « + affaire » à toucher. `pastillesAffaireCliquables`, `choisirAffairesDeLElement`.
 - **Bug corrigé** : après un changement d'affaire, le menu Plan du plan gardait les anciennes pastilles (sa liste ne se redessinait pas : les pastilles manquaient dans `signatureMenuPlans`). Reproduit et vérifié en Playwright avec un vrai DXF.
 

@@ -148,6 +148,13 @@ export function dansAffaire(projet, element, genre = '', choix = choisie) {
   return Boolean(categorie) && pastilles.includes(categorie);
 }
 
+/** Des pastilles (catégories) sont-elles visibles dans l'affaire choisie ? (sans pastille : oui ; « Toutes » : oui) */
+export function pastillesVisibles(projet, pastilles = [], choix = choisie) {
+  if (!choix || (pastilles ?? []).length === 0) return true;
+  const categorie = affaireParId(projet, choix)?.categorie;
+  return Boolean(categorie) && pastilles.includes(categorie);
+}
+
 /** Numéro d'affaire à écrire sur les exports et le cartouche : celui de l'affaire choisie, sinon celui de l'affaire principale. */
 export function numeroAffaireActif(projet, choix = choisie) {
   const numero = choix ? numeroDeLAffaire(projet, choix) : null;

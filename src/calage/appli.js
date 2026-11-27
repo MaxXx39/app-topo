@@ -8,6 +8,7 @@
 // « Ce qui a changé » entre deux indices (topo/differences-plan.js), cotations et lignes de repère lues.
 // Calculs : topo/calage-plan.js (caler), topo/nettoyage-plan.js (nettoyer) ; rangement : calage/plans.js.
 import { habillerPage } from '../navigation/cadre-page.js';
+import { dansAffaire, affaireChoisie } from '../topo/affaires.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderChamps } from '../outils/choix.js';
@@ -112,7 +113,17 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     });
   }
 
+  // 0.351.0 : changer d'affaire (pastille du haut) redessine la liste des plans calés (ceux de la nouvelle affaire).
+  let affaireVue = affaireChoisie();
+  const surAffaire = () => {
+    if (affaireChoisie() === affaireVue) return;
+    affaireVue = affaireChoisie();
+    if (etape === 'liste') dessiner();
+  };
+  document.addEventListener('topo-affaire-changee', surAffaire);
+
   function fermer({ sansRetour = false } = {}) {
+    document.removeEventListener('topo-affaire-changee', surAffaire);
     vues.forEach((v) => v.detruire());
     page.close();
     page.remove();
@@ -174,7 +185,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
   }
 
   function htmlListe() {
-    const cales = plansCales(projet.plansDxf);
+    const cales = plansCales(projet.plansDxf.filter((p) => dansAffaire(projet, p, 'plan'))); // 0.351.0 : ceux de l'affaire choisie
     const ligneIndice = (p) => {
       const c = p.calage;
       const ch = c.indices?.at(-1)?.changements;

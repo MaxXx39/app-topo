@@ -6,6 +6,7 @@
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
+import { affaireChoisie } from '../topo/affaires.js';
 import { ICONES_LIGNE } from '../outils/icones.js';
 import { valeurDansListe, CHOIX_AUTRE } from '../materiel/noms-tablette.js';
 import { echapper } from '../outils/echapper.js';
@@ -268,7 +269,8 @@ function ligneProjet(p, estOuvert, menu, partage) {
   // 0.346.0 : un projet à plusieurs affaires apparaît une fois par affaire (Base / Intermédiaire entrent par l'une ou l'autre).
   const affaires = p.local?.affaires ?? [];
   if (affaires.length === 0) return ligneProjetUne(p, estOuvert, menu, partage, null, true);
-  return affaires.map((a, i) => ligneProjetUne(p, false, menu, partage, a, i === 0)).join('');
+  // La ligne de l'affaire ouverte sur cette tablette est marquée « ouvert » (l'autre reste à toucher pour y passer).
+  return affaires.map((a, i) => ligneProjetUne(p, estOuvert && a.id === affaireChoisie(), menu, partage, a, i === 0)).join('');
 }
 
 function ligneProjetUne(p, estOuvert, menu, partage, affaire, avecMenu) {
@@ -282,10 +284,10 @@ function ligneProjetUne(p, estOuvert, menu, partage, affaire, avecMenu) {
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
     ailleurs ? `<span class="verrou-drive">${ICONES_LIGNE.cadenas} Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
-  const ouvrir = affaire ? `data-action="ouvrir-affaire" data-id="${p.id}" data-affaire="${echapper(affaire.id)}"` : estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
+  const ouvrir = affaire && estOuvert ? 'disabled' : affaire ? `data-action="ouvrir-affaire" data-id="${p.id}" data-affaire="${echapper(affaire.id)}"` : estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
     <button type="button" class="infos-projet" ${ouvrir}>
-      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${affaire ? ` <span class="etiquette-affaire">${echapper(affaire.categorie || '—')} · ${echapper(affaire.numero)}</span>` : ''}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
+      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(affaire ? [affaire.numero, p.local?.lieu].filter(Boolean).join(' - ') : p.titre)}${affaire ? ` <span class="etiquette-affaire">${echapper(affaire.categorie || '—')}</span>` : ''}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
       <span class="aide">${details}</span>
     </button>
     ${avecMenu ? `<button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>` : ''}
