@@ -365,6 +365,7 @@ export function ouvrirPlansChantier({
       <header class="entete-calage entete-chantier">
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <span class="aide-entete-chantier">${bulle('plansChantier')}</span>
+        <span class="nom-projet-entete" title="Projet ouvert">${echapper(leProjet().nom || 'Projet sans nom')}</span>
         <nav class="etapes-calage" aria-label="Parties">
           <button type="button" data-ecran="liste" class="${etat.ecran === 'liste' ? 'actif' : ''}">Gestion</button>
           <button type="button" data-ecran="dessin" class="${etat.ecran === 'dessin' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Dessin</button>
@@ -428,7 +429,7 @@ export function ouvrirPlansChantier({
 
   function htmlDessin() {
     // 0.297.1 : le ruban tient sur UNE ligne : icônes seules (le nom est dans l'infobulle), plus de titres de groupes.
-    const groupe = (titre, html, classe = '') => `<div class="groupe-ruban ${classe}" role="group" aria-label="${titre}">${html}</div>`;
+    const groupe = (titre, html, classe = '') => `<div class="groupe-ruban ${classe}" role="group" aria-label="${titre}"><span class="mini-titre">${titre}</span>${html}</div>`;
     // Mots courts sous les icônes (le nom complet est dans l'infobulle) : un juste milieu entre icônes seules et textes longs.
     const COURTS = {
       'Sélectionner': 'Choisir', 'Effacer': 'Effacer', 'Annuler (Ctrl+Z)': 'Annuler', 'Zone': 'Zone', 'Ligne': 'Ligne', 'Flèche': 'Flèche', 'Texte': 'Texte',
@@ -1691,7 +1692,8 @@ export function ouvrirPlansChantier({
     }
     if (cle === 'echelle') {
       return `${choix('Style', 'barreStyle', STYLES_BARRE, r.barreStyle)}${champNb('Taille', 'barreTaille', r.barreTaille, 50, 250, 10, '%')}
-        ${r.barreStyle === 'texte' ? '' : champNb('Longueur de la barre (0 = automatique)', 'barreLongueur', r.barreLongueur, 0, 5000, 1, 'm')}${couleur('barreCouleur', r.barreCouleur)}`;
+        ${r.barreStyle === 'texte' ? '' : champNb('Longueur de la barre (0 = automatique)', 'barreLongueur', r.barreLongueur, 0, 5000, 1, 'm')}${couleur('barreCouleur', r.barreCouleur)}
+        <label class="case-chantier"><input type="checkbox" data-feuille-case="barreFond" ${r.barreFond ? 'checked' : ''}> Fond blanc derrière l'échelle</label>`;
     }
     if (cle === 'legende') {
       return `${champNb('Taille du texte', 'legendeTaille', r.legendeTaille, 60, 200, 10, '%')}${choix('Colonnes', 'legendeColonnes', COLONNES_LEGENDE, r.legendeColonnes)}`;
@@ -3198,7 +3200,7 @@ export function ouvrirPlansChantier({
     const c = ev.target;
     const p = plan();
     if (!p) return;
-    if (etat.ecran === 'feuille') return changeFeuille(c, p);
+    if (etat.ecran === 'feuille' && !['rendu3d', 'tailleTexteMm'].includes(c.dataset.champ)) return changeFeuille(c, p);
     if (c.dataset.coupeSurface !== undefined) {
       if (c.checked) etat.coupe.cachees.delete(c.dataset.coupeSurface); else etat.coupe.cachees.add(c.dataset.coupeSurface);
       return majCoupe();

@@ -15291,3 +15291,8 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .outils-entete .groupe-gabarit .outil-ruban span { display: none; }
 .outils-entete .groupe-gabarit select { max-width: 96px; }
 .outils-entete .groupe-gabarit .outil-ruban { min-width: 36px; height: 40px; }
+
+/* 0.339.0 : nom du projet dans le bandeau du haut (bandeau du haut de la page supprimé) ; petits titres des groupes d'outils */
+.page-chantier > .bandeau-projet-page { display: none; }
+.nom-projet-entete { font-size: 0.8rem; font-weight: 700; color: #fde68a; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ruban-chantier .groupe-ruban .mini-titre { display: block; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; line-height: 1; padding: 0 0 2px; white-space: nowrap; }

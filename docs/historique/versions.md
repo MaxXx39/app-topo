@@ -1,6 +1,13 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.339.0 — Plans de chantier : échelle et effet 3D sur la même ligne (Dessin et Présentation)
+Lire seulement la section utile : `grep -n '^## 0.340.0 — Plans de chantier : petits titres, nom du projet dans le bandeau, fond de l'échelle, 3D / texte en Présentation
+- Petits titres (MINI TITRE) sur les groupes d'outils de Dessin.
+- Nom du projet déplacé dans le bandeau Gestion / Dessin / Présentation ; le bandeau du haut de la page est masqué dans Plans de chantier (hauteur inchangée).
+- Échelle : case « Fond blanc derrière l'échelle » (`barreFond`, défaut oui).
+- Présentation : Effet 3D et Texte (mm) étaient sans effet (le changement passait par le gestionnaire de Présentation) ; corrigé.
+- Vérifié en Playwright (capture Dessin). Pas vérifié : effet 3D / texte à l'écran en Présentation et l'export PDF avec fond de l'échelle désactivé.
+
+## 0.339.0 — Plans de chantier : échelle et effet 3D sur la même ligne (Dessin et Présentation)
 - Dessin : Échelle 1 : et Effet 3D sur une seule ligne dans le bandeau du haut (CSS `.reglages-entete`, plus de libellé au-dessus de la case).
 - Présentation : Effet 3D et Texte (mm) sur une ligne ; les boutons Gabarit + / Suppr. gab. sont en icônes seules pour que la ligne tienne. Le bouton PDF passe à la ligne suivante faute de place (à revoir si gênant).
 - Vérifié en Playwright (captures Dessin et Présentation).

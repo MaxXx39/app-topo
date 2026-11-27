@@ -21,7 +21,7 @@ export function reglagesElements(f = {}) {
     cartoucheActif: f.cartoucheActif !== false,
     nordStyle: STYLES_NORD.some(([c]) => c === f.nordStyle) ? f.nordStyle : 'boussole', nordTaille: borne(f.nordTaille, 50, 250, 100), nordCouleur: couleurDe(f.nordCouleur, '#1b2b36'),
     barreStyle: STYLES_BARRE.some(([c]) => c === f.barreStyle) ? f.barreStyle : 'alternee', barreTaille: borne(f.barreTaille, 50, 250, 100), barreLongueur: borne(f.barreLongueur, 0, 5000, 0), barreCouleur: couleurDe(f.barreCouleur, '#1b2b36'),
-    legendeTaille: borne(f.legendeTaille, 60, 200, 100), legendeColonnes: COLONNES_LEGENDE.some(([c]) => c === f.legendeColonnes) ? f.legendeColonnes : 'auto',
+    barreFond: f.barreFond !== false, legendeTaille: borne(f.legendeTaille, 60, 200, 100), legendeColonnes: COLONNES_LEGENDE.some(([c]) => c === f.legendeColonnes) ? f.legendeColonnes : 'auto',
   };
 }
 

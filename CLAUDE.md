@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.339.0)
+## Fonctionnalités (état à la 0.340.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,7 +137,8 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
 
-## Plans de chantier : état (26.11, 0.339.0)
+## Plans de chantier : état (26.11, 0.340.0)
+- **0.340.0** : petits titres sur les groupes d'outils ; nom du projet dans le bandeau Gestion/Dessin/Présentation ; échelle avec ou sans fond blanc ; Effet 3D / Texte corrigés en Présentation.
 - **0.339.0** : Échelle et Effet 3D sur une même ligne (Dessin et Présentation).
 - **0.338.0** : Ortho (Repère garde Ortho, angle à côté) ; Échelle + Effet 3D dans le bandeau du haut ; Répliquer à côté de Fond/Plan/Points ; **fenêtre Phases** (⚙ : monter, descendre, dupliquer, supprimer, ajouter) ; Ctrl+C / Ctrl+V dans le même plan ; bandeau du bas réduit sans sélection ; panneau de droite repliable ; **gabarits de présentation** (projet). Hypothèses à valider : dupliquer une phase copie ses éléments ; gabarits au niveau du projet.
 - **0.337.0 (corrections du 26.11)** : phases en liste + ⚙ dans le bandeau ; bandeau mince ; Présentation : Format / Sens / Échelle en haut, bande du bas titrée ; Ortho (Repère / angle / boutons allumés) ; **menus Fond / Plan comme Lever** (Trans., Geler / Isoler / Tout réafficher, couleur par plan) ; cases Cartouche / Situation / Flèche nord / Échelle / Légende avec popups (clic direct sur la feuille) et styles (nord ×4, échelle ×4). Voir `docs/historique/versions.md`.
