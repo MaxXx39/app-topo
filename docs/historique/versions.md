@@ -1,6 +1,10 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.344.0 — Un projet, plusieurs affaires ; Présentation comme Dessin (demandes du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.345.0 — Plans de chantier : pastille d'affaire, Couleurs près des phases (demandes du 27.11)
+- La pastille d'affaire était cachée dans Plans de chantier (son bandeau commun y est masqué) : elle est maintenant dans son en-tête, à côté du nom du projet, et ouvre le même menu. Fusion de projets : tous les projets de l'appareil sont listés ; pastille plus petite sur téléphone.
+- Le choix « Couleurs : celles des objets / une par phase » quitte le panneau Élément et passe dans le bandeau du haut, à côté des phases.
+
+## 0.344.0 — Un projet, plusieurs affaires ; Présentation comme Dessin (demandes du 27.11)
 - **Affaires** (`src/topo/affaires.js`, 11 tests) : un projet peut avoir plusieurs affaires (même désignation, autre numéro). La 1re = celle du cartouche (`principale`), les autres dans `projet.affaires`. Levés, surfaces, listes « autres », plans DXF / PDF, dessins, réseaux, plans de chantier, plateformes portent `affaireId` (sans = principale ; surface / liste d'un levé = suit son levé). L'affaire choisie est un réglage de CHAQUE tablette (`topo-affaire`), « Toutes » au départ. Elle filtre comme le sous-dossier (`estMontre`, `estDansSousDossier`, `idsHorsSousDossier`).
 - **Pastille 📋 dans l'en-tête** (`#pastille-affaire`) et recopiée dans le bandeau de chaque appli plein écran (`cadre-page.js`). Menu : choisir (tous les modes), ajouter / changer le numéro / fusionner un autre projet / retirer une affaire vide (Expert). Un nouvel élément prend l'affaire choisie. Changer un élément d'affaire : pastille de dossier de l'élément → « Changer d'affaire ».
 - Le numéro d'affaire du cartouche, des PDF, du titre et des noms de fichiers suit l'affaire choisie (`cartoucheActif`).

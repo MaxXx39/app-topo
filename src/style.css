@@ -15373,3 +15373,6 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 /* 0.344.0 : longues listes (fusion de projets) : la fenêtre défile ; pastille d'affaire plus petite sur téléphone */
 .fenetre-choix { max-height: 90vh; overflow-y: auto; }
 body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; padding: 2px 8px; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 0.345.0 : pastille d'affaire dans l'en-tête de Plans de chantier (le bandeau commun y est caché) */
+.pastille-affaire-chantier { margin-left: 4px; font: inherit; font-size: 0.8rem; font-weight: 700; padding: 3px 12px; white-space: nowrap; background: #1d4ed8; color: #fff; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 999px; cursor: pointer; }
+.pastille-affaire-chantier[hidden] { display: none; }

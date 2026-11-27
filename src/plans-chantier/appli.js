@@ -216,7 +216,21 @@ export function ouvrirPlansChantier({
   };
 
   let fermee = false;
+  // 0.345.0 : l'affaire choisie se voit et se change aussi ici (copie de la pastille de l'en-tête de l'appli).
+  function majPastilleAffaire() {
+    const source = document.querySelector('#pastille-affaire');
+    const bouton = page.querySelector('[data-affaire-chantier]');
+    if (!bouton || !source) return;
+    bouton.hidden = source.hidden;
+    bouton.textContent = source.textContent;
+    const nom = page.querySelector('.nom-projet-entete');
+    if (nom) nom.textContent = titreProjet(leProjet());
+  }
+  page.addEventListener('click', (ev) => { if (ev.target.closest('[data-affaire-chantier]')) document.querySelector('#pastille-affaire')?.click(); });
+  document.addEventListener('topo-affaire-changee', majPastilleAffaire);
+
   function fermer() {
+    document.removeEventListener('topo-affaire-changee', majPastilleAffaire);
     fermee = true;
     vue?.detruire();
     feuille?.observateur?.disconnect();
@@ -394,6 +408,7 @@ export function ouvrirPlansChantier({
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <span class="aide-entete-chantier">${bulle('plansChantier')}</span>
         <span class="nom-projet-entete" title="Projet ouvert">${echapper(titreProjet(leProjet()))}</span>
+        <button type="button" class="pastille-affaire-page pastille-affaire-chantier" data-affaire-chantier hidden></button>
         <nav class="etapes-calage" aria-label="Parties">
           <button type="button" data-ecran="liste" class="${etat.ecran === 'liste' ? 'actif' : ''}">Gestion</button>
           <button type="button" data-ecran="dessin" class="${etat.ecran === 'dessin' ? 'actif' : ''}" ${plan() ? '' : 'disabled'}>Dessin</button>
@@ -405,6 +420,7 @@ export function ouvrirPlansChantier({
       <main class="contenu-calage ${etat.ecran !== 'liste' ? 'en-calage' : ''}">${etat.ecran === 'dessin' ? htmlDessin() : etat.ecran === 'feuille' ? htmlFeuille() : htmlListe()}</main>`;
     majEnteteOutils();
     if (etat.ecran === 'dessin') monterVue();
+    majPastilleAffaire();
     if (etat.ecran === 'feuille') monterFeuille();
   }
 
@@ -2152,7 +2168,8 @@ export function ouvrirPlansChantier({
     if (!p) return '';
     return `<span class="phases-entete groupe-tete tete-phase"><span class="mini-titre">Phase</span><label class="champ-bande" title="Phase dans laquelle on dessine"><span>Phase</span>
       <select data-phase-select>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === p.phaseActive ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
-      <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button></span>`;
+      <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button>
+      <label class="champ-bande" title="Couleur des éléments : celle de chaque objet, ou une couleur par phase"><span>Couleurs</span><select data-champ="couleurs"><option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option><option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une par phase</option></select></label></span>`;
   }
 
   /** Redessine seulement la liste des phases du bandeau (nom, phase active, menu ouvert). */
@@ -2611,9 +2628,6 @@ export function ouvrirPlansChantier({
     majPhasesEntete();
     zone.innerHTML = `
       <h3>Plan</h3>
-      <label class="champ-calage"><span>Couleurs</span><select data-champ="couleurs">
-        <option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option>
-        <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
       ${choisi}
       ${ficheGrueHtml(o)}
       <button type="button" class="bouton-secondaire" data-action="modeles-grues">Modèles de grues…</button>
