@@ -15386,3 +15386,23 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 
 /* 0.348.0 : pastille d'affaire d'un élément = un petit rond avec un petit texte (catégorie) */
 .pastille-affaire-el { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; border-radius: 50%; margin: 1px 4px 1px 0; color: #fff; font-size: 0.55rem; font-weight: 500; line-height: 1; letter-spacing: -0.2px; vertical-align: middle; }
+
+/* 0.349.0 : menus Fond / Plan / Points / Surface plus serrés (moins d'espace entre les lignes) */
+.menu-plans-dxf, .menu-calques { padding: 2px 8px; font-size: 0.85rem; }
+.menu-plans-dxf .ligne-menu-plan, .menu-calques .ligne-menu-plan { padding: 1px 0; gap: 6px; }
+.menu-plans-dxf .reglette-transparence { margin: 0; padding: 2px 8px; gap: 2px; }
+.menu-plans-dxf .calques-dxf-menu { gap: 0; margin: 0 0 3px 24px; }
+.menu-plans-dxf .case, .menu-calques .case { min-height: 0; padding: 1px 0; }
+.menu-listes-points .categorie-affichage { margin: 3px 0; }
+.menu-listes-points .categorie-affichage > summary { min-height: 34px; }
+.menu-listes-points .liste-depliable > summary { min-height: 34px; }
+.menu-listes-points .reglages-liste { padding: 2px 6px; gap: 0; }
+.menu-listes-points .couleur-liste-menu { margin: 2px 0; }
+.ligne-trans-calques { display: flex; align-items: center; gap: 4px; flex: 1 1 100%; min-width: 0; }
+.ligne-trans-calques .reglette-transparence { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.ligne-trans-calques .reglette-transparence input { flex: 1 1 0; min-width: 0; width: auto; }
+.ligne-trans-calques .fleche-calques-dxf { min-width: 26px; font-size: 1rem; padding: 0; }
+/* Points : le nom du levé en haut (un peu remonté), sa nature dessous, texte plus petit et non gras */
+.bloc-nom-liste { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1 1 auto; line-height: 1.15; margin-top: -2px; }
+.bloc-nom-liste .nom-liste-menu { font-size: 0.8rem; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bloc-nom-liste .etiquette-nature { margin: 1px 0 0; font-size: 0.52rem; font-weight: 600; padding: 0 4px; }

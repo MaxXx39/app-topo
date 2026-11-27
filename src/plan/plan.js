@@ -2232,7 +2232,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const ligne = (l) => {
       const reglages = REGLAGES_LISTE[l.section] ?? [];
       const entete = `<input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} aria-label="Afficher ${echapper(l.nom)}" />
-          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}${htmlDossiersCliquables(l.id, l.sousDossiers, l.pastilles)}`;
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="bloc-nom-liste"><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}</span>${htmlDossiersCliquables(l.id, l.sousDossiers, l.pastilles)}`;
       if (reglages.length === 0 && !l.couleurModifiable) return `<div class="ligne-menu-plan"><label class="oeil-plan">${entete}</label></div>`;
       const cases = reglages.map(([cle, titre, n]) => `<label class="case ${n ? `seulement-${n}` : ''}"><input type="checkbox" data-reglage-liste="${cle}" data-id="${l.id}" ${reglageListe(cle, l.id) ? 'checked' : ''} /> ${titre}</label>`).join('');
       const couleur = l.couleurModifiable ? `<div class="couleur-liste-menu"><span>Couleur</span>${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}</div>` : '';
@@ -2410,9 +2410,9 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           ${htmlNomDePlan(plan.nom)}${htmlDossiersCliquables(plan.id, plan.sousDossiers, plan.pastilles)}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
-        <label class="reglette-transparence reglette-plan"><b>Trans.</b>
+        <div class="ligne-trans-calques"><label class="reglette-transparence reglette-plan"><b>Trans.</b>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
-        ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
+        ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}</div>
       </div>
       ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.ifc && coupeIfc ? htmlCoupeIfc(coupeIfc) : ''}${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
   }

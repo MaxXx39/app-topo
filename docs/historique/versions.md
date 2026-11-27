@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.348.0 — Pastilles d'affaire visibles sur les éléments ; pastilles de dossier plus petites
+Lire seulement la section utile : `grep -n '^## 0.349.0 — Menus Fond / Plan / Points / Surface plus serrés (demande du 27.11)
+- Plan : la flèche ▾ des calques est à droite de la réglette Trans. (plus sur une ligne à part).
+- Les 4 menus : marges, espaces entre lignes et hauteur des titres réduits.
+- Points : le nom du levé est un peu remonté et la nature est dessous (petite étiquette) ; texte du nom plus petit, sans gras (`.bloc-nom-liste`).
+- Vérifié sur une maquette dans la page (pas sur de vraies données).
+
+## 0.348.0 — Pastilles d'affaire visibles sur les éléments ; pastilles de dossier plus petites
 - Un élément (plan, liste de points, surface…) qui porte des pastilles d'affaire montre un **petit rond** de la couleur de la catégorie avec ses 3 premières lettres (GC, BÂT, Aut…) : page Plans / Gérer, menus Afficher (Plan, Points, Surface). Couleurs fixes pour ACQ, BÂT, GC, NAT, T/R, Autres ; les catégories ajoutées ont une couleur tirée de leur nom. `topo/affaires.js` : `pastillesAffaireHtml`.
 - Pastilles de **dossier** : environ 20 % plus petites, texte non gras (500 au lieu de 800).
 - Rien n'est affiché pour un élément sans pastille (visible partout).
