@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.338.0 — Plans de chantier : suite de l'essai du 26.11 (Ortho, phases, copier-coller, gabarits, bandeau)
+Lire seulement la section utile : `grep -n '^## 0.339.0 — Plans de chantier : échelle et effet 3D sur la même ligne (Dessin et Présentation)
+- Dessin : Échelle 1 : et Effet 3D sur une seule ligne dans le bandeau du haut (CSS `.reglages-entete`, plus de libellé au-dessus de la case).
+- Présentation : Effet 3D et Texte (mm) sur une ligne ; les boutons Gabarit + / Suppr. gab. sont en icônes seules pour que la ligne tienne. Le bouton PDF passe à la ligne suivante faute de place (à revoir si gênant).
+- Vérifié en Playwright (captures Dessin et Présentation).
+
+## 0.338.0 — Plans de chantier : suite de l'essai du 26.11 (Ortho, phases, copier-coller, gabarits, bandeau)
 - **Ortho** : Repère garde Ortho allumé ; l'angle (°) est à côté de Repère.
 - **Échelle et Effet 3D** passent dans le bandeau du haut (Dessin) ; **Effet 3D + Texte (mm)** dans le bandeau de Présentation. Texte (mm) reste dans la bande du bas en Dessin.
 - **Répliquer** est à côté de Fond / Plan / Points (Présentation), retiré du bandeau.

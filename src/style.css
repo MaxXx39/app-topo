@@ -15283,3 +15283,11 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .repli-elements > summary::marker { color: #b45309; }
 .outils-entete .groupe-gabarit { display: inline-flex; align-items: center; gap: 4px; padding-right: 6px; border-right: 1px solid rgba(255, 255, 255, 0.25); }
 .outils-entete .groupe-gabarit select { max-width: 120px; }
+
+/* 0.339.0 : échelle et effet 3D sur la même ligne (Dessin et Présentation) */
+.outils-entete .reglages-entete { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 10px; }
+.outils-entete .reglages-entete > label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
+.outils-entete .reglages-entete input[type="text"] { width: 64px; }
+.outils-entete .groupe-gabarit .outil-ruban span { display: none; }
+.outils-entete .groupe-gabarit select { max-width: 96px; }
+.outils-entete .groupe-gabarit .outil-ruban { min-width: 36px; height: 40px; }
