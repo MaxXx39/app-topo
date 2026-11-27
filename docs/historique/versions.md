@@ -1,6 +1,9 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.346.0 — Affaires par catégorie et pastilles (refonte du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.347.0 — Matériel : planning des articles, la désignation seule
+- Le numéro était écrit deux fois (pastille + désignation, qui contient déjà le numéro). Maintenant la désignation seule, dans la pastille de couleur. La vue année garde le numéro seul.
+
+## 0.346.0 — Affaires par catégorie et pastilles (refonte du 27.11)
 - **Modèle** (`topo/affaires.js`, 10 tests) : chaque affaire = numéro + UNE catégorie (ACQ, BÂT, GC, NAT, T/R, Autres ; liste partagée par Drive, partie `categoriesAffaires`, modifiable par l'Expert ; « BÂT » avec accent car le sous-dossier BAT existe). Une seule affaire par catégorie dans un projet. Un élément porte des **pastilles** (`pastilles: ['GC','BÂT']`) : sans pastille = visible dans toutes les affaires ; avec = seulement dans les affaires de ces catégories. Une surface / liste d'un levé suit son levé. `affaireId` de la 0.344.0 est migré en pastille (`migrerAffaires` dans `completerProjet`).
 - **Qui voit quoi** : l'Expert a « Toutes » ou une affaire (pastille 📋 ▾ cliquable), règle les pastilles d'un élément (dossiers de l'élément › « Changer les pastilles d'affaire »), ajoute / modifie / retire / fusionne. Base et Intermédiaire sont dans UNE affaire fixée par la ligne d'« Ouvrir » (un projet à plusieurs affaires apparaît une fois par affaire) ; pastille non cliquable.
 - Création et fusion : numéro + catégorie ; l'affaire de départ reçoit sa catégorie au 1er ajout. Un nouvel élément reçoit la pastille de l'affaire choisie (« Toutes » : aucune).

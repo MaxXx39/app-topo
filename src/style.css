@@ -15379,3 +15379,5 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 /* 0.346.0 : affaires par catégorie */
 .etiquette-affaire { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 999px; background: #1d4ed8; color: #fff; font-size: 0.72rem; font-weight: 700; }
 .pastille-entete.pastille-affaire.pastille-fixe { cursor: default; }
+/* 0.347.0 : planning des articles : la désignation seule, dans la pastille de couleur (plus de numéro en double) */
+.nom-pl .pastille-article { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 0.8rem; }
