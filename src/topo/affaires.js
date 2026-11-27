@@ -1,16 +1,48 @@
-// Affaires d'un projet (0.344.0, demande du 27.11) : UN projet, plusieurs affaires (même désignation, numéro d'affaire différent :
-// terrassement GC 8 114, bâtiment béton 10 203…). Fonctionne comme les sous-dossiers :
-// - la 1re affaire est celle du cartouche (projet.cartouche.affaire, id « principale ») ; les autres sont dans projet.affaires
-//   [{ id, numero }] ;
-// - un élément (levé, surface, plan DXF / PDF, dessin, réseau, plan de chantier, plateforme) porte `affaireId` ; sans `affaireId`,
-//   il est dans l'affaire principale ; une surface ou une liste « autres » issue d'un levé suit son levé ;
-// - l'affaire choisie est un réglage de CHAQUE tablette (« Toutes » = rien n'est filtré) ;
-// - un nouvel élément est rangé dans l'affaire choisie ; on peut le changer d'affaire (oubli, changement) ;
-// - le numéro d'affaire du cartouche et des exports est celui de l'affaire choisie.
+// Affaires d'un projet (0.344.0, refait en 0.346.0 d'après la demande du 27.11) : UN projet, plusieurs affaires (même
+// désignation, numéro d'affaire différent) ; chaque affaire a UNE catégorie (ACQ, BÂT, GC, NAT, T/R, Autres… liste partagée par
+// Drive, modifiable par l'Expert) et il y a au plus une affaire par catégorie dans un projet.
+// - la 1re affaire est celle du cartouche (projet.cartouche.affaire, id « principale », catégorie projet.categoriePrincipale) ;
+//   les autres sont dans projet.affaires [{ id, numero, categorie }] ;
+// - un élément (levé, surface, plan DXF / PDF, dessin, réseau, plan de chantier, plateforme) porte des PASTILLES = des catégories :
+//   `pastilles: ['GC', 'BÂT']`. Sans pastille, il se voit dans toutes les affaires. Avec pastilles, il ne se voit que dans les
+//   affaires de ces catégories. Une surface ou une liste « autres » issue d'un levé suit son levé ;
+// - Expert : voit tout (« Toutes ») ou une affaire, change les pastilles ; Base et Intermédiaire : une seule affaire, fixée par la
+//   ligne choisie dans « Ouvrir », sans pouvoir en changer ;
+// - un nouvel élément reçoit la pastille de l'affaire choisie ; le numéro d'affaire du cartouche et des exports suit l'affaire choisie.
 import { nouvelIdentifiant } from './surface.js';
+import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
 export const PRINCIPALE = 'principale';
 export const TOUTES = '';
+
+/** Catégories de départ (liste modifiable par l'Expert, partagée par Drive). « BÂT » avec accent : le sous-dossier BAT existe déjà. */
+export const CATEGORIES_DEPART = ['ACQ', 'BÂT', 'GC', 'NAT', 'T/R', 'Autres'];
+
+/** Texte ou liste → noms de catégories propres (sans doublon, 12 signes au plus). */
+export function nettoyerCategories(texteOuListe) {
+  const morceaux = Array.isArray(texteOuListe) ? texteOuListe : String(texteOuListe ?? '').split(/[,;\n]/);
+  const vus = new Set();
+  const noms = [];
+  for (const m of morceaux) {
+    const nom = String(m).trim().slice(0, 12);
+    if (nom && !vus.has(nom.toLowerCase())) {
+      vus.add(nom.toLowerCase());
+      noms.push(nom);
+    }
+  }
+  return noms;
+}
+
+/** Catégories proposées : la liste partagée, sinon celles de départ. */
+export function categoriesAffaires(listes = lireListesPartagees()) {
+  const propres = nettoyerCategories(listes?.categoriesAffaires ?? []);
+  return propres.length > 0 ? propres : [...CATEGORIES_DEPART];
+}
+
+/** Enregistre la liste des catégories (envoyée par Drive à tous les appareils). */
+export function enregistrerCategoriesAffaires(texteOuListe) {
+  ecrireListesPartagees({ ...lireListesPartagees(), categoriesAffaires: nettoyerCategories(texteOuListe) });
+}
 
 /** Listes du projet dont les éléments se rangent par affaire : [clé du projet, genre]. */
 const GENRES = [['leves', 'leve'], ['surfaces', 'surface'], ['autres', 'autre'], ['plansDxf', 'plan'], ['dessins', 'dessin'], ['canalisations', 'reseau'], ['plansChantier', 'planChantier'], ['plateformes', 'plateforme']];
@@ -23,7 +55,7 @@ export function elementsDesAffaires(projet) {
 /** Affaires du projet : la principale (numéro du cartouche) puis les autres. */
 export function affairesDe(projet) {
   const numero = String(projet?.cartouche?.affaire ?? '').trim();
-  return [{ id: PRINCIPALE, numero: numero || 'Affaire 1', principale: true }, ...(projet?.affaires ?? [])];
+  return [{ id: PRINCIPALE, numero: numero || 'Affaire 1', categorie: projet?.categoriePrincipale ?? '', principale: true }, ...(projet?.affaires ?? [])];
 }
 
 /** Le projet a-t-il plusieurs affaires ? */
@@ -34,47 +66,69 @@ export function numeroDeLAffaire(projet, id) {
   return affairesDe(projet).find((a) => a.id === id)?.numero ?? null;
 }
 
-/** Ajoute une affaire (numéro tapé, sans doublon). Renvoie l'affaire ; lève une erreur lisible sinon. */
-export function ajouterAffaire(projet, numero) {
+/** Affaire par son identifiant, ou null. */
+export const affaireParId = (projet, id) => affairesDe(projet).find((a) => a.id === id) ?? null;
+
+function verifier(projet, id, numero, categorie) {
   const n = String(numero ?? '').trim().slice(0, 30);
+  const c = String(categorie ?? '').trim();
   if (!n) throw new Error('Tapez le numéro de l\'affaire.');
-  if (affairesDe(projet).some((a) => a.numero.toLowerCase() === n.toLowerCase())) throw new Error(`L'affaire « ${n} » existe déjà dans ce projet.`);
-  const affaire = { id: nouvelIdentifiant(), numero: n };
+  if (!c) throw new Error('Choisissez la catégorie de l\'affaire (GC, BÂT…).');
+  if (affairesDe(projet).some((a) => a.id !== id && a.numero.toLowerCase() === n.toLowerCase())) throw new Error(`L'affaire « ${n} » existe déjà dans ce projet.`);
+  if (affairesDe(projet).some((a) => a.id !== id && a.categorie.toLowerCase() === c.toLowerCase())) throw new Error(`Ce projet a déjà une affaire « ${c} » (une seule par catégorie).`);
+  return { n, c };
+}
+
+/** Ajoute une affaire (numéro + catégorie, sans doublon). Renvoie l'affaire ; lève une erreur lisible sinon. */
+export function ajouterAffaire(projet, numero, categorie) {
+  const { n, c } = verifier(projet, null, numero, categorie);
+  const affaire = { id: nouvelIdentifiant(), numero: n, categorie: c };
   projet.affaires = [...(projet.affaires ?? []), affaire];
   return affaire;
 }
 
-/** Change le numéro d'une affaire (la principale : le numéro du cartouche). Renvoie le même texte d'erreur que ajouterAffaire. */
-export function renommerAffaire(projet, id, numero) {
-  const n = String(numero ?? '').trim().slice(0, 30);
-  if (!n) throw new Error('Tapez le numéro de l\'affaire.');
-  if (affairesDe(projet).some((a) => a.id !== id && a.numero.toLowerCase() === n.toLowerCase())) throw new Error(`L'affaire « ${n} » existe déjà dans ce projet.`);
+/**
+ * Change le numéro et / ou la catégorie d'une affaire (la principale : numéro du cartouche). Les pastilles des éléments
+ * qui portaient l'ancienne catégorie prennent la nouvelle. Lève une erreur lisible si c'est refusé.
+ */
+export function modifierAffaire(projet, id, numero, categorie) {
+  const { n, c } = verifier(projet, id, numero, categorie);
+  const trouvee = affaireParId(projet, id);
+  if (!trouvee) return false;
+  const avant = { ...trouvee }; // copie : l'affaire est modifiée juste après
   if (id === PRINCIPALE) {
     projet.cartouche = { ...(projet.cartouche ?? {}), affaire: n };
-    return true;
+    projet.categoriePrincipale = c;
+  } else {
+    const a = projet.affaires.find((x) => x.id === id);
+    a.numero = n;
+    a.categorie = c;
   }
-  const a = (projet.affaires ?? []).find((x) => x.id === id);
-  if (!a) return false;
-  a.numero = n;
+  if (avant.categorie && avant.categorie !== c) {
+    for (const { element } of elementsDesAffaires(projet)) {
+      if (Array.isArray(element.pastilles) && element.pastilles.includes(avant.categorie)) element.pastilles = [...new Set(element.pastilles.map((x) => (x === avant.categorie ? c : x)))];
+    }
+  }
   return true;
 }
 
-/** Retire une affaire VIDE (sans élément). Renvoie un texte d'erreur ou null. */
+/** Retire une affaire VIDE (aucun élément n'a sa pastille). Renvoie un texte d'erreur ou null. */
 export function retirerAffaire(projet, id) {
   if (id === PRINCIPALE) return 'L\'affaire principale ne peut pas être retirée.';
-  if (elementsDesAffaires(projet).some(({ genre, element }) => affaireDe(projet, element, genre) === id)) return 'Cette affaire contient encore des éléments : changez-les d\'affaire d\'abord.';
-  projet.affaires = (projet.affaires ?? []).filter((a) => a.id !== id);
+  const a = affaireParId(projet, id);
+  if (!a) return 'Affaire introuvable.';
+  if (elementsDesAffaires(projet).some(({ element }) => (element.pastilles ?? []).includes(a.categorie))) return 'Des éléments ont encore la pastille de cette affaire : changez leurs pastilles d\'abord.';
+  projet.affaires = (projet.affaires ?? []).filter((x) => x.id !== id);
   return null;
 }
 
-/** Affaire d'un élément : la sienne, sinon celle de son levé (surface / liste « autres » issue d'un levé), sinon la principale. */
-export function affaireDe(projet, element, genre = '') {
+/** Pastilles d'un élément (catégories) : les siennes, sinon celles de son levé (surface / liste « autres » issue d'un levé). */
+export function pastillesDe(projet, element, genre = '') {
   if ((genre === 'surface' || genre === 'autre') && element?.leveId) {
     const leve = (projet?.leves ?? []).find((l) => l.id === element.leveId);
-    if (leve) return leve.affaireId ?? PRINCIPALE;
+    if (leve) return leve.pastilles ?? [];
   }
-  const id = element?.affaireId ?? PRINCIPALE;
-  return id === PRINCIPALE || (projet?.affaires ?? []).some((a) => a.id === id) ? id : PRINCIPALE; // affaire disparue : retour à la principale
+  return element?.pastilles ?? [];
 }
 
 // --- Affaire choisie sur CETTE tablette ---
@@ -85,9 +139,13 @@ export function definirAffaire(id) {
   choisie = id || TOUTES;
 }
 
-/** L'élément est-il dans l'affaire choisie (Toutes : oui) ? */
+/** L'élément est-il visible dans l'affaire choisie ? Toutes : oui ; sans pastille : oui ; sinon la catégorie de l'affaire doit y être. */
 export function dansAffaire(projet, element, genre = '', choix = choisie) {
-  return !choix || affaireDe(projet, element, genre) === choix;
+  if (!choix) return true;
+  const pastilles = pastillesDe(projet, element, genre);
+  if (pastilles.length === 0) return true;
+  const categorie = affaireParId(projet, choix)?.categorie;
+  return Boolean(categorie) && pastilles.includes(categorie);
 }
 
 /** Numéro d'affaire à écrire sur les exports et le cartouche : celui de l'affaire choisie, sinon celui de l'affaire principale. */
@@ -103,50 +161,65 @@ export function cartoucheActif(projet, choix = choisie) {
   return { ...c, affaire: numeroAffaireActif(projet, choix) };
 }
 
-/** Change un élément d'affaire (oubli, changement). Renvoie vrai si l'élément a été trouvé. */
-export function deplacerVersAffaire(projet, idElement, affaireId) {
+/** Change les pastilles d'un élément (Expert). Vide = visible partout. Renvoie vrai si l'élément a été trouvé. */
+export function definirPastilles(projet, idElement, pastilles) {
   const trouve = elementsDesAffaires(projet).find(({ element }) => element.id === idElement);
-  if (!trouve || numeroDeLAffaire(projet, affaireId) === null) return false;
-  if (affaireId === PRINCIPALE) delete trouve.element.affaireId;
-  else trouve.element.affaireId = affaireId;
+  if (!trouve) return false;
+  const liste = nettoyerCategories(pastilles);
+  if (liste.length) trouve.element.pastilles = liste;
+  else delete trouve.element.pastilles;
   return true;
 }
 
-/** Les éléments encore sans affaire reçoivent l'affaire choisie (nouveaux éléments) : `connus` = ids déjà là. Renvoie le nombre rangé. */
+/** Les éléments encore sans pastille reçoivent celle de l'affaire choisie (nouveaux éléments) : `connus` = ids déjà là. Renvoie le nombre rangé. */
 export function rangerNouveauxDansAffaire(projet, connus, choix = choisie) {
+  const categorie = choix ? affaireParId(projet, choix)?.categorie : '';
   let nb = 0;
   for (const { element } of elementsDesAffaires(projet)) {
     if (connus.has(element.id)) continue;
     connus.add(element.id);
-    if (element.affaireId !== undefined || !choix || choix === PRINCIPALE) continue;
-    element.affaireId = choix;
+    if (element.pastilles !== undefined || !categorie) continue;
+    element.pastilles = [categorie];
+    nb += 1;
+  }
+  return nb;
+}
+
+/** Projets de la 0.344.0 : `affaireId` devient une pastille (la catégorie de cette affaire, sinon « Autres »). Renvoie le nombre changé. */
+export function migrerAffaires(projet) {
+  let nb = 0;
+  for (const a of projet?.affaires ?? []) if (a.categorie === undefined) a.categorie = '';
+  for (const { element } of elementsDesAffaires(projet)) {
+    if (element.affaireId === undefined) continue;
+    const categorie = affaireParId(projet, element.affaireId)?.categorie || 'Autres';
+    delete element.affaireId;
+    element.pastilles = [...new Set([...(element.pastilles ?? []), categorie])];
     nb += 1;
   }
   return nb;
 }
 
 /**
- * Fusionne le projet `source` dans `cible` : il devient une nouvelle affaire (son numéro d'affaire, ou son nom), tous ses levés,
- * surfaces, plans, dessins, réseaux, plans de chantier et plateformes passent dans `cible` avec cette affaire ; points de
- * contrôle, contrôles, implantations et points à implanter sont repris tels quels. Si des identifiants sont déjà pris
+ * Fusionne le projet `source` dans `cible` : il devient une nouvelle affaire (numéro et catégorie donnés), tous ses levés,
+ * surfaces, plans, dessins, réseaux, plans de chantier et plateformes passent dans `cible` avec la pastille de cette catégorie ;
+ * points de contrôle, contrôles, implantations et points à implanter sont repris tels quels. Si des identifiants sont déjà pris
  * (même projet, ou copie) : erreur, rien n'est changé. Renvoie { affaire, nombre }.
  */
-export function fusionnerProjet(cible, source) {
+export function fusionnerProjet(cible, source, numero, categorie) {
   const aPrendre = [...GENRES.map(([cle]) => cle), 'pointsControle', 'controles', 'implantations', 'aImplanter'];
   const pris = new Set(elementsDesAffaires(cible).map(({ element }) => element.id));
   for (const cle of aPrendre) for (const e of cible?.[cle] ?? []) pris.add(e.id);
   for (const cle of aPrendre) for (const e of source?.[cle] ?? []) {
     if (pris.has(e.id)) throw new Error('Fusion impossible : ce projet a des éléments en commun avec celui-ci (est-ce une copie ?).');
   }
-  const base = String(source?.cartouche?.affaire ?? '').trim() || String(source?.nom ?? '').trim() || 'Affaire fusionnée';
-  let numero = base;
-  for (let k = 2; affairesDe(cible).some((a) => a.numero.toLowerCase() === numero.toLowerCase()); k += 1) numero = `${base} (${k})`;
-  const affaire = ajouterAffaire(cible, numero);
+  const affaire = ajouterAffaire(cible, numero, categorie);
   let nombre = 0;
   for (const [cle] of GENRES) {
     const copies = JSON.parse(JSON.stringify(source?.[cle] ?? []));
-    // L'affaire de la source (ses propres sous-affaires comprises) devient l'affaire fusionnée.
-    for (const e of copies) e.affaireId = affaire.id;
+    for (const e of copies) {
+      delete e.affaireId;
+      e.pastilles = [affaire.categorie];
+    }
     cible[cle] = [...(cible[cle] ?? []), ...copies];
     nombre += copies.length;
   }

@@ -15,7 +15,7 @@ import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
-import { affairesDe, aPlusieursAffaires, ajouterAffaire, renommerAffaire, retirerAffaire, affaireChoisie, definirAffaire, rangerNouveauxDansAffaire, deplacerVersAffaire, fusionnerProjet, numeroDeLAffaire, cartoucheActif, affaireDe, elementsDesAffaires, retenirAffaire, lireAffaireRetenue, PRINCIPALE, TOUTES } from './topo/affaires.js';
+import { affairesDe, aPlusieursAffaires, ajouterAffaire, modifierAffaire, retirerAffaire, affaireChoisie, definirAffaire, rangerNouveauxDansAffaire, definirPastilles, pastillesDe, fusionnerProjet, numeroDeLAffaire, cartoucheActif, elementsDesAffaires, retenirAffaire, lireAffaireRetenue, categoriesAffaires, enregistrerCategoriesAffaires, nettoyerCategories, PRINCIPALE } from './topo/affaires.js';
 import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, changerCouleurSousDossierProjet, retirerSousDossierProjet, estDossierDuProjet, COULEURS_CHOIX, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF, precisionPdf } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
@@ -8103,6 +8103,16 @@ const actionsProjet = {
   // Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
   // « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet.
   nouveauProjet: () => creerNouveauProjet(),
+  // 0.346.0 : une ligne d'« Ouvrir » par affaire : l'affaire est retenue pour cette tablette, puis le projet s'ouvre (ou reste ouvert).
+  ouvrirAffaire: (id, idAffaire) => {
+    retenirAffaire(id, idAffaire);
+    if (projet?.id === id) {
+      choisirAffaire(idAffaire);
+      navigation?.ouvrirPage?.();
+      return undefined;
+    }
+    return actionsProjet.ouvrirProjet(id);
+  },
   ouvrirProjet: (id) => avecChargement(async () => {
     const lu = await stockage.lireProjet(id);
     if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
@@ -9178,14 +9188,14 @@ async function choisirDossiersDeLElement(id) {
   if (!trouve) return;
   const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
   const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
-  // 0.344.0 : projet à plusieurs affaires : on peut aussi changer l'élément d'affaire (oubli, changement).
-  if (aPlusieursAffaires(projet)) {
+  // 0.346.0 : projet à plusieurs affaires : l'Expert peut aussi régler les pastilles (catégories) de l'élément.
+  if (aPlusieursAffaires(projet) && aAcces('expert')) {
     const quoi = await demanderChoix({ titre: `« ${cible.nom ?? 'cet élément'} »`, boutons: [
       { cle: 'dossiers', texte: 'Changer les dossiers', principal: true },
-      { cle: 'affaire', texte: `Changer d'affaire (actuellement ${numeroDeLAffaire(projet, affaireDe(projet, trouve.element, trouve.genre)) ?? '?'})` },
+      { cle: 'pastilles', texte: `Changer les pastilles d'affaire (${pastillesDe(projet, trouve.element, trouve.genre).join(', ') || 'aucune : visible partout'})` },
     ] });
     if (!quoi) return;
-    if (quoi === 'affaire') return changerAffaireDeLElement(trouve.element, trouve.genre);
+    if (quoi === 'pastilles') return changerPastillesDeLElement(trouve.element, trouve.genre);
   }
   const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
   const cochees = await demanderCases({
@@ -9197,25 +9207,24 @@ async function choisirDossiersDeLElement(id) {
   modifie();
 }
 
-// --- Affaires (0.344.0, voir topo/affaires.js) ---
+// --- Affaires (0.344.0, refait en 0.346.0, voir topo/affaires.js) ---
 
-/** Change un élément d'affaire (la surface d'un levé suit son levé : on change le levé). */
-async function changerAffaireDeLElement(element, genre) {
+/** Pastilles (catégories d'affaire) d'un élément : Expert. Aucune pastille = visible dans toutes les affaires. */
+async function changerPastillesDeLElement(element, genre) {
   const cible = (genre === 'surface' || genre === 'autre') && element.leveId ? projet.leves.find((l) => l.id === element.leveId) ?? element : element;
-  const actuelle = affaireDe(projet, cible, genre);
-  const reponse = await demanderChoix({
-    titre: `Affaire de « ${cible.nom ?? 'cet élément'} »`,
-    boutons: affairesDe(projet).map((a) => ({ cle: a.id, texte: `${a.numero}${a.id === actuelle ? ' ✓' : ''}`, principal: a.id === actuelle })),
+  const actuelles = new Set(pastillesDe(projet, cible, genre));
+  const cochees = await demanderCases({
+    titre: `Pastilles de « ${cible.nom ?? 'cet élément'} » (aucune = visible partout)`,
+    options: affairesDe(projet).filter((a) => a.categorie).map((a) => ({ cle: a.categorie, texte: `${a.categorie} (${a.numero})`, coche: actuelles.has(a.categorie) })),
   });
-  if (!reponse || reponse === actuelle) return;
-  if (deplacerVersAffaire(projet, cible.id, reponse)) {
+  if (!cochees) return;
+  if (definirPastilles(projet, cible.id, cochees)) {
     modifie();
-    afficherMessage(`Déplacé dans l'affaire ${numeroDeLAffaire(projet, reponse)}`, 3000, { ok: true });
     choisirAffaire(affaireChoisie()); // l'élément peut disparaître de la vue (ou apparaître)
   }
 }
 
-/** Choisit l'affaire de cette tablette pour ce projet (« » = Toutes) et redessine tout. */
+/** Choisit l'affaire de cette tablette pour ce projet (« » = Toutes, Expert seulement) et redessine tout. */
 function choisirAffaire(id) {
   definirAffaire(id);
   retenirAffaire(projet.id, id);
@@ -9226,70 +9235,119 @@ function choisirAffaire(id) {
   mettreAJourEtatEntete();
 }
 
-/** Pastille de l'en-tête : l'affaire choisie (visible dès que le projet a plusieurs affaires, ou en Expert pour en ajouter). */
+/**
+ * Pastille de l'en-tête : l'affaire choisie. Visible dès que le projet a plusieurs affaires, ou en Expert pour en ajouter.
+ * Base / Intermédiaire : elle montre l'affaire sans pouvoir la changer (on change d'affaire par « Ouvrir »).
+ */
 function mettreAJourPastilleAffaire() {
   const pastille = document.querySelector('#pastille-affaire');
   if (!pastille) return;
-  const visible = aPlusieursAffaires(projet) || aAcces('expert');
+  const expert = aAcces('expert');
+  const visible = aPlusieursAffaires(projet) || expert;
   pastille.hidden = !visible;
   if (!visible) return;
   const choix = affaireChoisie();
-  pastille.textContent = `📋 ${choix ? numeroDeLAffaire(projet, choix) ?? 'Toutes' : 'Toutes'} ▾`;
-  pastille.title = 'Affaire choisie : touche pour en changer';
+  const a = choix ? affairesDe(projet).find((x) => x.id === choix) : null;
+  pastille.textContent = `📋 ${a ? a.categorie || a.numero : 'Toutes'}${expert ? ' ▾' : ''}`;
+  pastille.title = expert ? 'Affaire choisie : touche pour en changer' : `Affaire ${a?.numero ?? ''} : on change d'affaire par « Ouvrir »`;
+  pastille.classList.toggle('pastille-fixe', !expert);
   // Les applis plein écran (Calage, Matériel, Plans de chantier…) recopient cette pastille dans leur bandeau.
   document.dispatchEvent(new CustomEvent('topo-affaire-changee'));
 }
 
-/** Menu des affaires : choisir (tous les modes) ; ajouter, renommer, fusionner, retirer (Expert). */
+/** Choix d'une catégorie parmi celles qui ne sont pas déjà prises par une autre affaire (ou celle qu'on modifie). */
+async function choisirCategorie(titre, idAffaire = null) {
+  const prises = new Set(affairesDe(projet).filter((a) => a.id !== idAffaire && a.categorie).map((a) => a.categorie));
+  const libres = categoriesAffaires().filter((c) => !prises.has(c));
+  if (libres.length === 0) {
+    afficherMessage('Toutes les catégories sont prises : l\'Expert peut en ajouter (« Modifier la liste des catégories »).', 5000);
+    return null;
+  }
+  return demanderChoix({ titre, boutons: libres.map((c) => ({ cle: c, texte: c })) });
+}
+
+/** Menu des affaires (Expert) : choisir, ajouter, modifier, fusionner, retirer, liste des catégories. */
 async function ouvrirMenuAffaires() {
+  if (!aAcces('expert')) return; // Base / Intermédiaire : une seule affaire, choisie par « Ouvrir »
   const choix = affaireChoisie();
-  const expert = aAcces('expert');
+  const multiple = aPlusieursAffaires(projet);
   const boutons = [
-    ...(aPlusieursAffaires(projet) ? [{ cle: 'toutes', texte: `Toutes les affaires${choix === '' ? ' ✓' : ''}`, principal: choix === '' }] : []),
-    ...affairesDe(projet).filter(() => aPlusieursAffaires(projet)).map((a) => ({ cle: `a:${a.id}`, texte: `${a.numero}${a.id === choix ? ' ✓' : ''}`, principal: a.id === choix })),
-    ...(expert ? [{ cle: 'ajouter', texte: '＋ Ajouter une affaire…' }, { cle: 'renommer', texte: 'Changer le numéro d\'une affaire…' }, { cle: 'fusionner', texte: 'Fusionner un autre projet ici…' }, ...(aPlusieursAffaires(projet) ? [{ cle: 'retirer', texte: 'Retirer une affaire vide…' }] : [])] : []),
+    ...(multiple ? [{ cle: 'toutes', texte: `Toutes les affaires${choix === '' ? ' ✓' : ''}`, principal: choix === '' }] : []),
+    ...(multiple ? affairesDe(projet).map((a) => ({ cle: `a:${a.id}`, texte: `${a.categorie || '—'} · ${a.numero}${a.id === choix ? ' ✓' : ''}`, principal: a.id === choix })) : []),
+    { cle: 'ajouter', texte: '＋ Ajouter une affaire…' },
+    { cle: 'modifier', texte: 'Changer le numéro / la catégorie d\'une affaire…' },
+    { cle: 'fusionner', texte: 'Fusionner un autre projet ici…' },
+    ...(multiple ? [{ cle: 'retirer', texte: 'Retirer une affaire sans élément…' }] : []),
+    { cle: 'categories', texte: 'Modifier la liste des catégories…' },
   ];
-  if (boutons.length === 0) return;
-  const reponse = await demanderChoix({ titre: 'Affaires du projet', texte: aPlusieursAffaires(projet) ? '' : 'Ce projet n\'a qu\'une affaire. Ajoutez-en une pour y ranger un autre lot (même désignation, autre numéro).', boutons });
+  const reponse = await demanderChoix({ titre: 'Affaires du projet', texte: multiple ? '' : 'Ce projet n\'a qu\'une affaire. Ajoutez-en une pour y ranger un autre lot (même désignation, autre numéro, autre catégorie).', boutons });
   if (!reponse) return;
   if (reponse === 'toutes') return choisirAffaire('');
   if (reponse.startsWith('a:')) return choisirAffaire(reponse.slice(2));
   if (refuserEnLectureSeule()) return;
-  const choisirUne = async (titre) => demanderChoix({ titre, boutons: affairesDe(projet).map((a) => ({ cle: a.id, texte: a.numero })) });
+  const choisirUne = async (titre) => demanderChoix({ titre, boutons: affairesDe(projet).map((a) => ({ cle: a.id, texte: `${a.categorie || '—'} · ${a.numero}` })) });
   try {
     if (reponse === 'ajouter') {
+      // L'affaire de départ doit avoir une catégorie avant qu'on en ajoute une autre.
+      const principale = affairesDe(projet)[0];
+      if (!principale.categorie) {
+        const c0 = await choisirCategorie(`Catégorie de l'affaire ${principale.numero} (celle qui existe déjà)`, PRINCIPALE);
+        if (!c0) return;
+        modifierAffaire(projet, PRINCIPALE, principale.numero, c0);
+      }
       const numero = await demanderTexte({ titre: 'Numéro de la nouvelle affaire (ex. 10 203)' });
       if (!numero) return;
-      if (!(projet.affaires?.length)) afficherMessage(`Le numéro ${numeroDeLAffaire(projet, PRINCIPALE)} reste l'affaire de départ.`, 3500);
-      const a = ajouterAffaire(projet, numero);
+      const categorie = await choisirCategorie('Catégorie de la nouvelle affaire');
+      if (!categorie) return;
+      const a = ajouterAffaire(projet, numero, categorie);
       modifie();
       choisirAffaire(a.id);
-    } else if (reponse === 'renommer') {
+    } else if (reponse === 'modifier') {
       const id = await choisirUne('Quelle affaire ?');
       if (!id) return;
-      const numero = await demanderTexte({ titre: 'Nouveau numéro d\'affaire', valeur: numeroDeLAffaire(projet, id) ?? '' });
+      const actuelle = affairesDe(projet).find((x) => x.id === id);
+      const numero = await demanderTexte({ titre: 'Numéro d\'affaire', valeur: actuelle.numero });
       if (!numero) return;
-      renommerAffaire(projet, id, numero);
+      const categorie = await choisirCategorie('Catégorie de l\'affaire', id);
+      if (!categorie) return;
+      modifierAffaire(projet, id, numero, categorie);
       modifie();
       mettreAJourEtatEntete();
     } else if (reponse === 'retirer') {
-      const id = await choisirUne('Retirer quelle affaire (vide) ?');
+      const id = await choisirUne('Retirer quelle affaire (sans élément) ?');
       if (!id) return;
       const erreur = retirerAffaire(projet, id);
       if (erreur) return afficherMessage(erreur, 5000);
       if (affaireChoisie() === id) choisirAffaire('');
       modifie();
       mettreAJourEtatEntete();
+    } else if (reponse === 'categories') {
+      const texte = await demanderTexte({ titre: 'Catégories d\'affaire (séparées par des virgules)', valeur: categoriesAffaires().join(', ') });
+      if (texte == null) return;
+      const noms = nettoyerCategories(texte);
+      if (noms.length === 0) return afficherMessage('Il faut au moins une catégorie.', 4000);
+      enregistrerCategoriesAffaires(noms);
+      afficherMessage('Catégories enregistrées (partagées par Drive)', 3000);
     } else if (reponse === 'fusionner') {
       const autres = (await stockage.listerProjets()).filter((p) => p.id !== projet.id).sort((a, b) => titreProjet(a).localeCompare(titreProjet(b), 'fr'));
       if (autres.length === 0) return afficherMessage('Aucun autre projet sur cet appareil.', 4000);
       const idSource = await demanderChoix({ titre: 'Quel projet fusionner ici ?', texte: 'Tous les projets de cet appareil. Le projet choisi devient une affaire de ce projet ; l\'original reste sur l\'appareil.', boutons: autres.map((p) => ({ cle: p.id, texte: titreProjet(p) })) });
       if (!idSource) return;
       const source = autres.find((p) => p.id === idSource);
-      const { affaire, nombre } = fusionnerProjet(projet, source);
+      const principale = affairesDe(projet)[0];
+      if (!principale.categorie) {
+        const c0 = await choisirCategorie(`Catégorie de l'affaire ${principale.numero} (celle de ce projet)`, PRINCIPALE);
+        if (!c0) return;
+        modifierAffaire(projet, PRINCIPALE, principale.numero, c0);
+      }
+      const numero = await demanderTexte({ titre: 'Numéro d\'affaire du projet fusionné', valeur: String(source.cartouche?.affaire ?? '').trim() });
+      if (!numero) return;
+      const categorie = await choisirCategorie('Catégorie de l\'affaire fusionnée');
+      if (!categorie) return;
+      const { affaire, nombre } = fusionnerProjet(projet, source, numero, categorie);
       modifie();
       choisirAffaire(affaire.id);
-      afficherMessage(`${titreProjet(source)} fusionné : affaire ${affaire.numero} (${nombre} éléments)`, 5000, { ok: true });
+      afficherMessage(`${titreProjet(source)} fusionné : affaire ${affaire.numero} ${affaire.categorie} (${nombre} éléments)`, 5000, { ok: true });
     }
   } catch (erreur) {
     afficherMessage(erreur.message, 6000);
@@ -9774,7 +9832,10 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   appliquerAffichage(projet);
   // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
   definirSousDossier(lireChoix(projet));
-  definirAffaire(lireAffaireRetenue(projet)); // 0.344.0 : affaire choisie sur CETTE tablette
+  // 0.346.0 : Expert = « Toutes » au départ ; Base / Intermédiaire = toujours dans UNE affaire (celle de la ligne ouverte, sinon la 1re).
+  let affaireDeDepart = lireAffaireRetenue(projet);
+  if (aPlusieursAffaires(projet) && !aAcces('expert') && !affaireDeDepart) affaireDeDepart = affairesDe(projet)[0].id;
+  definirAffaire(affaireDeDepart);
   elementsAffaires = new Set(elementsDesAffaires(projet).map(({ element }) => element.id));
   elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.

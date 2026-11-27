@@ -89,6 +89,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     } else if (action === 'ouvrir') {
       panneau = null;
       actions.ouvrirProjet(id);
+    } else if (action === 'ouvrir-affaire') {
+      panneau = null;
+      actions.ouvrirAffaire(id, bouton.dataset.affaire);
     } else if (action === 'ouvrir-drive') {
       panneau = null;
       actions.ouvrirDrive(id);
@@ -262,6 +265,13 @@ function ligneDossier(projetId) {
 
 /** Une ligne : on la touche pour ouvrir le projet ; ⋮ ouvre le menu. */
 function ligneProjet(p, estOuvert, menu, partage) {
+  // 0.346.0 : un projet à plusieurs affaires apparaît une fois par affaire (Base / Intermédiaire entrent par l'une ou l'autre).
+  const affaires = p.local?.affaires ?? [];
+  if (affaires.length === 0) return ligneProjetUne(p, estOuvert, menu, partage, null, true);
+  return affaires.map((a, i) => ligneProjetUne(p, false, menu, partage, a, i === 0)).join('');
+}
+
+function ligneProjetUne(p, estOuvert, menu, partage, affaire, avecMenu) {
   const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
   const ou = `${p.local ? ICONES_LIGNE.tablette : ''}${p.drive ? ICONES_LIGNE.nuage : ''}`;
   const verrou = p.drive?.verrou;
@@ -272,14 +282,14 @@ function ligneProjet(p, estOuvert, menu, partage) {
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
     ailleurs ? `<span class="verrou-drive">${ICONES_LIGNE.cadenas} Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
-  const ouvrir = estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
+  const ouvrir = affaire ? `data-action="ouvrir-affaire" data-id="${p.id}" data-affaire="${echapper(affaire.id)}"` : estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
     <button type="button" class="infos-projet" ${ouvrir}>
-      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
+      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${affaire ? ` <span class="etiquette-affaire">${echapper(affaire.categorie || '—')} · ${echapper(affaire.numero)}</span>` : ''}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
       <span class="aide">${details}</span>
     </button>
-    <button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
-    ${menu ? `<div class="menu-projet">
+    ${avecMenu ? `<button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>` : ''}
+    ${menu && avecMenu ? `<div class="menu-projet">
       ${estOuvert ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="renommerProjet">renommer</button>' : ''}
       <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>
       ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>

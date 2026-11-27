@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.345.0 — Plans de chantier : pastille d'affaire, Couleurs près des phases (demandes du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.346.0 — Affaires par catégorie et pastilles (refonte du 27.11)
+- **Modèle** (`topo/affaires.js`, 10 tests) : chaque affaire = numéro + UNE catégorie (ACQ, BÂT, GC, NAT, T/R, Autres ; liste partagée par Drive, partie `categoriesAffaires`, modifiable par l'Expert ; « BÂT » avec accent car le sous-dossier BAT existe). Une seule affaire par catégorie dans un projet. Un élément porte des **pastilles** (`pastilles: ['GC','BÂT']`) : sans pastille = visible dans toutes les affaires ; avec = seulement dans les affaires de ces catégories. Une surface / liste d'un levé suit son levé. `affaireId` de la 0.344.0 est migré en pastille (`migrerAffaires` dans `completerProjet`).
+- **Qui voit quoi** : l'Expert a « Toutes » ou une affaire (pastille 📋 ▾ cliquable), règle les pastilles d'un élément (dossiers de l'élément › « Changer les pastilles d'affaire »), ajoute / modifie / retire / fusionne. Base et Intermédiaire sont dans UNE affaire fixée par la ligne d'« Ouvrir » (un projet à plusieurs affaires apparaît une fois par affaire) ; pastille non cliquable.
+- Création et fusion : numéro + catégorie ; l'affaire de départ reçoit sa catégorie au 1er ajout. Un nouvel élément reçoit la pastille de l'affaire choisie (« Toutes » : aucune).
+- **À essayer** : lignes d'« Ouvrir » par affaire sur tablette ; Base / Intermédiaire ; pastille dans les applis plein écran ; plans de chantier et plateformes pas encore filtrés dans leur liste.
+
+## 0.345.0 — Plans de chantier : pastille d'affaire, Couleurs près des phases (demandes du 27.11)
 - La pastille d'affaire était cachée dans Plans de chantier (son bandeau commun y est masqué) : elle est maintenant dans son en-tête, à côté du nom du projet, et ouvre le même menu. Fusion de projets : tous les projets de l'appareil sont listés ; pastille plus petite sur téléphone.
 - Le choix « Couleurs : celles des objets / une par phase » quitte le panneau Élément et passe dans le bandeau du haut, à côté des phases.
 
