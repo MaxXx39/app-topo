@@ -188,8 +188,10 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     const tt = 6 * mise.k * f; // taille des chiffres
     const coul = R.barreCouleur;
     const largeur = R.barreStyle === 'texte' ? 40 * mise.k * f : b.mm + 14 * mise.k * f;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillRect(mm(x - 2 * mise.k), mm(y - 6 * mise.k * f), mm(largeur), mm(9 * mise.k * f));
+    if (R.barreFond) { // 0.339.0 : fond blanc derrière l'échelle (réglable)
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(mm(x - 2 * mise.k), mm(y - 6 * mise.k * f), mm(largeur), mm(9 * mise.k * f));
+    }
     ctx.strokeStyle = coul;
     ctx.lineWidth = Math.max(1, 0.2 * s);
     if (R.barreStyle === 'texte') {

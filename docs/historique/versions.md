@@ -1,6 +1,29 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.338.0 — Plans de chantier : suite de l'essai du 26.11 (Ortho, phases, copier-coller, gabarits, bandeau)
+Lire seulement la section utile : `grep -n '^## 0.342.0 — Plans de chantier : groupes titrés (titre AU-DESSUS), même hauteur, bandeau sur une ligne
+- Demande du 27.11 : les titres verticaux de la 0.341.0 étaient « horribles » (rien à la même hauteur). Maintenant : petit titre horizontal AU-DESSUS de chaque groupe (grille CSS : titre en ligne 1, contenu en ligne 2), tous les groupes à la même hauteur.
+- **Bandeau du haut sur UNE ligne** en Dessin et en Présentation : groupes PHASE, AFFICHAGE (échelle, effet 3D), ÉDITION (Dessin) ; PHASE, PRÉSENTATION, FEUILLE + PDF (Présentation). **Gabarit et Affichage (Effet 3D, Texte) de Présentation sont passés dans la bande du bas.**
+- **Bande du bas de Présentation** : 5 groupes titrés (VUE, ROTATION, DÉTAILS, GABARIT, AFFICHAGE) ; boutons en icônes seules (l'info-bulle dit le détail) ; la bande est un peu plus haute. Elle défile horizontalement si l'écran est étroit (largeur 1098 / 1070 px à 1280).
+- Vérifié en Playwright (captures Dessin et Présentation). Pas vérifié : écrans plus étroits.
+
+## 0.341.0 — Plans de chantier : groupes titrés compacts dans le bandeau et les outils
+- Titres de groupe **verticaux** (texte tourné, ~10 px de large, aucune hauteur) sur les groupes d'outils de Dessin (TRACER, ANNOTER, SYMBOLES, CONSTRUCTION, COUPE) et sur les groupes du bandeau (PHASE, PRÉSENTATION, FEUILLE, GABARIT, AFFICHAGE, chacun d'une teinte).
+- Nom du plan masqué dans le bandeau (le nom du projet y est déjà). Dessin : bandeau sur une seule ligne. **Présentation reste sur 2 lignes à 1280 px** (trop de groupes) : à revoir si gênant (idée : Gabarit dans la bande du bas).
+- Vérifié en Playwright (captures Dessin et Présentation).
+
+## 0.340.0 — Plans de chantier : petits titres, nom du projet dans le bandeau, fond de l'échelle, 3D / texte en Présentation
+- Petits titres (MINI TITRE) sur les groupes d'outils de Dessin.
+- Nom du projet déplacé dans le bandeau Gestion / Dessin / Présentation ; le bandeau du haut de la page est masqué dans Plans de chantier (hauteur inchangée).
+- Échelle : case « Fond blanc derrière l'échelle » (`barreFond`, défaut oui).
+- Présentation : Effet 3D et Texte (mm) étaient sans effet (le changement passait par le gestionnaire de Présentation) ; corrigé.
+- Vérifié en Playwright (capture Dessin). Pas vérifié : effet 3D / texte à l'écran en Présentation et l'export PDF avec fond de l'échelle désactivé.
+
+## 0.339.0 — Plans de chantier : échelle et effet 3D sur la même ligne (Dessin et Présentation)
+- Dessin : Échelle 1 : et Effet 3D sur une seule ligne dans le bandeau du haut (CSS `.reglages-entete`, plus de libellé au-dessus de la case).
+- Présentation : Effet 3D et Texte (mm) sur une ligne ; les boutons Gabarit + / Suppr. gab. sont en icônes seules pour que la ligne tienne. Le bouton PDF passe à la ligne suivante faute de place (à revoir si gênant).
+- Vérifié en Playwright (captures Dessin et Présentation).
+
+## 0.338.0 — Plans de chantier : suite de l'essai du 26.11 (Ortho, phases, copier-coller, gabarits, bandeau)
 - **Ortho** : Repère garde Ortho allumé ; l'angle (°) est à côté de Repère.
 - **Échelle et Effet 3D** passent dans le bandeau du haut (Dessin) ; **Effet 3D + Texte (mm)** dans le bandeau de Présentation. Texte (mm) reste dans la bande du bas en Dessin.
 - **Répliquer** est à côté de Fond / Plan / Points (Présentation), retiré du bandeau.
