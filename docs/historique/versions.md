@@ -1,6 +1,9 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.347.0 — Matériel : planning des articles, la désignation seule
+Lire seulement la section utile : `grep -n '^## 0.347.1 — En-tête : menu des affaires comme celui des sous-dossiers
+- En Expert, toucher la pastille d'affaire ouvre une liste déroulante : « Toutes », chaque affaire (catégorie · numéro, ✓ sur la choisie), « ⚙ Gérer les affaires… » (ajouter, modifier, fusionner, retirer, catégories). Les deux pastilles (affaire et sous-dossier) restent visibles en Expert. Les listes de l'en-tête passent au-dessus des pages (z-index).
+
+## 0.347.0 — Matériel : planning des articles, la désignation seule
 - Le numéro était écrit deux fois (pastille + désignation, qui contient déjà le numéro). Maintenant la désignation seule, dans la pastille de couleur. La vue année garde le numéro seul.
 
 ## 0.346.0 — Affaires par catégorie et pastilles (refonte du 27.11)

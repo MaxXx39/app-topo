@@ -13930,7 +13930,7 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 .entete-pastilles .pastille-entete.pastille-affaire[hidden] { display: none; }
 .pastille-entete.pastille-dossier { font-size: 0.95rem; padding: 5px 14px; max-width: 55vw; border: 2px solid rgba(255, 255, 255, 0.85); }
 .pastille-pastel-dossier { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; margin: 2px 4px 2px 0; }
-#menu-dossiers { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+#menu-dossiers, #menu-affaires { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
 .ligne-menu-dossiers { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-weight: 700; font-size: 1.05rem; text-align: left; }
 .ligne-menu-dossiers i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
 .ligne-menu-dossiers span { flex: 1; }
@@ -15381,3 +15381,5 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .pastille-entete.pastille-affaire.pastille-fixe { cursor: default; }
 /* 0.347.0 : planning des articles : la désignation seule, dans la pastille de couleur (plus de numéro en double) */
 .nom-pl .pastille-article { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 0.8rem; }
+/* 0.347.1 : les listes déroulantes de l'en-tête (affaires, dossiers) passent au-dessus des pages (Applications…) */
+#menu-affaires, #menu-dossiers { z-index: 1000; }

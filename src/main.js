@@ -9353,7 +9353,56 @@ async function ouvrirMenuAffaires() {
     afficherMessage(erreur.message, 6000);
   }
 }
-document.querySelector('#pastille-affaire')?.addEventListener('click', () => ouvrirMenuAffaires());
+/**
+ * 0.347.1 (demande du 27.11) : toucher la pastille d'affaire (Expert) ouvre une liste déroulante comme celle des sous-dossiers :
+ * « Toutes » + chaque affaire (catégorie · numéro), puis « Gérer les affaires… » (ajouter, modifier, fusionner, catégories).
+ */
+function ouvrirMenuAffairesDeroulant() {
+  const existant = document.querySelector('#menu-affaires');
+  if (existant) {
+    existant.remove();
+    return;
+  }
+  if (!aAcces('expert')) return;
+  const choix = affaireChoisie();
+  const echappe = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const ligne = (valeur, titre, actif) => `<button type="button" class="ligne-menu-dossiers ${actif ? 'actif' : ''}" data-affaire-choix="${echappe(valeur)}"><span>${echappe(titre)}</span>${actif ? '<b>✓</b>' : ''}</button>`;
+  const menu = document.createElement('div');
+  menu.id = 'menu-affaires';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = [
+    ligne('', 'Toutes', choix === ''),
+    ...affairesDe(projet).filter((a) => aPlusieursAffaires(projet) || a.principale).map((a) => ligne(a.id, `${a.categorie || '—'} · ${a.numero}`, a.id === choix)),
+    '<button type="button" class="ligne-menu-dossiers" data-affaire-gerer><span>⚙ Gérer les affaires…</span></button>',
+  ].join('');
+  const entete = document.querySelector('.entete')?.getBoundingClientRect();
+  menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
+  document.body.append(menu);
+  const fermer = () => {
+    menu.remove();
+    document.removeEventListener('pointerdown', dehors, true);
+    document.removeEventListener('keydown', touche, true);
+  };
+  const dehors = (evenement) => {
+    if (!menu.contains(evenement.target) && !evenement.target.closest('#pastille-affaire')) fermer();
+  };
+  const touche = (evenement) => {
+    if (evenement.key === 'Escape') fermer();
+  };
+  menu.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-affaire-choix], [data-affaire-gerer]');
+    if (!bouton) return;
+    fermer();
+    if (bouton.hasAttribute('data-affaire-gerer')) ouvrirMenuAffaires();
+    else choisirAffaire(bouton.dataset.affaireChoix);
+  });
+  document.addEventListener('pointerdown', dehors, true);
+  document.addEventListener('keydown', touche, true);
+}
+document.querySelector('#pastille-affaire')?.addEventListener('click', (evenement) => {
+  evenement.stopPropagation();
+  ouvrirMenuAffairesDeroulant();
+});
 
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
 function choisirSousDossier(nom) {
