@@ -15406,3 +15406,8 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .bloc-nom-liste { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1 1 auto; line-height: 1.15; margin-top: -2px; }
 .bloc-nom-liste .nom-liste-menu { font-size: 0.8rem; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bloc-nom-liste .etiquette-nature { margin: 1px 0 0; font-size: 0.52rem; font-weight: 600; padding: 0 4px; }
+
+/* 0.350.0 : pastilles d'affaire cliquables (changer directement) ; « + affaire » */
+.affaires-cliquables { display: inline-flex; align-items: center; cursor: pointer; }
+.affaires-cliquables.ajout-affaire { padding: 0 6px; border: 1px dashed #94a3b8; border-radius: 999px; font-size: 0.6rem; color: #475569; margin-right: 4px; }
+.dossiers-cliquables { cursor: pointer; }

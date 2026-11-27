@@ -244,6 +244,16 @@ export function pastillesAffaireHtml(categories = []) {
   return (categories ?? []).map((c) => `<span class="pastille-affaire-el" style="background: ${couleurCategorie(c)}" title="Affaire ${echappeAffaire(c)}">${echappeAffaire(String(c).slice(0, 3))}</span>`).join('');
 }
 
+/**
+ * 0.350.0 : pastilles d'affaire qu'on TOUCHE pour les changer directement (Expert) : le groupe porte data-affaire-de.
+ * Élément sans pastille : « + affaire » si `ajout` (projet à plusieurs affaires, Expert), sinon rien.
+ */
+export function pastillesAffaireCliquables(id, categories = [], ajout = false) {
+  const ronds = pastillesAffaireHtml(categories);
+  if (ronds) return `<span class="affaires-cliquables" data-affaire-de="${echappeAffaire(id)}" title="Changer les affaires">${ronds}</span>`;
+  return ajout ? `<span class="affaires-cliquables ajout-affaire" data-affaire-de="${echappeAffaire(id)}">+ affaire</span>` : '';
+}
+
 // --- Choix gardé sur la tablette (comme le sous-dossier) ---
 const CLE_AFFAIRE = 'topo-affaire';
 function magasin() {

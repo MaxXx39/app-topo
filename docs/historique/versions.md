@@ -1,6 +1,10 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.349.0 — Menus Fond / Plan / Points / Surface plus serrés (demande du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.350.0 — Toucher une pastille = la changer directement ; menu Plan à jour (demandes du 27.11)
+- Toucher un **rond d'affaire** d'un élément ouvre tout de suite ses cases d'affaires (Expert ; plus de fenêtre « dossiers ou affaires ? ») ; toucher une **pastille de dossier** ouvre tout de suite ses cases de dossiers. Vaut dans le menu Plan / Points / Surface du plan ET dans la page Plans / Gérer du projet. Élément sans pastille d'affaire (projet à plusieurs affaires, Expert) : « + affaire » à toucher. `pastillesAffaireCliquables`, `choisirAffairesDeLElement`.
+- **Bug corrigé** : après un changement d'affaire, le menu Plan du plan gardait les anciennes pastilles (sa liste ne se redessinait pas : les pastilles manquaient dans `signatureMenuPlans`). Reproduit et vérifié en Playwright avec un vrai DXF.
+
+## 0.349.0 — Menus Fond / Plan / Points / Surface plus serrés (demande du 27.11)
 - Plan : la flèche ▾ des calques est à droite de la réglette Trans. (plus sur une ligne à part).
 - Les 4 menus : marges, espaces entre lignes et hauteur des titres réduits.
 - Points : le nom du levé est un peu remonté et la nature est dessous (petite étiquette) ; texte du nom plus petit, sans gras (`.bloc-nom-liste`).

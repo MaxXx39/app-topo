@@ -2307,6 +2307,9 @@ function retirerPointControleConfirme(id) {
 }
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), document.querySelector('#contenu-projet'), {
+  choisirAffaires: (id) => choisirAffairesDeLElement(id),
+  choisirDossiers: (id) => choisirDossiersDeLElement(id),
+  ajoutAffaire: () => aPlusieursAffaires(projet) && aAcces('expert'),
   exporterListe: (type, id) => exporterListe(type, id),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
   importerSurface: (fichier) => importerSurface(fichier),
@@ -8324,6 +8327,8 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherSelectionCalques: (position, tolerance) => toucherSelectionCalques(position, tolerance),
   quandChoisirCalques: (mode) => choisirCalques(mode),
   quandChoisirDossiers: (id) => choisirDossiersDeLElement(id),
+  quandChoisirAffaires: (id) => choisirAffairesDeLElement(id),
+  ajoutAffaire: () => aPlusieursAffaires(projet) && aAcces('expert'),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
@@ -9188,15 +9193,6 @@ async function choisirDossiersDeLElement(id) {
   if (!trouve) return;
   const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
   const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
-  // 0.346.0 : projet à plusieurs affaires : l'Expert peut aussi régler les pastilles (catégories) de l'élément.
-  if (aPlusieursAffaires(projet) && aAcces('expert')) {
-    const quoi = await demanderChoix({ titre: `« ${cible.nom ?? 'cet élément'} »`, boutons: [
-      { cle: 'dossiers', texte: 'Changer les dossiers', principal: true },
-      { cle: 'pastilles', texte: `Changer les pastilles d'affaire (${pastillesDe(projet, trouve.element, trouve.genre).join(', ') || 'aucune : visible partout'})` },
-    ] });
-    if (!quoi) return;
-    if (quoi === 'pastilles') return changerPastillesDeLElement(trouve.element, trouve.genre);
-  }
   const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
   const cochees = await demanderCases({
     titre: `Dossiers de « ${cible.nom ?? 'cet élément'} »`,
@@ -9222,6 +9218,14 @@ async function changerPastillesDeLElement(element, genre) {
     modifie();
     choisirAffaire(affaireChoisie()); // l'élément peut disparaître de la vue (ou apparaître)
   }
+}
+
+/** Pastilles d'affaire d'un élément trouvé par son identifiant (toucher sa pastille d'affaire) : Expert seulement. */
+function choisirAffairesDeLElement(id) {
+  if (!aAcces('expert')) return afficherMessage('Seul l\'Expert change les affaires d\'un élément.', 3000);
+  if (refuserEnLectureSeule()) return undefined;
+  const trouve = elementsDesAffaires(projet).find(({ element }) => element.id === id);
+  return trouve ? changerPastillesDeLElement(trouve.element, trouve.genre) : undefined;
 }
 
 /** Choisit l'affaire de cette tablette pour ce projet (« » = Toutes, Expert seulement) et redessine tout. */
