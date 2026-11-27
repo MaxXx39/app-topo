@@ -229,6 +229,21 @@ export function fusionnerProjet(cible, source, numero, categorie) {
   return { affaire, nombre };
 }
 
+// --- Pastilles d'affaire à l'écran : un petit rond avec un petit texte (0.348.0) ---
+const COULEURS_CATEGORIES = { ACQ: '#0d9488', 'BÂT': '#2563eb', GC: '#b45309', NAT: '#7c3aed', 'T/R': '#be185d', Autres: '#6b7280' };
+/** Couleur d'une catégorie : fixe pour les 6 de départ, sinon tirée du nom (toujours la même). */
+export function couleurCategorie(categorie) {
+  if (COULEURS_CATEGORIES[categorie]) return COULEURS_CATEGORIES[categorie];
+  let h = 0;
+  for (const c of String(categorie)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return `hsl(${h}, 55%, 40%)`;
+}
+const echappeAffaire = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** HTML des pastilles d'affaire d'un élément : un rond par catégorie, avec ses 3 premières lettres (nom complet au toucher). */
+export function pastillesAffaireHtml(categories = []) {
+  return (categories ?? []).map((c) => `<span class="pastille-affaire-el" style="background: ${couleurCategorie(c)}" title="Affaire ${echappeAffaire(c)}">${echappeAffaire(String(c).slice(0, 3))}</span>`).join('');
+}
+
 // --- Choix gardé sur la tablette (comme le sous-dossier) ---
 const CLE_AFFAIRE = 'topo-affaire';
 function magasin() {

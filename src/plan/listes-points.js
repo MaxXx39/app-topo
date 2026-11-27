@@ -16,6 +16,7 @@
 // Les listes décochées sont rangées dans le projet (projet.listesCachees : leurs identifiants).
 import { estImportee } from '../topo/surface.js';
 import { elementsRangeables, sousDossiersEffectifs } from '../topo/sous-dossiers.js';
+import { elementsDesAffaires, pastillesDe } from '../topo/affaires.js';
 import { estLeveDirect } from '../topo/leve-direct.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
@@ -122,6 +123,9 @@ export function listesDePoints(projet) {
   // 0.258.0 : dossiers de chaque liste (pastilles dans « Afficher »).
   const rangees = new Map(elementsRangeables(projet).map(({ genre, element }) => [element.id, sousDossiersEffectifs(projet, element, genre)]));
   for (const l of listes) l.sousDossiers = rangees.get(l.id) ?? [];
+  // 0.348.0 : pastilles d'affaire (catégories) de chaque liste
+  const pastilles = new Map(elementsDesAffaires(projet).map(({ genre, element }) => [element.id, pastillesDe(projet, element, genre)]));
+  for (const l of listes) l.pastilles = pastilles.get(l.id) ?? [];
   const ordre = SECTIONS.map(([cle]) => cle);
   return listes.sort((a, b) => ordre.indexOf(a.section) - ordre.indexOf(b.section));
 }

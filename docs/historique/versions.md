@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.347.1 — En-tête : menu des affaires comme celui des sous-dossiers
+Lire seulement la section utile : `grep -n '^## 0.348.0 — Pastilles d'affaire visibles sur les éléments ; pastilles de dossier plus petites
+- Un élément (plan, liste de points, surface…) qui porte des pastilles d'affaire montre un **petit rond** de la couleur de la catégorie avec ses 3 premières lettres (GC, BÂT, Aut…) : page Plans / Gérer, menus Afficher (Plan, Points, Surface). Couleurs fixes pour ACQ, BÂT, GC, NAT, T/R, Autres ; les catégories ajoutées ont une couleur tirée de leur nom. `topo/affaires.js` : `pastillesAffaireHtml`.
+- Pastilles de **dossier** : environ 20 % plus petites, texte non gras (500 au lieu de 800).
+- Rien n'est affiché pour un élément sans pastille (visible partout).
+
+## 0.347.1 — En-tête : menu des affaires comme celui des sous-dossiers
 - En Expert, toucher la pastille d'affaire ouvre une liste déroulante : « Toutes », chaque affaire (catégorie · numéro, ✓ sur la choisie), « ⚙ Gérer les affaires… » (ajouter, modifier, fusionner, retirer, catégories). Les deux pastilles (affaire et sous-dossier) restent visibles en Expert. Les listes de l'en-tête passent au-dessus des pages (z-index).
 
 ## 0.347.0 — Matériel : planning des articles, la désignation seule
