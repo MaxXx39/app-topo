@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.343.0 — Demandes du 27.11 : retour d'Ouvrir, nom du projet, Matériel, Plateformes (altitudes en direct, arc), Plans de chantier (couleur / phase avant dessin, Espace, Ctrl + clic)
+Lire seulement la section utile : `grep -n '^## 0.344.0 — Un projet, plusieurs affaires ; Présentation comme Dessin (demandes du 27.11)
+- **Affaires** (`src/topo/affaires.js`, 11 tests) : un projet peut avoir plusieurs affaires (même désignation, autre numéro). La 1re = celle du cartouche (`principale`), les autres dans `projet.affaires`. Levés, surfaces, listes « autres », plans DXF / PDF, dessins, réseaux, plans de chantier, plateformes portent `affaireId` (sans = principale ; surface / liste d'un levé = suit son levé). L'affaire choisie est un réglage de CHAQUE tablette (`topo-affaire`), « Toutes » au départ. Elle filtre comme le sous-dossier (`estMontre`, `estDansSousDossier`, `idsHorsSousDossier`).
+- **Pastille 📋 dans l'en-tête** (`#pastille-affaire`) et recopiée dans le bandeau de chaque appli plein écran (`cadre-page.js`). Menu : choisir (tous les modes), ajouter / changer le numéro / fusionner un autre projet / retirer une affaire vide (Expert). Un nouvel élément prend l'affaire choisie. Changer un élément d'affaire : pastille de dossier de l'élément → « Changer d'affaire ».
+- Le numéro d'affaire du cartouche, des PDF, du titre et des noms de fichiers suit l'affaire choisie (`cartoucheActif`).
+- **Fusion** : le projet choisi devient une affaire (ses éléments sont copiés, l'original reste sur l'appareil) ; refus si des identifiants sont déjà pris (copie).
+- **Pas fait / à essayer** : filtrage dans toutes les applis (testé : pastille et menu seulement) ; changer d'affaire un plan de chantier ou une plateforme depuis leur appli ; Drive (un seul fichier pour tout le projet, rien de changé) ; points de contrôle / implantations non filtrés.
+- **Présentation comme Dessin** : le menu Plan de Présentation est le même que celui de Dessin (couleurs, calques, transparence) et change les mêmes réglages dans les deux écrans ; plus de bouton « Répliquer » (les réglages de plans propres à la feuille ne sont plus lus).
+
+## 0.343.0 — Demandes du 27.11 : retour d'Ouvrir, nom du projet, Matériel, Plateformes (altitudes en direct, arc), Plans de chantier (couleur / phase avant dessin, Espace, Ctrl + clic)
 - **Retour d'« Ouvrir »** : la flèche ← de la page Ouvrir projet ramenait à une page vide (le code cherchait `.bouton-retour`, le bouton est `.bouton-retour-partie`) ; elle ramène maintenant à la page Applications.
 - **Nom du projet (Plans de chantier)** : l'en-tête affiche « affaire - désignation » (`titreProjet`), plus « Projet sans nom ».
 - **Matériel, fiche d'article** : « Numéro » en tête du bloc Désignation (N° interne retiré), Marque et Modèle en listes déroulantes à jour (« ＋ Nouvelle… » ajoute une valeur), enregistrement automatique (plus de bouton Enregistrer ; un nouvel article s'enregistre dès que le numéro est rempli), champs resserrés. **Pas vérifié sur tablette : la fiche tient-elle sans défilement ?**

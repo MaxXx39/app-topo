@@ -44,6 +44,7 @@ import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 import { retirerDessins } from './retrait-dessins.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
+import { numeroAffaireActif, affairesDe } from '../topo/affaires.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -101,7 +102,8 @@ export function ajouterLeve(projet, nomFichier, points) {
  * sinon son nom, sinon « Projet sans nom ».
  */
 export function titreProjet(projet) {
-  const affaireLieu = [projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
+  // 0.344.0 : le numéro d'affaire est celui de l'affaire choisie sur cette tablette
+  const affaireLieu = [affairesDe(projet).length > 1 ? numeroAffaireActif(projet) : projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
   return affaireLieu || (projet.nom ?? '').trim() || projet.nomAuto || 'Projet sans nom';
 }
 

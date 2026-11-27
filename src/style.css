@@ -13926,6 +13926,8 @@ body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
 .puce-dossier i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
 .puce-dossier.actif { background: var(--sombre, #1b2b36); border-color: var(--sombre, #1b2b36); color: #ffffff; }
 body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); border-color: var(--ambre, #f6ab07); color: #1b2b36; }
+.pastille-entete.pastille-affaire { background: #1d4ed8; color: #fff; font-size: 0.95rem; padding: 5px 14px; max-width: 45vw; border: 2px solid rgba(255, 255, 255, 0.85); }
+.entete-pastilles .pastille-entete.pastille-affaire[hidden] { display: none; }
 .pastille-entete.pastille-dossier { font-size: 0.95rem; padding: 5px 14px; max-width: 55vw; border: 2px solid rgba(255, 255, 255, 0.85); }
 .pastille-pastel-dossier { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; margin: 2px 4px 2px 0; }
 #menu-dossiers { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
@@ -15363,3 +15365,7 @@ dialog.popup-feuille { position: fixed; inset: 130px 340px auto auto; width: 330
 .bande-page .zone-bande-page .groupe-ruban.type-gabarit .champ-bande > span:not(.titre-groupe) { display: none; }
 .bande-page .zone-bande-page .groupe-ruban.type-gabarit select { max-width: 110px; }
 .bande-page .zone-bande-page .groupe-ruban.type-affichage .champ-bande input { width: 44px; }
+
+/* 0.344.0 : pastille d'affaire dans le bandeau des applis plein écran */
+.bandeau-projet-page .pastille-affaire-page { margin-left: 10px; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 999px; background: #1d4ed8; color: #fff; font: inherit; font-size: 0.9rem; padding: 2px 12px; cursor: pointer; }
+.bandeau-projet-page .pastille-affaire-page[hidden] { display: none; }

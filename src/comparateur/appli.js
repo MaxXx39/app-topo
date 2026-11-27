@@ -4,6 +4,7 @@
 // centre, modifications / annotations à droite) · Rapport (PDF avec pdf-lib, image PNG).
 // Calculs : topo/comparaison-pdf.js ; lecture des PDF : lecture.js ; détection en arrière-plan : calculs.js ;
 // calage automatique : celui du calage de plans (calage/calcul-auto.js) ; rapport : rapport.js.
+import { cartoucheActif } from '../topo/affaires.js';
 import { habillerPage } from '../navigation/cadre-page.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
@@ -1242,7 +1243,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       </div>`;
   }
 
-  const nomRapport = (ext) => `${nomFichierExport(projet.cartouche?.affaire ?? '', `comparaison_${comp().nom}`)}.${ext}`;
+  const nomRapport = (ext) => `${nomFichierExport(cartoucheActif(projet).affaire ?? '', `comparaison_${comp().nom}`)}.${ext}`;
 
   /** Encre de A et de B (B posé par l'alignement) à k pixels par point : { encreA, encreB, W, H, taille }. */
   async function masquesPlanche(p, k) {
@@ -1322,7 +1323,7 @@ export function ouvrirComparateur({ projet, modifie, qui = () => '', enregistrer
       const octets = await creerRapport({
         comparaison: c, planches,
         options: { avecPlanches: etat.rapport.planches, avecIgnorees: etat.rapport.ignorees, avecCommentaires: etat.rapport.commentaires },
-        cartouche: { affaire: projet.cartouche?.affaire ?? '', projet: projet.cartouche?.designation ?? projet.nom ?? '', date: new Date().toLocaleDateString('fr-CH') },
+        cartouche: { affaire: cartoucheActif(projet).affaire ?? '', projet: projet.cartouche?.designation ?? projet.nom ?? '', date: new Date().toLocaleDateString('fr-CH') },
       });
       enregistrer(new Blob([octets], { type: 'application/pdf' }), nomRapport('pdf'));
       message('Rapport PDF prêt.', 3000, { ok: true });

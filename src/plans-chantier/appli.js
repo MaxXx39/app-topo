@@ -9,6 +9,7 @@
 // une page par phase), PDF et DXF.
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
+import { cartoucheActif } from '../topo/affaires.js';
 import { habillerPage } from '../navigation/cadre-page.js';
 import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
@@ -210,7 +211,8 @@ export function ouvrirPlansChantier({
   // 0.317.0 : plans de la FEUILLE, réglés à part de l'écran (plan.feuille.plans : cases + opacité) ; sans réglage = comme l'écran.
   const plansFeuille = (idPhase) => {
     const p = plan();
-    return plansDeLaFeuille(plansAvecCalques(plans(), p?.fond), plansFond(idPhase), p ? reglagesFeuille(p).plans : null);
+    // 0.344.0 : Présentation et Dessin partagent les mêmes réglages (plans, calques, couleurs) : on change dans l'un ou l'autre.
+    return plansDeLaFeuille(plansAvecCalques(plans(), p?.fond), plansFond(idPhase), null);
   };
 
   let fermee = false;
@@ -1765,7 +1767,7 @@ export function ouvrirPlansChantier({
     if (cle === 'cartouche') {
       return `
       <label class="champ-calage" title="Coin du cartouche (la légende le suit ; nord, barre d'échelle et situation se replacent pour ne pas le recouvrir)"><span>Position</span><select data-feuille="cartouche">${options(COINS_CARTOUCHE, r.cartouche)}</select></label>
-      <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(leProjet().cartouche, leProjet().nom))}" data-feuille="chantier"></label>
+      <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(cartoucheActif(leProjet()), leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
       <label class="champ-calage"><span>Date (vide = du jour)</span><input type="text" maxlength="20" value="${echapper(r.date)}" placeholder="${new Date().toLocaleDateString('fr-CH')}" data-feuille="date"></label>
@@ -1829,7 +1831,7 @@ export function ouvrirPlansChantier({
       <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomPdf)}</span></p>`;
   }
 
-  const nomFichier = () => nomFichierExport(leProjet().cartouche?.affaire || leProjet().nom || '', `plan-chantier_${plan().nom}`);
+  const nomFichier = () => nomFichierExport(cartoucheActif(leProjet()).affaire || leProjet().nom || '', `plan-chantier_${plan().nom}`);
 
   function telecharger(blob, nom) {
     if (enregistrerFichier) return enregistrerFichier(blob, nom);
@@ -2174,22 +2176,11 @@ export function ouvrirPlansChantier({
   /** Contenu du menu d'une pastille (écran Dessin, ou Présentation : plans de la feuille et photo pâlie). */
   function menuPastille(cle) {
     const p = plan();
-    const feuilleEcran = etat.ecran === 'feuille';
     if (cle === 'fond') return htmlMenuFond(p.fond, { paleur: p.fond.paleur ?? PALEUR_ORTHO, paleurCarte: p.fond.paleurCarte ?? 0 });
     if (cle === 'points') {
       const listes = listesPoints ? listesPoints() : [{ id: '__tous', nom: 'Points levés', points: points() }];
       const caches = new Set(p.fond.listesPointsCachees ?? []);
       return htmlMenuPoints({ listes: listes.map((l) => ({ id: l.id, nom: l.nom, n: l.points.length, montre: p.fond.points !== false && !caches.has(l.id) })), noms: Boolean(p.fond.nomsPoints) });
-    }
-    if (feuilleEcran) { // plans de la feuille : cases + opacité propres (« Répliquer » = comme à l'écran)
-      const r = reglagesFeuille(p);
-      return `<button type="button" class="bouton-secondaire petit" data-action="feuille-plans-reinit" title="La feuille reprend les plans, calques et fonds réglés dans Dessin">⇆ Répliquer le dessin</button>
-        ${plans().length ? plans().map((x) => {
-    const eff = plansDeLaFeuille(plansAvecCalques(plans(), p.fond), plansFond(), r.plans).find((y) => y.id === x.id);
-    const op = Math.round(100 - (eff ? (eff.transparence ?? 0) : (r.plans?.[x.id]?.opacite !== undefined ? 100 - r.plans[x.id].opacite : (x.transparence ?? 0))));
-    return `<div class="plan-feuille"><label class="case-chantier"><input type="checkbox" data-feuille-plan="${echapper(x.id)}" ${eff ? 'checked' : ''}> ${echapper(x.nom)}</label>
-          <label class="champ-calage"><span>Opacité : <b data-valeur-de="op-${echapper(x.id)}">${op} %</b></span><input type="range" min="0" max="100" step="5" value="${op}" data-feuille-plan-op="${echapper(x.id)}"></label></div>`;
-  }).join('') : '<p class="aide-calage">Aucun plan dans le projet.</p>'}`;
     }
     const montres = new Set(plansMontres().map((x) => x.id));
     return htmlMenuPlan({
@@ -2211,7 +2202,7 @@ export function ouvrirPlansChantier({
     const f = p.fond;
     const pales = { fond: !(f.ortho || f.carte || f.cadastre || f.surfaces !== false), plan: !plansMontres().length, points: f.points === false };
     // 0.338.0 : « Répliquer » est à côté de Fond / Plan / Points dans Présentation (reprend les plans et fonds réglés dans Dessin)
-    const replique = etat.ecran === 'feuille' ? '<button type="button" class="puce" data-action="feuille-plans-reinit" title="La feuille reprend les plans, calques et fonds réglés dans Dessin">⇆ Répliquer</button>' : '';
+    const replique = '';
     zone.innerHTML = htmlPastilles({ ouvert: etat.menuPastille, pales, menus: etat.menuPastille ? { [etat.menuPastille]: menuPastille(etat.menuPastille) } : {}, extra: replique });
   }
 
