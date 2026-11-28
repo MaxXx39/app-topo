@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.359.1 — Liebherr 81 K.1 : choix validés (HSC page 1, estimés, rayon arrière 3,50 m), notes du modèle à jour
+Lire seulement la section utile : `grep -n '^## 0.360.0 — Demandes du 28.11 : pastilles de couleur, Modifier (Prolonger / Ajuster), aligner, grue
+- **Pastilles de couleur** à la place des noms (bord des cadres de détail, couleur des constructions) : `plans-chantier/pastilles-couleur.js` (liste cachée + `change`).
+- **Croix ✕** pour fermer la bibliothèque de symboles.
+- **Groupe « Modifier »** du ruban Dessin : Décaler (sorti de Tracer), **Prolonger** et **Ajuster** (Intermédiaire, décidé le 28.11). On choisit l'outil, on clique la ou les lignes (ligne, flèche, piste, construction segment), Espace / Entrée, puis on clique jusqu'où : une ligne du plan (droite infinie) ou un point libre ; Ajuster enlève le bout du côté du clic (décidé le 28.11). Calculs : `topo/modifier-plan.js` + `tests/modifier-plan.test.js`.
+- **Bloc : Rotation, 90°, Vers un point et Aligner rangés ensemble** ; au survol, la ligne qui servira à aligner s'allume en orange (aussi pour Prolonger / Ajuster : la limite visée).
+- **Grue (fiche)** : une grue nouvellement posée a Crochet et HSC décochés ; texte de la flèche : case « Nom du modèle » (cochée pour les nouvelles grues, pas pour les anciennes), Z châssis / Z HSC / Z haut grue (`niveauxGrue`) ; textes de la flèche et de la charge plus près de la flèche (0,85 m et 0,6 m).
+- À essayer : le doigt sur tablette pour Prolonger / Ajuster ; Plateformes : aucune liste de couleurs en texte trouvée (seulement la pastille ronde du sélecteur), à préciser si une autre liste est visée.
+
+## 0.359.1 — Liebherr 81 K.1 : choix validés (HSC page 1, estimés, rayon arrière 3,50 m), notes du modèle à jour
 
 ## 0.359.0 — Grue Liebherr 81 K.1 ajoutée (fiche technique reçue le 28.11)
 - **Modèle livré** `src/topo/grue-liebherr-81k-donnees.js` (`MODELE_LIEBHERR_81K`, id `liebherr-81k1`, automontante) : flèches 31 / 37 / 42 / 45 / 48 m ; tableaux **LM 1** (Tableau 1) et **Load-Plus** (Tableau 2), 6 t de 3,0 m jusqu'à 12,0 / 13,3 / 14,1 / 15,1 / 16,3 m (`rPlein`) ; HSC de la page 1 (montage bas 0–3 : 17,4 → 24,6 m ; montage haut 0–6 : 26,0 → 40,4 m*) ; châssis 4,5 × 4,5 m, mât 1,10 m, flèche 0,87 × 0,84 m, cabine 2,65 × 2,00 m, rayon arrière 3,50 m (lest 35 t ; 40 t à 2,75 m) ; infos (poids 20,3 t, treuil, flèche relevée à 30°, alimentation).

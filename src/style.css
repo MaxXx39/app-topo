@@ -15229,6 +15229,7 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 
 /* 0.336.0 : outils de Dessin rangés par type, avec une couleur par type ; petite fenêtre de la Présentation */
 .ruban-chantier .groupe-ruban.type-trace { background: #ffedd5; border-radius: 8px; }
+.ruban-chantier .groupe-ruban.type-modifier { background: #dcfce7; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-annoter { background: #dbeafe; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-construction { background: #cffafe; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-symboles { background: #ede9fe; border-radius: 8px; }
@@ -15511,3 +15512,23 @@ html .bande-appli.bande-page .partie-appli { font-size: 15px; font-weight: 400; 
 .page-chantier .ruban-element .onglets-bandeau button.actif { border-color: var(--bordure, #cbd5e1); background: var(--surface, #fff); color: #b45309; font-weight: 700; margin-bottom: -1px; }
 .page-chantier .ruban-element .partie-onglet { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 10px; padding-top: 4px; }
 .page-chantier .ruban-element.bandeau-grue .partie-onglet .champ-calage { flex-direction: column; align-items: flex-start; gap: 1px; }
+
+/* 0.360.0 : rotation, 90°, Vers un point et Aligner rangés ensemble dans le bandeau de l'élément. */
+.groupe-rotation-bloc {
+  display: inline-flex;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+}
+
+/* 0.360.0 : choix de couleur par pastilles dans Plans de chantier (la liste cachée garde la valeur). */
+.pastilles-select .palette-flottante {
+  display: inline-flex;
+  padding: 0;
+}
+
+.biblio-chantier h3 { display: flex; align-items: center; justify-content: space-between; }
+.fermer-volet { border: 0; background: transparent; font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer; color: inherit; }

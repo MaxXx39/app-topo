@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.359.1)
+## Fonctionnalités (état à la 0.360.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -141,6 +141,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
 
 ## Plans de chantier : état (28.11, 0.353.0)
+- **0.360.0** : groupe **Modifier** (Décaler, **Prolonger**, **Ajuster**, Intermédiaire ; `topo/modifier-plan.js`) ; pastilles de couleur (`pastilles-couleur.js`) ; ✕ de la bibliothèque ; Rotation / 90° / Vers un point / Aligner ensemble + ligne d'alignement en orange au survol ; grue : Crochet et HSC décochés au départ, texte de flèche avec nom du modèle et Z châssis / HSC / haut. Voir `docs/historique/versions.md`.
 - **0.353.0** : élément avec phase de fin = présent en normal de son début à sa fin ; case « Montrer les phases précédentes » (estompé / couleur / couleur estompée) dans Gestion des phases ; panneau « Phase de début / Phase de fin ». Voir `docs/historique/versions.md`.
 - **0.342.0** : groupes titrés avec le titre AU-DESSUS, même hauteur, bandeau du haut sur une ligne (Présentation : Gabarit et Affichage dans la bande du bas, icônes seules).
 - **0.340.0** : petits titres sur les groupes d'outils ; nom du projet dans le bandeau Gestion/Dessin/Présentation ; échelle avec ou sans fond blanc ; Effet 3D / Texte corrigés en Présentation.

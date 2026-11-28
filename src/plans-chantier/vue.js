@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, survol = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, survol = () => null, surbrillance = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -191,6 +191,18 @@ export function creerVueChantier(conteneur, options) {
       if (sel) dessinerChoix(ctx, sel);
       const sv = survol(); // 0.357.0 : objet sous la souris (infobulle) : contour bleu léger
       if (sv) dessinerSurvol(ctx, sv);
+      const ligneVisee = surbrillance(); // 0.360.0 : ligne qui servira à aligner un bloc (orange, avant le clic)
+      if (ligneVisee) {
+        ctx.save();
+        ctx.strokeStyle = ORANGE;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ligneVisee.forEach(([e, n], i) => { const q = versEcran(e, n, vue); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+        ctx.stroke();
+        ctx.restore();
+      }
       for (const id of multi()) { // plusieurs éléments choisis (Ctrl + clic)
         const autre = visibles.find((o) => o.id === id);
         if (autre) dessinerChoix(ctx, autre);

@@ -7,6 +7,7 @@ import { piece, trait, rectArrondi, cercle, tourner, texte, tournerPrims, NOIR }
 import { versSymbole } from './symboles-retouches.js';
 import { coteDuChassis } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
+import { fixe3 } from './format.js';
 import { modeleDe, versionModeles, estModeleGenerique } from './grue-modele.js';
 
 export const CLE_FICHE = 'fiche';
@@ -79,6 +80,8 @@ export function reglagesGrue(o = {}) {
     texteFleche: String(o.texteFleche ?? '').trim().slice(0, 60), rotationFleche: Number(o.rotationFleche) || 0,
     zPied: Number.isFinite(Number(o.zPied)) && o.zPied !== '' && o.zPied != null ? Number(o.zPied) : 0,
     afficherCharge: o.afficherCharge !== false, afficherHsc: o.afficherHsc !== false,
+    // 0.360.0 : nom du modèle et cotes Z dans le texte de la flèche (une grue posée avant : pas de nom, comme avant)
+    afficherModele: o.afficherModele === true, afficherZPied: o.afficherZPied === true, afficherZHsc: o.afficherZHsc === true, afficherZHaut: o.afficherZHaut === true,
     couleurTexte: /^#[0-9a-f]{6}$/i.test(o.couleurTexte ?? '') ? o.couleurTexte : COULEUR_TEXTE,
     // 0.313.0 : 4 massifs carrés (côté massifL, 2 m au départ) sous le pied, dans l'orientation du pied ; massifH : seulement pour la vue de côté
     massifs: Boolean(o.massifs) && !o.radier, massifL: nombreOu(o.massifL, 2), massifB: nombreOu(o.massifL, 2), massifH: nombreOu(o.massifH, 1),
@@ -315,7 +318,7 @@ function partieHaute(g) {
   if (g.afficherCharge && g.afficherCrochet) {
     const ch = chargeAuRayon(f, r, mode);
     // 0.320.4 : texte de charge collé sous la flèche (10 cm sous le chariot), plus à 1,7 m
-    res.push(texte(`r ${fixe1(ch.rayon)} m · ${fixe2(ch.t)} t`, r, -(Math.max(fl / 2, fl * 0.65) + 0.1 + 0.9), 0.9, { k: g.couleurTexte }));
+    res.push(texte(`r ${fixe1(ch.rayon)} m · ${fixe2(ch.t)} t`, r, -(Math.max(fl / 2, fl * 0.65) + 0.1 + 0.6), 0.9, { k: g.couleurTexte }));
   }
   return res;
 }
@@ -366,7 +369,7 @@ function cerclesDeCharge(g) {
  */
 export function grueFiche(o = {}) {
   const g = reglagesGrue(o);
-  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesMode, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB, g.radier, g.radierL, g.radierB]);
+  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesMode, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.afficherModele, g.afficherZPied, g.afficherZHsc, g.afficherZHaut, g.zPied, g.couleurTexte, g.massifs, g.massifL, g.massifB, g.radier, g.radierL, g.radierB]);
   return garder(cle, () => {
     const dessous = g.radier ? radier(g) : g.massifs ? massifs(g) : [];
     const base = pied(g.tour);
@@ -380,8 +383,14 @@ export function grueFiche(o = {}) {
     // 0.315.0 : UNE étiquette le long de la flèche (côté opposé au texte du crochet) : longueur de flèche + HSC
     // 0.318.0 : l'étiquette de la flèche est toujours là : [texte libre ·] Flèche … m [· HSC … m si la case est cochée]
     {
-      const etiquette = `${g.texteFleche ? `${g.texteFleche} · ` : ''}Flèche ${fixe1(g.fleche.nom)} m${g.afficherHsc ? ` · HSC ${fixe1(g.hauteur.h)} m` : ''}`;
-      haut.push(texte(etiquette, (g.modele.dim.flecheDebut + boutDeFleche(g.modele, g.fleche)) / 2, g.modele.dim.flecheLargeur / 2 + 1.3, 0.9, { k: '#1e293b' }));
+      const z = niveauxGrue(g);
+      const morceaux = [
+        g.texteFleche, g.afficherModele ? g.modele.nom : '', `Flèche ${fixe1(g.fleche.nom)} m`,
+        g.afficherHsc ? `HSC ${fixe1(g.hauteur.h)} m` : '',
+        g.afficherZPied ? `Z châssis ${fixe3(z.pied)}` : '', g.afficherZHsc ? `Z HSC ${fixe3(z.crochet)}` : '', g.afficherZHaut ? `Z haut ${fixe3(z.haut)}` : '',
+      ].filter(Boolean);
+      // 0.360.0 : texte encore plus près de la flèche (1,3 → 0,85 m du bord)
+      haut.push(texte(morceaux.join(' · '), (g.modele.dim.flecheDebut + boutDeFleche(g.modele, g.fleche)) / 2, g.modele.dim.flecheLargeur / 2 + 0.85, 0.9, { k: '#1e293b' }));
     }
     if (g.rotationFleche) haut = tournerPrims(haut, g.rotationFleche);
     const nom = `Grue ${g.modele.nom} · flèche ${fixe1(g.fleche.nom)} m`;
