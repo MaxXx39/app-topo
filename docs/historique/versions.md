@@ -1,6 +1,9 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.361.0 — Demandes du 28.11 (suite) : choix par surbrillance, benne, fenêtres compactes, cartouche sur mesure
+Lire seulement la section utile : `grep -n '^## 0.361.1 — Cartouche : plus d'ordre, seulement montrer / cacher et la taille (demande du 28.11)
+- Les positions du cartouche redeviennent celles d'avant (échelle / format et date / dessiné par côte à côte). `feuille.cartouchePerso` = { champs: { clé: { visible, taille } } } ; plus d'`ordre` (un ancien réglage avec `ordre` est simplement ignoré).
+
+## 0.361.0 — Demandes du 28.11 (suite) : choix par surbrillance, benne, fenêtres compactes, cartouche sur mesure
 - **Choisir la ligne à décaler / prolonger / ajuster** : curseur flèche (plus de croix) et élément visé en contour bleu (Décaler : segment orange) avant le clic.
 - **Benne à béton (grue)** rangée dans « Engins » (plus dans « Grues »).
 - **Fenêtres plus petites** (style AutoCAD / Mensura) dans les applis de PC : fenêtres Cartouche & co, menu des phases, fenêtres de choix, boutons OK / Annuler.

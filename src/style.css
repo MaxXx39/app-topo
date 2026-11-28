@@ -15537,7 +15537,7 @@ html .bande-appli.bande-page .partie-appli { font-size: 15px; font-weight: 400; 
 /* 0.361.0 : fenêtres plus petites, façon AutoCAD / Mensura (texte 12 px, marges serrées) */
 .cartouche-perso { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .cartouche-perso > b { font-size: 0.78rem; }
-.ligne-cartouche { display: grid; grid-template-columns: 16px minmax(0, 1fr) 54px 24px 24px; align-items: center; gap: 4px; }
+.ligne-cartouche { display: grid; grid-template-columns: 16px minmax(0, 1fr) 54px; align-items: center; gap: 4px; }
 .ligne-cartouche > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ligne-cartouche input[type='number'] { width: 54px; }
 html:has(dialog.page-pc[open]) dialog.popup-feuille { inset: 120px 330px auto auto; width: 270px; max-height: 70vh; padding: 6px 8px; border-radius: 6px; font-size: 0.78rem; box-shadow: 0 4px 16px rgba(16, 24, 20, 0.3); }

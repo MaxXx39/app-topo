@@ -2119,18 +2119,17 @@ export function ouvrirPlansChantier({
     return htmlPanneauDetails(r, p);
   }
 
-  /** 0.361.0 : informations du cartouche : ordre (▲ ▼), case pour les montrer, taille du texte (points). */
+  /** 0.361.1 : informations du cartouche : case pour les montrer, taille du texte (points) ; positions inchangées. */
   function htmlCartouchePerso(r) {
     const perso = r.cartouchePerso ?? cartouchePersoDe({});
+    const ordre = CHAMPS_CARTOUCHE.map(([c]) => c);
     const noms = Object.fromEntries(CHAMPS_CARTOUCHE.map(([c, nom]) => [c, nom]));
-    const lignes = perso.ordre.map((c, i) => `<div class="ligne-cartouche">
+    const lignes = ordre.map((c) => `<div class="ligne-cartouche">
       <input type="checkbox" data-cartouche="visible" data-cle="${c}" ${perso.champs[c].visible ? 'checked' : ''} aria-label="Montrer : ${echapper(noms[c])}">
       <span>${echapper(noms[c])}</span>
-      <input type="number" min="${TAILLE_CARTOUCHE_MIN}" max="${TAILLE_CARTOUCHE_MAX}" step="0.5" value="${perso.champs[c].taille}" data-cartouche="taille" data-cle="${c}" title="Taille du texte (points)" aria-label="Taille : ${echapper(noms[c])}">
-      <button type="button" class="bouton-secondaire petit" data-cartouche-ordre="-1" data-cle="${c}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">▲</button>
-      <button type="button" class="bouton-secondaire petit" data-cartouche-ordre="1" data-cle="${c}" ${i === perso.ordre.length - 1 ? 'disabled' : ''} aria-label="Descendre">▼</button></div>`).join('');
-    return `<div class="cartouche-perso"><b>Informations (ordre, taille en pt)</b>${lignes}
-      ${r.cartouchePerso ? '<button type="button" class="lien-calage" data-cartouche-standard>Remettre le cartouche standard</button>' : '<p class="aide-calage">Standard : toucher une case, une taille ou ▲ ▼ le personnalise.</p>'}</div>`;
+      <input type="number" min="${TAILLE_CARTOUCHE_MIN}" max="${TAILLE_CARTOUCHE_MAX}" step="0.5" value="${perso.champs[c].taille}" data-cartouche="taille" data-cle="${c}" title="Taille du texte (points)" aria-label="Taille : ${echapper(noms[c])}"></div>`).join('');
+    return `<div class="cartouche-perso"><b>Informations (montrer, taille en pt)</b>${lignes}
+      ${r.cartouchePerso ? '<button type="button" class="lien-calage" data-cartouche-standard>Remettre le cartouche standard</button>' : '<p class="aide-calage">Standard : toucher une case ou une taille le personnalise (les positions ne changent pas).</p>'}</div>`;
   }
 
   /** Change le réglage sur mesure du cartouche (modif(perso) change une copie). */
@@ -3458,15 +3457,6 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'degrouper') return faireDegrouper(groupeChoisi()?.id);
     if (b.dataset.action === 'entrer-groupe') { const g = groupeChoisi(); return g ? entrerDansGroupe(g.id) : undefined; }
     if (b.dataset.action === 'sortir-groupe') return echap();
-    if (b.dataset.cartoucheOrdre) {
-      const cle = b.dataset.cle;
-      const pas = Number(b.dataset.cartoucheOrdre);
-      return changerCartouchePerso((pp) => {
-        const i = pp.ordre.indexOf(cle);
-        const j = i + pas;
-        if (j >= 0 && j < pp.ordre.length) [pp.ordre[i], pp.ordre[j]] = [pp.ordre[j], pp.ordre[i]];
-      });
-    }
     if (b.dataset.cartoucheStandard !== undefined) {
       if (!avantChangement()) return;
       const f = { ...(plan().feuille ?? {}) };
