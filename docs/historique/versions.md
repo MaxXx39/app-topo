@@ -8,7 +8,7 @@ Lire seulement la section utile : `grep -n '^## 0.356.0 — Plans de chantier : 
 - **Copies** (Ctrl+V, dupliquer une phase) : nouveau groupe « … (copie) », jamais l'original (`regrouperCopies`).
 
 ## 0.355.0 — Plans de chantier : lot 2 des demandes du 28.11 (volume des tas, grues, Éléments, présentation)
-- **Volume d'un tas** (Expert, `volumeDuTas` dans `topo/plan-chantier.js`) : talus 1/1 par défaut (`TAS_TALUS` = 1, champ « Talus » modifiable), V = h / 6 × (A bas + 4 A milieu + A haut) (prismatoïde : exact pour une base décalée vers l'intérieur ; l'utilisateur avait validé le « tronc de pyramide », qui donne 1 % de moins sur un rectangle 20 × 10 m h 3 m : 361.8 au lieu de 366 m³ — **à confirmer**). Tas pointu (zone trop étroite) : tranches jusqu'à la hauteur atteinte. Case « Écrire le volume » et ligne de résultat dans le panneau.
+- **Volume d'un tas** (Expert, `volumeDuTas` dans `topo/plan-chantier.js`) : talus 1/1 par défaut (`TAS_TALUS` = 1, champ « Talus » modifiable), V = h / 6 × (A bas + 4 A milieu + A haut) (prismatoïde : exact pour une base décalée vers l'intérieur ; **formule exacte validée par l'utilisateur le 28.11**, plutôt que le tronc de pyramide qui donnait 361.8 au lieu de 366 m³ sur un rectangle 20 × 10 m h 3 m). Tas pointu (zone trop étroite) : tranches jusqu'à la hauteur atteinte. Case « Écrire le volume » et ligne de résultat dans le panneau.
 - **Texte (mm)** remonté dans Affichage (bandeau du haut).
 - **Panneau de droite replié** : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place (le volet Symboles prenait toute la page).
 - **Liste Éléments** : phase début → fin en petit gris (« 1 → 3 »), tri « Dernier dessiné en haut / Par type / Par phase ».
