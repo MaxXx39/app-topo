@@ -1,6 +1,10 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.365.0 — Gabarits de présentation pour tous les projets, par Drive (choix 2 du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.366.0 — Dernières couleurs seulement dans la fenêtre de choix (demande du 28.11)
+- Les petites pastilles sous chaque sélecteur de couleur (0.363.0) sont **retirées de l'appli**. Un clic sur un sélecteur de couleur ouvre maintenant **notre fenêtre** (`plans-chantier/couleurs-recentes.js`) : « Dernières couleurs » (6 au plus, gardées sur l'appareil, `topo-couleurs-recentes`), « Palette » (16 couleurs) et « Autre couleur… » (le sélecteur du navigateur). Échap ou clic à côté ferme. Les pastilles de l'appli (cadres de détail, constructions) comptent aussi dans les dernières couleurs.
+- Le sélecteur natif du navigateur ne peut pas recevoir de rangée en plus : d'où la fenêtre à nous.
+
+## 0.365.0 — Gabarits de présentation pour tous les projets, par Drive (choix 2 du 28.11)
 - Nouvelle partie `gabarits` des listes partagées (`reglages/listes-partagees.js`, fusion partie par partie comme les autres) : { id, nom, feuille, echelle }.
 - « Gabarit + » demande : **Tous les projets** (Drive) ou **Ce projet seulement** (comme avant, `projet.gabaritsPresentation`). La liste « Gabarit » montre deux groupes : « Ce projet » et « Tous les projets (Drive) » (valeurs `p:` / `d:`). Supprimer un gabarit partagé demande confirmation.
 - Un gabarit partagé ne garde pas ce qui appartient à un chantier (`PROPRES_AU_PLAN` : centre, détails et leurs places, plans montrés, phase, pages, rotation, titre du plan, nom du chantier, date, indice) ; en l'utilisant, le plan garde les siens (`feuilleSansChantier`, `utiliserGabaritPartage` dans `topo/presentations.js`). **Choix fait sans l'utilisateur, à valider.**

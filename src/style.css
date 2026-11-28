@@ -15567,9 +15567,16 @@ dialog.popup-feuille.popup-large { width: 400px; }
 html:has(dialog.page-pc[open]) dialog.popup-feuille.popup-large { width: 400px; }
 
 /* 0.363.0 : dernières couleurs, style de cote, titre de la présentation */
-.recentes-couleurs { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-left: 6px; vertical-align: middle; }
-.recente-couleur { width: 16px; height: 16px; min-width: 16px; min-height: 16px; padding: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.35); cursor: pointer; }
-.recente-couleur:hover { outline: 2px solid var(--sombre, #1b2b36); outline-offset: 1px; }
+/* Fenêtre de choix de couleur (0.366.0) : dernières couleurs + palette + autre couleur */
+.popup-couleur { position: fixed; z-index: 60; width: 214px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); color: var(--texte); border: 1px solid var(--bordure); border-radius: 8px; box-shadow: 0 6px 22px rgba(16, 24, 20, 0.35); font-size: 0.78rem; }
+.popup-couleur > b { font-size: 0.72rem; color: var(--gris); }
+.rang-couleurs { display: flex; flex-wrap: wrap; gap: 5px; min-height: 24px; align-items: center; }
+.rang-couleurs.grille { display: grid; grid-template-columns: repeat(8, 1fr); }
+.pastille-choix { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.35); cursor: pointer; }
+.pastille-choix:hover { outline: 2px solid #b45309; outline-offset: 1px; }
+.aucune-couleur { color: var(--gris); font-style: italic; }
+.autre-couleur { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; cursor: pointer; }
+.autre-couleur input[type='color'] { width: 40px; height: 22px; padding: 0 1px; }
 .style-cote > summary { cursor: pointer; font-size: 0.8rem; margin: 2px 0; }
 .styles-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
 .style-titre { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 0.72rem; }
