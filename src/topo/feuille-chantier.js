@@ -232,7 +232,8 @@ export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
 /** Objets d'une page (phases de la page). */
 export function objetsDeLaPage(plan, page) {
   // Gestion des phases : une page par phase avec des règles = « on voit quoi » dans cette phase.
-  if (page.phase && plan.vues?.[page.phase]) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
+  // 0.353.0 : sans règle, objetsVus donne la même chose qu'avant (phase + phases communes), plus les éléments « en place » (début → fin) et les phases précédentes si elles sont cochées.
+  if (page.phase) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
   const ids = new Set(page.phases);
   return plan.objets.filter((o) => o.type !== 'construction' && ids.has(o.phase)); // construction : jamais imprimée
 }

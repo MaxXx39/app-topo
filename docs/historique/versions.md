@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.352.0 — Affaires : un dossier de projets par affaire ; après une fusion, que faire de l'original ? (demandes du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.353.0 — Plans de chantier : phase de début → phase de fin, et phases précédentes (demandes du 28.11)
+- **Début → fin** : un élément avec une phase de fin est **présent en normal de sa phase de début à sa phase de fin** (sur l'écran, les pages de la feuille PDF), sans régler chaque phase dans Gestion des phases ; après la fin, il suit « Éléments terminés » (caché au départ). Sans fin : comme avant (sa phase seule + ce que dit Gestion des phases). Fin avant le début : ignorée (la liste ne propose que les phases ≥ début ; avancer le début au-delà de la fin enlève la fin avec un message). Une case de Gestion des phases réglée à la main fait toujours la loi.
+- **Panneau de l'objet** : « Phase de début » / « Phase de fin » (« — (pas de fin) »).
+- **Phases précédentes** (Gestion des phases, `plan.precedentes` { actif, mode, opacite, couleur }, décoché au départ) : toutes les phases d'AVANT la phase en cours en **estompé** (couleurs d'origine), **couleur unique** ou **couleur unique estompée**. Réglage de départ : une case du tableau réglée à la main (`manuel`) le garde ; un élément « en place » (début → fin) reste normal. Fonctions : `precedentesDe`, `regleDeVue` (couche), `objetsVus` ; `dessin.js` (`rendu.estompe`).
+- Hypothèses à valider : mode « couleur estompée » = ma lecture de « x couleur / estompé couleur » ; réglage global au plan (pas par phase).
+
+## 0.352.0 — Affaires : un dossier de projets par affaire ; après une fusion, que faire de l'original ? (demandes du 28.11)
 - **Dossiers de projets** : chaque ligne d'affaire d'« Ouvrir » a son ⋮ et se range dans son propre dossier (clé `idProjet#idAffaire` dans `dossiers.projets` ; sans rangement propre : le dossier du projet). Ex. « 8114 - Arzier Bix GC » dans « Perrin - GC », « 662 524 - Arzier Bix BÂT » dans « Perrin - Bât ». Un dossier qui contient encore une ligne d'affaire ne peut pas être supprimé.
 - **Fusion** : l'original restait sans rien dire. Maintenant une fenêtre demande « Que faire de « … » ? » : le garder (par défaut), le supprimer de cet appareil, ou partout (appareil + Drive, si Drive est connecté ; confirmation ensuite). La nouvelle ligne d'affaire reprend le dossier de projets de l'original.
 - Vérifié en Playwright (2 dossiers, rangement de chaque ligne, fusion puis suppression de l'original).

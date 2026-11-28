@@ -2684,8 +2684,9 @@ export function ouvrirPlansChantier({
     const pose = estPose(o);
     const petit = (titre, attr, cle, valeur, min, max, pas, unite = '') => `<label class="champ-bandeau"><span>${titre}${unite ? ` (${unite})` : ''}</span><input type="number" min="${min}" max="${max}" step="${pas}" value="${valeur}" data-${attr}="${cle}"></label>`;
     const bouton = (attr, texte, titre) => `<button type="button" class="bouton-secondaire petit" ${attr} title="${titre}">${texte}</button>`;
-    const phases = `<label class="champ-bandeau"><span>Phase</span><select data-prop="phase">${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.phase ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
-      <label class="champ-bandeau" title="Dernière phase où l'élément est en place ; après, il est « fini » (voir Gestion des phases)"><span>Fin</span><select data-prop="fin"><option value="">— (reste)</option>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.fin ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>`;
+    const rangDebut = p.phases.findIndex((ph) => ph.id === o.phase);
+    const phases = `<label class="champ-bandeau" title="Première phase où l'élément est présent"><span>Phase de début</span><select data-prop="phase">${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.phase ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
+      <label class="champ-bandeau" title="Dernière phase où l'élément est présent en normal (de la phase de début à celle-ci) ; après, il suit le réglage « Éléments terminés » de Gestion des phases. Sans fin : il reste dans sa phase de début."><span>Phase de fin</span><select data-prop="fin"><option value="">— (pas de fin)</option>${p.phases.map((ph, i) => (i < rangDebut ? '' : `<option value="${ph.id}" ${ph.id === o.fin ? 'selected' : ''}>${echapper(ph.nom)}</option>`)).join('')}</select></label>`;
     const couleur = pose || o.type === 'construction' ? '' : p.couleurs === 'phases' ? '<span class="aide-calage">Couleur : celle de la phase</span>'
       : `<label class="champ-bandeau"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>${o.couleur ? bouton('data-action="couleur-origine"', '↺', 'Couleur d\'origine') : ''}`;
     const poseHtml = pose ? `${petit('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
@@ -3611,6 +3612,11 @@ export function ouvrirPlansChantier({
       }
       if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
       if (cle === 'fin' && !valeur) delete o.fin;
+      // 0.353.0 : la fin ne peut pas être avant le début ; si on avance le début au-delà de la fin, la fin est enlevée
+      if (cle === 'phase' && o.fin && p.phases.findIndex((ph) => ph.id === o.fin) < p.phases.findIndex((ph) => ph.id === o.phase)) {
+        delete o.fin;
+        message('La phase de fin était avant le nouveau début : elle a été enlevée.', 4000);
+      }
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
       if (cle === 'texteSous' && !valeur) delete o.texteSous; // 0.320.6 : texte aligné sous le portail
       if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;

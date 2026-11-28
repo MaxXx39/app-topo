@@ -2,7 +2,7 @@
 // phase Y » ; chaque case dit comment montrer les éléments de Y quand on est dans X (caché, normal, estompé, assombri,
 // couleur unique), avec un réglage pour les éléments dont la fin est passée, par genre et par élément. Dates de phase.
 import { echapper } from '../outils/echapper.js';
-import { MODES_VUE, OPACITE_VUE, COULEUR_VUE, regleDeVue, reglerVue, reinitialiserVues, resumeObjet, ganttPhases } from '../topo/plan-chantier.js';
+import { MODES_VUE, MODES_PRECEDENTES, precedentesDe, OPACITE_VUE, COULEUR_VUE, regleDeVue, reglerVue, reinitialiserVues, resumeObjet, ganttPhases } from '../topo/plan-chantier.js';
 
 const GENRES = [['zone', 'Zones'], ['ligne', 'Lignes et clôtures'], ['piste', 'Pistes'], ['fleche', 'Flèches'], ['texte', 'Textes'], ['symbole', 'Symboles'], ['grue', 'Grues'], ['cotation', 'Cotations']];
 const COURT = { cache: '—', normal: 'Normal', estompe: 'Estompé', assombri: 'Grisé', couleur: 'Couleur' };
@@ -35,6 +35,7 @@ export function ouvrirGestionPhases(acces) {
       <div class="entete-fenetre-champs"><h2>Gestion des phases</h2><button type="button" class="bouton-retour" data-cle="fermer" aria-label="Fermer">✕</button></div>
       <div class="corps-phases">
         <p class="aide-calage">Chaque ligne : « quand on est dans cette phase… » ; chaque colonne : « … on voit les éléments de cette phase comme ça ». Touchez une case pour la régler. ✎ = genres ou éléments cachés ; ↪ = éléments terminés visibles.</p>
+        ${precedentes(p)}
         <div class="tableau-phases"><table>${ligneEntete}${lignes}</table></div>
         ${sel ? editeur(p) : '<p class="aide-calage">Aucune case choisie.</p>'}
         <h3>Planning des phases</h3>
@@ -43,6 +44,18 @@ export function ouvrirGestionPhases(acces) {
         <table class="dates-phases"><tr><th>Phase</th><th>Début</th><th>Fin</th></tr>${dates}</table>
       </div>
       <div class="boutons-choix"><button type="button" class="bouton" data-cle="fermer"><strong>Fermer</strong></button></div>`;
+  }
+
+  /** Case « Montrer les phases précédentes » : toutes les phases d'avant la phase en cours, estompées ou en une couleur (0.353.0). */
+  function precedentes(p) {
+    const pr = precedentesDe(p);
+    return `<div class="editeur-vue precedentes">
+      <label class="case"><input type="checkbox" data-prec="actif" ${pr.actif ? 'checked' : ''}> Montrer les phases précédentes</label>
+      ${pr.actif ? `<label class="champ-calage"><span>Rendu des phases précédentes</span><select data-prec="mode">${MODES_PRECEDENTES.map(([c, t]) => `<option value="${c}" ${c === pr.mode ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${pr.mode !== 'couleur' ? `<label class="champ-calage"><span>Opacité : <b>${Math.round(pr.opacite * 100)} %</b></span><input type="range" min="5" max="90" step="5" value="${Math.round(pr.opacite * 100)}" data-prec="opacite"></label>` : ''}
+      ${pr.mode !== 'estompe' ? `<label class="champ-calage"><span>Couleur</span><input type="color" value="${pr.couleur}" data-prec="couleur"></label>` : ''}
+      <p class="aide-calage">Une case du tableau réglée à la main garde son réglage. Un élément avec une phase de fin reste en normal jusqu'à sa fin.</p>` : ''}
+    </div>`;
   }
 
   /** Diagramme de Gantt (SVG) : une barre par phase, d'après ses dates. */
@@ -109,6 +122,15 @@ export function ouvrirGestionPhases(acces) {
       const ph = acces.plan().phases.find((x) => x.id === c.dataset.id);
       if (c.value) ph[c.dataset.date] = c.value;
       else delete ph[c.dataset.date];
+      acces.enregistrer();
+      acces.redessiner();
+      return dessiner();
+    }
+    if (c.dataset.prec) {
+      if (!acces.avantChangement()) return;
+      const pl = acces.plan();
+      const v = c.dataset.prec === 'actif' ? c.checked : c.dataset.prec === 'opacite' ? Number(c.value) / 100 : c.value;
+      pl.precedentes = { ...precedentesDe(pl), [c.dataset.prec]: v };
       acces.enregistrer();
       acces.redessiner();
       return dessiner();

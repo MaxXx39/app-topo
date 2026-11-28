@@ -165,16 +165,36 @@ export const MODES_VUE = [['cache', 'Caché'], ['normal', 'Normal'], ['estompe',
 export const OPACITE_VUE = 0.35;
 export const COULEUR_VUE = '#64748b';
 
-/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ). */
-export function regleDeVue(plan, courante, vue) {
-  const r = plan.vues?.[courante]?.[vue];
-  if (r) return r;
-  // 0.296.2 : par défaut, seule la phase en cours est montrée (ni les phases d'avant, ni celles d'après)
-  return { mode: vue === courante ? 'normal' : 'cache' };
+/** Rang (0, 1, 2…) d'une phase dans la liste des phases, -1 si elle n'existe pas. */
+const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+
+/**
+ * Phases précédentes (0.353.0) : réglage du plan (plan.precedentes), décoché au départ. Coché, toutes les phases d'AVANT la
+ * phase en cours sont montrées estompées (couleurs d'origine), en couleur unique, ou en couleur unique estompée.
+ * C'est un réglage de départ : une case de Gestion des phases réglée à la main (`manuel`) garde son propre réglage.
+ */
+export const MODES_PRECEDENTES = [['estompe', 'Estompé (couleurs d\'origine)'], ['couleur', 'Couleur unique'], ['couleur-estompe', 'Couleur unique estompée']];
+export const PRECEDENTES_DEPART = { actif: false, mode: 'estompe', opacite: OPACITE_VUE, couleur: COULEUR_VUE };
+export const precedentesDe = (plan) => ({ ...PRECEDENTES_DEPART, ...plan.precedentes });
+
+/** Règle enregistrée pour la case (courante, vue), ou celle de départ (0.296.2 : seule la phase en cours est montrée). */
+function regleDeBase(plan, courante, vue) {
+  return plan.vues?.[courante]?.[vue] ?? { mode: vue === courante ? 'normal' : 'cache' };
 }
 
-/** Phase après laquelle l'élément est « fini » : rang de la phase de fin, ou null. */
-const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+/** Vrai si la case a été réglée à la main (marque `manuel`, ou, pour un ancien plan sans marque, réglage différent du départ). */
+function estReglee(r, courante, vue) {
+  if (r.manuel !== undefined) return r.manuel;
+  return r.mode !== (vue === courante ? 'normal' : 'cache') || Boolean(r.genresCaches?.length || r.elementsCaches?.length || (r.fini && r.fini !== 'cache'));
+}
+
+/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ ; les phases précédentes suivent leur réglage si la case est cochée). */
+export function regleDeVue(plan, courante, vue) {
+  const r = regleDeBase(plan, courante, vue);
+  const pr = precedentesDe(plan);
+  if (!pr.actif || rangDe(plan, vue) < 0 || rangDe(plan, vue) >= rangDe(plan, courante) || estReglee(r, courante, vue)) return r;
+  return { ...r, mode: pr.mode === 'estompe' ? 'estompe' : 'couleur', opacite: pr.opacite, couleur: pr.mode === 'estompe' ? r.couleur : pr.couleur, estompe: pr.mode === 'couleur-estompe', auto: true };
+}
 
 /**
  * Objets à montrer dans la phase `courante` (la phase active à l'écran, celle de la page sur la feuille). Un élément
@@ -186,14 +206,25 @@ export function objetsVus(plan, courante = plan.phaseActive) {
   const rc = rangDe(plan, courante);
   return plan.objets.flatMap((o) => {
     if (o.type === 'construction') return construction ? [o] : [];
-    if (!reglee) return o.phase === courante || plan.phases.find((p) => p.id === o.phase)?.commune ? [o] : []; // départ : la phase en cours (et celles « sur toutes les pages »)
+    // 0.353.0 : un élément est « en place » de sa phase de début à sa phase de fin (fin avant le début = ignorée)
+    const rd = rangDe(plan, o.phase);
+    const rf = o.fin ? rangDe(plan, o.fin) : -1;
+    const aUneFin = rd >= 0 && rf >= rd;
+    const enPlace = aUneFin && rc >= rd && rc <= rf;
+    if (!reglee) {
+      // départ : la phase en cours, celles « sur toutes les pages », puis les éléments en place (sauf phases précédentes estompées)
+      if (o.phase === courante || plan.phases.find((p) => p.id === o.phase)?.commune) return [o];
+      if (enPlace) return [o];
+      if (!precedentesDe(plan).actif) return [];
+    }
     const r = regleDeVue(plan, courante, o.phase);
     if (r.genresCaches?.includes(o.type) || r.elementsCaches?.includes(o.id)) return [];
     let mode = r.mode;
-    if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
+    if (enPlace) { if (mode === 'cache' || r.auto) mode = 'normal'; } // en place : normal, sauf case réglée à la main
+    else if (aUneFin && rc > rf) mode = r.fini ?? 'cache';
     if (mode === 'cache') return [];
     if (mode === 'normal') return [o];
-    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE } }]; // couleur unique de départ = celle de la phase
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE, ...(r.estompe ? { estompe: true } : {}) } }]; // couleur unique de départ = celle de la phase
   });
 }
 
@@ -205,11 +236,13 @@ export function objetsVisibles(plan) {
 /** Modifie une règle de vue (crée la ligne de la phase en cours au besoin, avec les règles de départ de toutes les phases). */
 export function reglerVue(plan, courante, vue, champs) {
   plan.vues ??= {};
+  const cible = regleDeVue(plan, courante, vue); // ce que l'utilisateur voyait (phases précédentes comprises)
   if (!plan.vues[courante]) {
     plan.vues[courante] = {};
-    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeVue(plan, courante, p.id) };
+    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeBase(plan, courante, p.id), manuel: false }; // départ brut : le réglage « phases précédentes » reste libre de changer
   }
-  plan.vues[courante][vue] = { ...(plan.vues[courante][vue] ?? { mode: 'normal' }), ...champs };
+  const { auto, ...sansAuto } = cible;
+  plan.vues[courante][vue] = { ...sansAuto, ...champs, manuel: true };
   return plan.vues[courante][vue];
 }
 

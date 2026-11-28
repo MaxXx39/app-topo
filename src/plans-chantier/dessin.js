@@ -215,13 +215,13 @@ export function dessinerObjets(d, objets) {
   for (const o of objets) {
     if (!o.rendu) normaux.push(o);
     else {
-      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}`;
+      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}|${o.rendu.estompe ? 1 : 0}`;
       if (!groupes.has(cle)) groupes.set(cle, []);
       groupes.get(cle).push(o);
     }
   }
   for (const liste of groupes.values()) {
-    const { mode, opacite } = liste[0].rendu;
+    const { mode, opacite, estompe } = liste[0].rendu;
     const toile = document.createElement('canvas');
     toile.width = d.ctx.canvas.width;
     toile.height = d.ctx.canvas.height;
@@ -230,7 +230,7 @@ export function dessinerObjets(d, objets) {
     for (const o of liste) dessinerObjet({ ...d, ctx: tctx }, o);
     d.ctx.save();
     d.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    d.ctx.globalAlpha = mode === 'estompe' ? opacite : mode === 'assombri' ? 0.8 : 1;
+    d.ctx.globalAlpha = mode === 'estompe' || (mode === 'couleur' && estompe) ? opacite : mode === 'assombri' ? 0.8 : 1; // « couleur estompée » (phases précédentes, 0.353.0)
     if (mode === 'assombri') d.ctx.filter = 'grayscale(1) brightness(0.7)';
     d.ctx.drawImage(toile, 0, 0);
     d.ctx.restore();
