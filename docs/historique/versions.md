@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.358.0 — Demandes du 28.11 (suite) : flèche retour, bouton du bas, arc → segment, onglets, radier, tours
+Lire seulement la section utile : `grep -n '^## 0.359.0 — Grue Liebherr 81 K.1 ajoutée (fiche technique reçue le 28.11)
+- **Modèle livré** `src/topo/grue-liebherr-81k-donnees.js` (`MODELE_LIEBHERR_81K`, id `liebherr-81k1`, automontante) : flèches 31 / 37 / 42 / 45 / 48 m ; tableaux **LM 1** (Tableau 1) et **Load-Plus** (Tableau 2), 6 t de 3,0 m jusqu'à 12,0 / 13,3 / 14,1 / 15,1 / 16,3 m (`rPlein`) ; HSC de la page 1 (montage bas 0–3 : 17,4 → 24,6 m ; montage haut 0–6 : 26,0 → 40,4 m*) ; châssis 4,5 × 4,5 m, mât 1,10 m, flèche 0,87 × 0,84 m, cabine 2,65 × 2,00 m, rayon arrière 3,50 m (lest 35 t ; 40 t à 2,75 m) ; infos (poids 20,3 t, treuil, flèche relevée à 30°, alimentation).
+- **À vérifier avec l'utilisateur** : la page 2 de la fiche donne des hauteurs 1,5 m plus basses (15,9 → 38,9 m) : HSC ou autre cote ? Estimés : début de la flèche, largeur de l'arrière tournant (2,5 m), tête au-dessus de la flèche (3,2 m).
+- Liste « Charges » : noms des tableaux du modèle (`nomsTableaux`, ici « LM 1 / Load-Plus ») ; repère « * » d'une HSC avec son explication (`etoile` en texte).
+
+## 0.358.0 — Demandes du 28.11 (suite) : flèche retour, bouton du bas, arc → segment, onglets, radier, tours
 - **Applis plein écran** : flèche jaune « retour » du haut cachée (`page-habillee`, doublon du bouton ☰ du bas) ; bouton du bas à gauche = 54 px et 15 px comme les autres applis (il faisait 58 px / 13 px).
 - **Plateformes** : double-clic sur la poignée ronde d'un arc = retour au côté droit (`redresserArc`).
 - **Plans de chantier** : réglages de l'élément choisi en **onglets** dans le bandeau (`htmlOngletsBandeau` : chaque `.groupe-grue` = un onglet ; zone : Genre et texte / Aspect / Stock ; grue d'après fiche : Modèle / Flèche et charge / Tour et châssis / Affichage ; onglet gardé par genre) ; **radier** sous la grue (« Fondation » : Aucune / Massifs / Radier ; dalle `radierL` × `radierB`, 5 × 5 m au départ, centrée sous l'axe dans l'orientation du pied, béton, cotée ; aussi dans la vue de côté) ; **dupliquer une tour** (⧉ dans Régl. grues) ; bouton « **Régl. grues** » (grue + engrenage) ; case « Sans texte » (au lieu de « Sans le texte du bloc »).

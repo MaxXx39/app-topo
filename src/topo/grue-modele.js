@@ -15,6 +15,7 @@
 // portées : on prend la suivante, côté prudent, sans calculer entre deux).
 import { FLECHES, TOURS, ELEMENTS_FLECHE, BLOCS, DIMENSIONS } from './grue-liebherr-172-donnees.js';
 import { MODELE_CONDECTA } from './grue-condecta-4513-donnees.js';
+import { MODELE_LIEBHERR_81K } from './grue-liebherr-81k-donnees.js';
 
 export const MODELE_LIEBHERR = {
   id: 'liebherr-172-ecb',
@@ -41,8 +42,8 @@ export const MODELE_LIEBHERR = {
   tours: TOURS,
 };
 
-export { MODELE_CONDECTA };
-export const MODELES_DE_BASE = [MODELE_LIEBHERR, MODELE_CONDECTA];
+export { MODELE_CONDECTA, MODELE_LIEBHERR_81K };
+export const MODELES_DE_BASE = [MODELE_LIEBHERR, MODELE_CONDECTA, MODELE_LIEBHERR_81K]; // 0.359.0 : Liebherr 81 K.1 (fiche du 28.11)
 
 // ---------------------------------------------------------------- Registre (modèles livrés + ceux du projet)
 

@@ -153,7 +153,7 @@ export function ficheGrue(o) {
   const limite = modele.chargesValablesJusqua;
   l.push({ titre: 'HSC (hauteur sous crochet)', valeur: `${fixe1(h.h)} m`, detail: `Z pied ${fixe2(nv.pied)} · Z crochet ${fixe2(nv.crochet)} · Z haut de la grue ${fixe2(nv.haut)}`, alerte: limite && h.h > limite ? `Les charges de la fiche valent jusqu'à ${limite} m de hauteur sous crochet : au-dessus, voir le manuel du constructeur.` : null });
   if (h.speciaux) pas.push(`Éléments de mât spéciaux demandés : ${h.speciaux}.`);
-  if (h.etoile) pas.push('Cette HSC porte le repère « *) » de la fiche (pictogramme non expliqué dans la fiche).');
+  if (h.etoile) pas.push(typeof h.etoile === 'string' ? `Cette HSC porte le repère « * » de la fiche : ${h.etoile}.` : 'Cette HSC porte le repère « *) » de la fiche (pictogramme non expliqué dans la fiche).');
   if (h.suspect) pas.push('Valeur qui semble fausse dans la fiche (imprimée telle quelle).');
   const pf = poidsFleche(modele, f);
   l.push({ titre: 'Flèche', valeur: `${fixe1(f.nom)} m (portée maximale ${fixe1(f.rMax ?? rMax)} m)`, detail: f.sections ? `éléments ${f.sections.map((i) => CERCLES[i - 1]).join(' ')}${pf ? `, ${Math.round(pf)} kg` : ''}` : null });
