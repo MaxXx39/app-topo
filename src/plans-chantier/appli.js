@@ -55,8 +55,8 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe, pointsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, volumeDuTas, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, segmentProcheAvecOrigine, segmentConstruction, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION, CHAMPS_CARTOUCHE, TAILLE_CARTOUCHE_MIN, TAILLE_CARTOUCHE_MAX, cartouchePersoDe } from '../topo/feuille-chantier.js';
-import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
+import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION, CHAMPS_CARTOUCHE, COULEUR_TEXTE_CARTOUCHE, COULEURS_DEFAUT_CARTOUCHE, texteCartoucheDe, TAILLE_CARTOUCHE_MIN, TAILLE_CARTOUCHE_MAX, cartouchePersoDe, listeLogos } from '../topo/feuille-chantier.js';
+import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo, chargerLogos, dessinerApercuCartouche } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
 import { PALEUR_ORTHO } from './tuiles.js';
@@ -2007,10 +2007,12 @@ export function ouvrirPlansChantier({
       prep = preparerPage(donnees, pages[feuille.page], pxParMm);
       feuille.mise = prep.mise; // pour le toucher (nord, barre d'échelle, situation)
       feuille.vue = prep.vue;
-      const logo = await chargerImage(adresseLogo(r.logo));
+      const logos = await chargerLogos(r);
+      feuille.champs = prep.champs; // pour l'aperçu en gros du cartouche
+      feuille.logosImages = logos;
       if (!feuille || feuille.canvas !== c || feuille.numero !== numero) return; // un dessin plus récent a pris la suite
       dessinerPage(ctx, donnees, prep, pxParMm, {
-        logo,
+        logos,
         quandTuile: () => {
           cancelAnimationFrame(imageApercu);
           imageApercu = requestAnimationFrame(() => dessinerApercu());
@@ -2027,6 +2029,7 @@ export function ouvrirPlansChantier({
     feuille.hors = hors; // pour la surbrillance de l'alignement (0.334.0)
     const cc = c.getContext('2d');
     cc.drawImage(hors, 0, 0);
+    majApercuCartouche();
     // 0.333.0 : le cadre de détail choisi montre ses 8 poignées (pas imprimées : dessinées seulement sur l'aperçu)
     const choisiD = reglagesFeuille(plan()).details.find((d) => d.id === etat.detailChoisi);
     const BD = choisiD && prep?.mise?.boites?.[`det:${choisiD.id}`];
@@ -2096,14 +2099,15 @@ export function ouvrirPlansChantier({
     }
     if (cle === 'cartouche') {
       return `
+      <canvas class="apercu-cartouche" data-apercu-cartouche aria-label="Aperçu du cartouche"></canvas>
       <label class="champ-calage" title="Coin du cartouche (la légende le suit ; nord, barre d'échelle et situation se replacent pour ne pas le recouvrir)"><span>Position</span><select data-feuille="cartouche">${options(COINS_CARTOUCHE, r.cartouche)}</select></label>
       <label class="champ-calage"><span>Nom du chantier (vide = affaire - désignation)</span><input type="text" maxlength="120" value="${echapper(r.chantier)}" placeholder="${echapper(nomChantierCartouche(cartoucheActif(leProjet()), leProjet().nom))}" data-feuille="chantier"></label>
       <label class="champ-calage"><span>Titre du plan</span><input type="text" maxlength="80" value="${echapper(r.titre || p.nom)}" data-feuille="titre"></label>
       <label class="champ-calage"><span>Indice</span><input type="text" maxlength="6" value="${echapper(r.indice)}" data-feuille="indice"></label>
       <label class="champ-calage"><span>Date (vide = du jour)</span><input type="text" maxlength="20" value="${echapper(r.date)}" placeholder="${new Date().toLocaleDateString('fr-CH')}" data-feuille="date"></label>
       <label class="champ-calage"><span>Dessiné par</span><input type="text" maxlength="40" value="${echapper(r.auteur)}" placeholder="${echapper(auteur())}" data-feuille="auteur"></label>
-      <label class="champ-calage"><span>Logo</span><select data-feuille="logo">${options([['perrin', 'Perrin'], ['natalini', 'Natalini'], ['ronchi', 'Ronchi'], ['aucun', 'Sans logo'], ['image', r.logo?.startsWith?.('data:') ? 'Image choisie' : 'Autre image…']], r.logo?.startsWith?.('data:') ? 'image' : r.logo)}</select></label>
-      ${r.logo?.startsWith?.('data:') ? '<button type="button" class="lien-calage" data-action="feuille-logo">Changer d\'image…</button>' : ''}
+      ${htmlLogos(r)}
+      ${htmlTexteCartouche(r)}
       ${htmlCartouchePerso(r)}
       ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}`;
     }
@@ -2119,6 +2123,46 @@ export function ouvrirPlansChantier({
     return htmlPanneauDetails(r, p);
   }
 
+  /** 0.362.0 : logos du cartouche : plusieurs possibles (4 au plus), ajouter un logo livré ou importer une image. */
+  function htmlLogos(r) {
+    const noms = { perrin: 'Perrin', natalini: 'Natalini', ronchi: 'Ronchi' };
+    let images = 0;
+    const lignes = r.logos.map((l, i) => `<div class="ligne-logo"><span>${echapper(noms[l] ?? `Image importée ${++images}`)}</span>
+      <button type="button" class="bouton-secondaire petit" data-logo-retirer="${i}" aria-label="Retirer ce logo" title="Retirer ce logo">✕</button></div>`).join('');
+    return `<div class="cartouche-perso"><b>Logos (${r.logos.length}/4)</b>${lignes || '<p class="aide-calage">Aucun logo.</p>'}
+      ${r.logos.length < 4 ? `<label class="champ-calage"><span>Ajouter un logo</span><select data-logo-ajout><option value="">— choisir —</option><option value="perrin">Perrin</option><option value="natalini">Natalini</option><option value="ronchi">Ronchi</option><option value="image">Importer une image…</option></select></label>` : ''}</div>`;
+  }
+
+  /** 0.362.0 : texte au-dessus du cartouche (texte, taille, couleur, fond blanc plus ou moins transparent). */
+  function htmlTexteCartouche(r) {
+    const t = r.texteCartouche;
+    return `<div class="cartouche-perso"><b>Texte au-dessus du cartouche</b>
+      <textarea rows="2" maxlength="300" data-tc="texte" placeholder="Texte (vide = rien)" aria-label="Texte au-dessus du cartouche">${echapper(t.texte)}</textarea>
+      <div class="ligne-tc"><label>Taille <input type="number" min="4" max="20" step="0.5" value="${t.taille}" data-tc="taille"></label>
+        <label>Couleur <input type="color" value="${t.couleur}" data-tc="couleur"></label></div>
+      <div class="ligne-tc"><label><input type="checkbox" data-tc="fond" ${t.fond ? 'checked' : ''}> Fond blanc</label>
+        <label>Opacité <input type="number" min="0" max="100" step="5" value="${t.opaciteFond}" data-tc="opaciteFond"> %</label></div></div>`;
+  }
+
+  /** Aperçu en gros du cartouche (et de son texte du dessus) dans la fenêtre de réglage. */
+  function majApercuCartouche() {
+    const c = page.querySelector('canvas[data-apercu-cartouche]');
+    const p = plan();
+    if (!c || !p || !feuille?.champs || !feuille.mise) return;
+    const K = feuille.mise.cartouche;
+    dessinerApercuCartouche(c, { r: reglagesFeuille(p), champs: feuille.champs, logos: feuille.logosImages ?? [], dim: { l: K.l, h: K.h, k: feuille.mise.k } });
+  }
+
+  function changerLogos(modif) {
+    if (!avantChangement()) return;
+    const logos = [...listeLogos(plan().feuille)];
+    modif(logos);
+    plan().feuille = { ...(plan().feuille ?? {}), logos: logos.slice(0, 4) };
+    enregistrer();
+    majFeuille();
+    majPanneauFeuille();
+  }
+
   /** 0.361.1 : informations du cartouche : case pour les montrer, taille du texte (points) ; positions inchangées. */
   function htmlCartouchePerso(r) {
     const perso = r.cartouchePerso ?? cartouchePersoDe({});
@@ -2127,8 +2171,9 @@ export function ouvrirPlansChantier({
     const lignes = ordre.map((c) => `<div class="ligne-cartouche">
       <input type="checkbox" data-cartouche="visible" data-cle="${c}" ${perso.champs[c].visible ? 'checked' : ''} aria-label="Montrer : ${echapper(noms[c])}">
       <span>${echapper(noms[c])}</span>
-      <input type="number" min="${TAILLE_CARTOUCHE_MIN}" max="${TAILLE_CARTOUCHE_MAX}" step="0.5" value="${perso.champs[c].taille}" data-cartouche="taille" data-cle="${c}" title="Taille du texte (points)" aria-label="Taille : ${echapper(noms[c])}"></div>`).join('');
-    return `<div class="cartouche-perso"><b>Informations (montrer, taille en pt)</b>${lignes}
+      <input type="number" min="${TAILLE_CARTOUCHE_MIN}" max="${TAILLE_CARTOUCHE_MAX}" step="0.5" value="${perso.champs[c].taille}" data-cartouche="taille" data-cle="${c}" title="Taille du texte (points)" aria-label="Taille : ${echapper(noms[c])}">
+      <input type="color" value="${perso.champs[c].couleur ?? COULEURS_DEFAUT_CARTOUCHE[c] ?? COULEUR_TEXTE_CARTOUCHE}" data-cartouche="couleur" data-cle="${c}" title="Couleur du texte" aria-label="Couleur : ${echapper(noms[c])}"></div>`).join('');
+    return `<div class="cartouche-perso"><b>Informations (montrer, taille en pt, couleur)</b>${lignes}
       ${r.cartouchePerso ? '<button type="button" class="lien-calage" data-cartouche-standard>Remettre le cartouche standard</button>' : '<p class="aide-calage">Standard : toucher une case ou une taille le personnalise (les positions ne changent pas).</p>'}</div>`;
   }
 
@@ -2157,7 +2202,9 @@ export function ouvrirPlansChantier({
       return;
     }
     d.innerHTML = `<div class="entete-popup"><b>${TITRES_POPUP[cle]}</b><button type="button" class="bouton-secondaire petit" data-action="popup-feuille-fermer" aria-label="Fermer">✕</button></div>${htmlPopupFeuille(cle)}`;
+    d.classList.toggle('popup-large', cle === 'cartouche');
     if (!d.open) d.show();
+    majApercuCartouche();
   }
 
   function majPanneauFeuille() {
@@ -2328,7 +2375,7 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majFeuille();
     }
-    if (b.dataset.action === 'feuille-logo') return choisirLogo(p);
+    if (b.dataset.logoRetirer !== undefined) return changerLogos((l) => { l.splice(Number(b.dataset.logoRetirer), 1); });
     if (b.dataset.action === 'feuille-pdf') {
       b.disabled = true;
       try {
@@ -2375,9 +2422,10 @@ export function ouvrirPlansChantier({
     c.height = Math.round(image.height * k);
     c.getContext('2d').drawImage(image, 0, 0, c.width, c.height);
     if (!avantChangement()) return;
-    p.feuille = { ...(p.feuille ?? {}), logo: c.toDataURL(fichier.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.9) };
+    p.feuille = { ...(p.feuille ?? {}), logos: [...listeLogos(p.feuille), c.toDataURL(fichier.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.9)].slice(0, 4) };
     enregistrer();
     majFeuille();
+    majPanneauFeuille();
   }
 
   /** Réglages de plans de la feuille : tous les plans reçoivent leur état actuel (écran ou déjà réglé) avant le 1er changement. */
@@ -2458,8 +2506,22 @@ export function ouvrirPlansChantier({
       majFeuille();
       return vue?.redessiner();
     }
+    if (c.dataset.logoAjout !== undefined) {
+      if (!c.value) return;
+      if (c.value === 'image') return choisirLogo(p);
+      return changerLogos((l) => { l.push(c.value); });
+    }
+    if (c.dataset.tc) {
+      if (!avantChangement()) return majPanneauFeuille();
+      const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? Number(String(c.value).replace(',', '.')) : c.value;
+      plan().feuille = { ...(plan().feuille ?? {}), texteCartouche: { ...texteCartoucheDe(plan().feuille?.texteCartouche), [c.dataset.tc]: v } };
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
+    }
     if (c.dataset.cartouche) {
       const cle = c.dataset.cle;
+      if (c.dataset.cartouche === 'couleur') return changerCartouchePerso((pp) => { pp.champs[cle].couleur = c.value; });
       if (c.dataset.cartouche === 'visible') return changerCartouchePerso((pp) => { pp.champs[cle].visible = c.checked; });
       const v = Number(String(c.value).replace(',', '.'));
       if (!Number.isFinite(v) || v < TAILLE_CARTOUCHE_MIN || v > TAILLE_CARTOUCHE_MAX) { message(`Taille du texte : entre ${TAILLE_CARTOUCHE_MIN} et ${TAILLE_CARTOUCHE_MAX} points.`, 3500); return majPanneauFeuille(); }
@@ -2477,7 +2539,6 @@ export function ouvrirPlansChantier({
     }
     const cle = c.dataset.feuille ?? c.dataset.feuilleCase ?? c.dataset.fond ?? c.dataset.phaseCommune;
     if (!cle) return;
-    if (cle === 'logo' && c.value === 'image') return choisirLogo(p);
     if (!avantChangement()) return majPanneauFeuille();
     if (c.dataset.phaseCommune) p.phases.find((x) => x.id === c.dataset.phaseCommune).commune = c.checked || undefined;
     else if (c.dataset.fond) p.fond[cle] = c.checked;

@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.361.1 — Cartouche : plus d'ordre, seulement montrer / cacher et la taille (demande du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.362.0 — Cartouche : plusieurs logos, texte au-dessus, couleurs, aperçu en gros (demandes du 28.11)
+- **Logos** : `feuille.logos` (liste, 4 au plus ; livrés `perrin` / `natalini` / `ronchi` ou image importée réduite à 600 px) ; l'ancien `feuille.logo` est lu tant que `logos` n'existe pas (`listeLogos`). Chaque logo est centré dans sa part de la zone de gauche du cartouche, mêmes marges et proportions qu'avant (`dessinerCartouche` dans `plans-chantier/feuille.js`).
+- **Texte au-dessus du cartouche** : `feuille.texteCartouche` { texte (plusieurs lignes), taille, couleur, fond, opaciteFond }, posé contre le cartouche du côté du plan ; la légende se décale derrière (`miseEnPageFeuille` renvoie `texteCartouche`).
+- **Couleur de chaque information** du cartouche (`cartouchePerso.champs[clé].couleur`).
+- **Aperçu en gros** en haut de la fenêtre du cartouche (`dessinerApercuCartouche`), collé en haut quand on fait défiler.
+- Cases à cocher de la liste des informations : plus de chevauchement avec les noms.
+- À essayer : PDF exporté avec plusieurs logos et le texte du dessus ; image PNG transparente comme logo.
+
+## 0.361.1 — Cartouche : plus d'ordre, seulement montrer / cacher et la taille (demande du 28.11)
 - Les positions du cartouche redeviennent celles d'avant (échelle / format et date / dessiné par côte à côte). `feuille.cartouchePerso` = { champs: { clé: { visible, taille } } } ; plus d'`ordre` (un ancien réglage avec `ordre` est simplement ignoré).
 
 ## 0.361.0 — Demandes du 28.11 (suite) : choix par surbrillance, benne, fenêtres compactes, cartouche sur mesure

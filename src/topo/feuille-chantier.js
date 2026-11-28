@@ -33,7 +33,7 @@ export function reglagesFeuille(plan) {
     ...reglagesElements(f),
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une', phase: f.phase ?? '',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    cartouchePerso: cartouchePersoDe(f.cartouchePerso), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
+    cartouchePerso: cartouchePersoDe(f.cartouchePerso), texteCartouche: texteCartoucheDe(f.texteCartouche), logos: listeLogos(f), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
 }
 
@@ -42,6 +42,8 @@ export const CHAMPS_CARTOUCHE = [
   ['affaire', 'Affaire - désignation', 8, true], ['projet', 'Projet', 6.5, false], ['titre', 'Titre du plan', 9.5, true], ['indice', 'Indice', 8, true],
   ['phase', 'Phase', 7, false], ['echelle', 'Échelle', 6.5, false], ['format', 'Format', 6.5, false], ['date', 'Date', 6.5, false], ['auteur', 'Dessiné par', 6.5, false],
 ];
+export const COULEUR_TEXTE_CARTOUCHE = '#1b2b36';
+export const COULEURS_DEFAUT_CARTOUCHE = { phase: '#b45309' }; // les autres : COULEUR_TEXTE_CARTOUCHE
 export const TAILLE_CARTOUCHE_MIN = 4;
 export const TAILLE_CARTOUCHE_MAX = 16;
 
@@ -55,9 +57,40 @@ export function cartouchePersoDe(f) {
   for (const [c, , taille] of CHAMPS_CARTOUCHE) {
     const v = f.champs?.[c] ?? {};
     const t = Number(v.taille);
-    champs[c] = { visible: v.visible !== false, taille: Number.isFinite(t) && t > 0 ? Math.min(TAILLE_CARTOUCHE_MAX, Math.max(TAILLE_CARTOUCHE_MIN, t)) : taille };
+    champs[c] = { visible: v.visible !== false, couleur: /^#[0-9a-f]{6}$/i.test(v.couleur ?? '') ? v.couleur : null, taille: Number.isFinite(t) && t > 0 ? Math.min(TAILLE_CARTOUCHE_MAX, Math.max(TAILLE_CARTOUCHE_MIN, t)) : taille };
   }
   return { champs };
+}
+
+/**
+ * Texte au-dessus du cartouche (0.362.0) : { texte, taille (pt), couleur, fond (case), opaciteFond (0 à 100 %, blanc) }.
+ * Sans texte : pas de cadre.
+ */
+export function texteCartoucheDe(f) {
+  const t = f && typeof f === 'object' ? f : {};
+  const taille = Number(t.taille);
+  const opacite = Number(t.opaciteFond);
+  return {
+    texte: String(t.texte ?? '').slice(0, 300),
+    taille: Number.isFinite(taille) && taille > 0 ? Math.min(20, Math.max(4, taille)) : 9,
+    couleur: /^#[0-9a-f]{6}$/i.test(t.couleur ?? '') ? t.couleur : COULEUR_TEXTE_CARTOUCHE,
+    fond: t.fond !== false,
+    opaciteFond: Number.isFinite(opacite) && t.opaciteFond !== '' && t.opaciteFond != null ? Math.min(100, Math.max(0, opacite)) : 85,
+  };
+}
+
+/** Hauteur (mm) du cadre du texte posé au-dessus du cartouche ; 0 s'il n'y a pas de texte. k : taille des éléments (A3 = 1). */
+export function hauteurTexteCartouche(tc, k) {
+  if (!tc || !String(tc.texte ?? '').trim()) return 0;
+  const lignes = String(tc.texte).split('\n').length;
+  return lignes * tc.taille * k * 0.3528 * 1.4 + 3 * k;
+}
+
+/** Logos du cartouche, dans l'ordre : le réglage « logos » s'il existe, sinon l'ancien réglage « logo » (aucun = liste vide). 4 au plus. */
+export function listeLogos(f) {
+  if (Array.isArray(f?.logos)) return f.logos.filter((x) => typeof x === 'string' && x).slice(0, 4);
+  const l = f?.logo ?? 'perrin';
+  return l === 'aucun' ? [] : [l];
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
@@ -136,8 +169,11 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const ligne = 6 * k * (legendeTaille / 100); // hauteur d'une ligne de la légende
   const colonnes = legendeColonnes === '1' ? 1 : legendeColonnes === '2' ? 2 : lignesLegende > 8 ? 2 : 1;
   const nLignes = Math.ceil(lignesLegende / colonnes);
-  const hl = lignesLegende ? Math.min(cadre.h - hc - 10 * k, 9 * k + nLignes * ligne) : 0;
-  const legende = { x: cartouche.x, y: enBas ? cartouche.y - hl : cartouche.y + hc, l: lc, h: hl, ligne, colonnes };
+  const hl = lignesLegende ? Math.min(cadre.h - hc - hauteurTexteCartouche(opts.texteCartouche, k) - 10 * k, 9 * k + nLignes * ligne) : 0;
+  // 0.362.0 : texte posé contre le cartouche, du côté du plan (au-dessus si le cartouche est en bas) ; la légende se place derrière lui
+  const ex = cartoucheActif ? hauteurTexteCartouche(opts.texteCartouche, k) : 0;
+  const texteCartouche = ex ? { x: cartouche.x, y: enBas ? cartouche.y - ex : cartouche.y + hc, l: lc, h: ex } : null;
+  const legende = { x: cartouche.x, y: enBas ? cartouche.y - ex - hl : cartouche.y + hc + ex, l: lc, h: hl, ligne, colonnes };
   const maxBarre = Math.min(70 * k, cadre.l * 0.25);
   // Planning des phases (0.294.1) : dans la rangée du cartouche, à côté de lui (après la barre d'échelle si elle est en bas).
   const reserve = enBas ? maxBarre + 21 * k : 6 * k; // la barre d'échelle (bas gauche) reste devant lui
@@ -162,7 +198,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
     nomsDetails.push(nom);
     if (d.pos) positions = { ...positions, [nom]: d.pos };
   }
-  const occupes = [cartouche, ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
+  const occupes = [cartouche, ...(texteCartouche ? [texteCartouche] : []), ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
   const dansCoin = (nom, c) => {
     const { l, h } = tailles[nom];
     const m = (nom === 'situation' || nom.startsWith('det:') ? 3 : nom === 'nord' ? 1 : 4) * k;
@@ -203,7 +239,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const nord = boites.nord ? { x: boites.nord.x + 0.85 * tNord, y: boites.nord.y + 1.25 * tNord, t: tNord } : { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: tNord };
   const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k * (barreTaille / 100), max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
   return {
-    page, k, cadre, cartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
+    page, k, cadre, cartouche, texteCartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
     // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
     boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null, ...Object.fromEntries(nomsDetails.map((n) => [n, boites[n]])) }, fixes: occupes,
   };
@@ -331,7 +367,7 @@ export function barreDeLaFeuille(echelle, maxMm, longueurM = 0) {
 }
 
 /** Options de mise en page tirées des réglages de la feuille (une seule source pour l'écran et le PDF). */
-export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
+export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, texteCartouche: r.texteCartouche, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
 
 /**
  * Textes du cartouche (mm de papier, y vers le bas ; taille en points) : affaire, titre du plan, phase, échelle, format,
@@ -343,7 +379,7 @@ export function textesCartouche(cartouche, k, champs, perso = null) {
   const y = (f) => cartouche.y + cartouche.h * f;
   // 0.361.1 : positions toujours celles du cartouche standard ; le réglage ne change que la taille du texte et sa visibilité
   const reg = (cle) => perso?.champs?.[cle];
-  const t = (cle, texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: reg(cle)?.visible === false ? '' : String(texte ?? ''), x, y: yy, taille: (reg(cle)?.taille ?? taille) * k, gras, couleur });
+  const t = (cle, texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: reg(cle)?.visible === false ? '' : String(texte ?? ''), x, y: yy, taille: (reg(cle)?.taille ?? taille) * k, gras, couleur: reg(cle)?.couleur ?? couleur });
   const xm = x0 + (cartouche.x + cartouche.l - x0) / 2;
   return [
     t('affaire', champs.affaire, x0, y(0.15), 8, true), // 0.329.0 : « affaire - désignation » (modifiable), sur une seule ligne
