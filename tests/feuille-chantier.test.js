@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cartouchePersoDe, textesCartouche as textesCartoucheT, texteCartoucheDe, hauteurTexteCartouche, listeLogos, miseEnPageFeuille, titrePageDe, texteTitrePage, hauteurTitrePage, taillePourTitre } from '../src/topo/feuille-chantier.js';
+import { cartouchePersoDe, textesCartouche as textesCartoucheT, texteCartoucheDe, hauteurTexteCartouche, listeLogos, miseEnPageFeuille, titrePageDe, texteTitrePage, hauteurTitrePage, taillePourTitre, zonesTitrePage } from '../src/topo/feuille-chantier.js';
 describe('Cartouche sur mesure (0.361.0)', () => {
   const champs = { affaire: 'A', projet: '', titre: 'T', phase: '', echelle: 200, format: 'A3', date: '1.1.2026', indice: 'A', auteur: 'Moi' };
   it('sans réglage : cartouche standard', () => { expect(cartouchePersoDe(null)).toBeNull(); });
@@ -83,5 +83,17 @@ describe('Titre de la présentation (0.363.0)', () => {
     const tp = titrePageDe({ taille: 30 });
     expect(taillePourTitre(tp, 'court', 400, 1)).toBe(30);
     expect(taillePourTitre(tp, 'x'.repeat(200), 100, 1)).toBeLessThan(30);
+  });
+});
+
+describe('Titre : emplacement de chaque élément (0.364.0)', () => {
+  const champs = { affaire: '10 203 - Rue X', titre: 'Plan 1', phase: 'Phase : 2', echelle: 200, format: 'A3', date: '1.1.2026', indice: 'B', auteur: '' };
+  it('répartit les éléments à gauche, au centre et à droite', () => {
+    const t = titrePageDe({ elements: ['nom', 'phase', 'echelle', 'auteur'], positions: { nom: 'g', phase: 'c', echelle: 'd' } });
+    expect(zonesTitrePage(t, champs)).toEqual({ g: 'Plan 1', c: 'Phase : 2', d: 'Échelle 1:200' });
+  });
+  it('sans emplacement : l\'alignement général ; plusieurs éléments dans une zone', () => {
+    const t = titrePageDe({ elements: ['nom', 'phase'], alignement: 'd', texteLibre: 'Hall' });
+    expect(zonesTitrePage(t, champs)).toEqual({ g: '', c: '', d: 'Hall · Plan 1 · Phase : 2' });
   });
 });

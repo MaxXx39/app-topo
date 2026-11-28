@@ -11,7 +11,7 @@ import { repereDuDetail } from '../topo/details-feuille.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, optionsMiseEnPage, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
-  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche, hauteurTexteCartouche, texteTitrePage, taillePourTitre,
+  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche, hauteurTexteCartouche, texteTitrePage, zonesTitrePage, taillePourTitre,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
@@ -440,9 +440,12 @@ export function dessinerTitrePage(ctx, s, B, k, tp, champs, texte) {
   }
   ctx.restore();
   if (!t) return;
-  const taille = taillePourTitre(tp, t, B.l, k);
-  const x = tp.alignement === 'g' ? B.x + 3 * k : tp.alignement === 'd' ? B.x + B.l - 3 * k : B.x + B.l / 2;
-  texte(t, x, B.y + (B.h - (tp.style === 'souligne' ? 0.9 * k : 0)) / 2, taille, { gras: true, couleur: tp.couleur, align: tp.alignement === 'g' ? 'left' : tp.alignement === 'd' ? 'right' : 'center' });
+  // 0.364.0 : trois zones (gauche, centre, droite) ; la taille est réduite pour que tout tienne sur la ligne
+  const zones = zonesTitrePage(tp, champs);
+  const taille = taillePourTitre(tp, `${zones.g}  ${zones.c}  ${zones.d}`, B.l, k);
+  const y = B.y + (B.h - (tp.style === 'souligne' ? 0.9 * k : 0)) / 2;
+  const places = { g: [B.x + 3 * k, 'left'], c: [B.x + B.l / 2, 'center'], d: [B.x + B.l - 3 * k, 'right'] };
+  for (const z of ['g', 'c', 'd']) if (zones[z]) texte(zones[z], places[z][0], y, taille, { gras: true, couleur: tp.couleur, align: places[z][1] });
 }
 
 /** Cartouche : cadre, logos à gauche (même zone, chacun centré dans sa part), textes à droite. texte : fonction d'écriture. */

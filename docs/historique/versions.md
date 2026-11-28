@@ -1,6 +1,9 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.363.0 — Cote collée à la ligne, titre de présentation, dernières couleurs (demandes du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.364.0 — Titre : chaque élément à gauche, au centre ou à droite (demande du 28.11)
+- `feuille.titrePage.positions` { clé: 'g' | 'c' | 'd' } (clés : les 8 éléments + `libre`) ; sans choix, l'alignement général. Trois boutons ⇤ ↔ ⇥ à droite de chaque élément ; « Tout placer » remet tous les éléments au même endroit. `zonesTitrePage` répartit le texte, `dessinerTitrePage` écrit les 3 zones sur la même ligne (taille réduite si ça ne tient pas).
+
+## 0.363.0 — Cote collée à la ligne, titre de présentation, dernières couleurs (demandes du 28.11)
 - **Cotation** : la valeur est collée à la ligne (écart de 0,5 hauteur de texte), au choix **Dessus / Dessous** (`o.cotePos`, bandeau) ; le style de la valeur (cadre, ligne coupée…), les bouts, leur taille et les coins sont rangés dans « ⚙ Style de cote » (décidé le 28.11). Les cotes déjà dessinées gardent leur style ; les nouvelles partent en « Au-dessus, sans cadre ».
 - **Titre de présentation** : `feuille.titrePage` { actif, style (simple / bandeau / encadré / souligné), taille, couleur, couleurFond, alignement g / c / d, elements (nom, chantier, phase, échelle, format, indice, date, auteur), texteLibre } ; le titre prend une bande au-dessus du cadre du plan (`miseEnPageFeuille` renvoie `titrePage`, le cadre commence dessous) ; texte réduit s'il ne tient pas. Les 4 styles proposés ont tous été retenus (28.11). Case « Titre » dans les éléments de la feuille.
 - **Dernières couleurs** (`plans-chantier/couleurs-recentes.js`) : 8 couleurs gardées sur l'appareil (`topo-couleurs-recentes`), petite rangée sous chaque `input[type=color]` de l'appli (observateur), un clic remet la couleur ; les pastilles de couleur (0.360.0) comptent aussi.

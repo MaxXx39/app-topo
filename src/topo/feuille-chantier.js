@@ -112,7 +112,22 @@ export function titrePageDe(f) {
     alignement: ALIGNEMENTS_TITRE.some(([c]) => c === t.alignement) ? t.alignement : 'c',
     elements: Array.isArray(t.elements) ? ELEMENTS_TITRE.map(([c]) => c).filter((c) => t.elements.includes(c)) : ['nom', 'phase'],
     texteLibre: String(t.texteLibre ?? '').slice(0, 120),
+    // 0.364.0 : emplacement de chaque élément (g = gauche, c = centre, d = droite) ; sans choix : l'alignement général
+    positions: Object.fromEntries([...ELEMENTS_TITRE.map(([c]) => c), 'libre'].map((c) => [c, ['g', 'c', 'd'].includes(t.positions?.[c]) ? t.positions[c] : (ALIGNEMENTS_TITRE.some(([a]) => a === t.alignement) ? t.alignement : 'c')])),
   };
+}
+
+/**
+ * Titre réparti en trois zones { g, c, d } (0.364.0) : chaque élément coché va à gauche, au centre ou à droite selon son
+ * emplacement ; dans une zone, le texte libre d'abord puis les éléments dans l'ordre de la liste, séparés par « · ».
+ */
+export function zonesTitrePage(tp, champs) {
+  const morceaux = { nom: champs.titre, chantier: champs.affaire, phase: champs.phase, echelle: `Échelle 1:${champs.echelle}`, format: `Format ${champs.format}`, indice: `Indice ${champs.indice}`, date: `Date ${champs.date}`, auteur: champs.auteur ? `Dessiné par ${champs.auteur}` : '' };
+  const zones = { g: [], c: [], d: [] };
+  const ajouter = (cle, texte) => { const t = String(texte ?? '').trim(); if (t) zones[tp.positions[cle]].push(t); };
+  ajouter('libre', tp.texteLibre);
+  for (const c of tp.elements) ajouter(c, morceaux[c]);
+  return { g: zones.g.join(' · '), c: zones.c.join(' · '), d: zones.d.join(' · ') };
 }
 
 /** Texte du titre : le texte libre puis les éléments cochés (dans l'ordre de la liste), séparés par « · ». champs : ceux du cartouche. */

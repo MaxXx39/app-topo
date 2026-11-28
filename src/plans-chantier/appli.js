@@ -2102,15 +2102,17 @@ export function ouvrirPlansChantier({
     }
     if (cle === 'titre') {
       const t = r.titrePage;
+      const place = (c) => `<span class="places-titre" role="group" aria-label="Emplacement : ${c}">${['g', 'c', 'd'].map((a) => `<button type="button" class="${t.positions[c] === a ? 'actif' : ''}" data-titre-place="${c}:${a}" title="${{ g: 'À gauche', c: 'Au centre', d: 'À droite' }[a]}">${{ g: '⇤', c: '↔', d: '⇥' }[a]}</button>`).join('')}</span>`;
       const dessinAlign = (a) => `<button type="button" class="bouton-secondaire petit ${t.alignement === a ? 'actif' : ''}" data-titre-align="${a}" title="${ALIGNEMENTS_TITRE.find(([c]) => c === a)[1]}">${{ g: '⇤ Gauche', c: '↔ Centré', d: 'Droite ⇥' }[a]}</button>`;
       return `
       <div class="styles-titre" role="group" aria-label="Style du titre">${STYLES_TITRE.map(([c, nom]) => `<button type="button" class="style-titre ${t.style === c ? 'actif' : ''}" data-titre-style="${c}" title="${nom}"><i class="mini-titre-${c}"></i><span>${nom}</span></button>`).join('')}</div>
-      <div class="ligne-tc">${['g', 'c', 'd'].map(dessinAlign).join('')}</div>
+      <div class="ligne-tc"><span>Tout placer :</span>${['g', 'c', 'd'].map(dessinAlign).join('')}</div>
       <div class="ligne-tc"><label>Taille <input type="number" min="8" max="40" step="1" value="${t.taille}" data-titre="taille"> pt</label>
         <label>Texte <input type="color" value="${t.couleur}" data-titre="couleur"></label>
         ${t.style === 'simple' || t.style === 'encadre' ? '' : `<label>${t.style === 'souligne' ? 'Trait' : 'Fond'} <input type="color" value="${t.couleurFond}" data-titre="couleurFond"></label>`}</div>
       <b>Éléments du titre</b>
-      <div class="elements-titre">${ELEMENTS_TITRE.map(([c, nom]) => `<label class="case-chantier"><input type="checkbox" data-titre-element="${c}" ${t.elements.includes(c) ? 'checked' : ''}> ${nom}</label>`).join('')}</div>
+      <div class="elements-titre">${ELEMENTS_TITRE.map(([c, nom]) => `<div class="ligne-element-titre"><label class="case-chantier"><input type="checkbox" data-titre-element="${c}" ${t.elements.includes(c) ? 'checked' : ''}> ${nom}</label>${place(c)}</div>`).join('')}</div>
+      <div class="ligne-element-titre"><span>Texte libre</span>${place('libre')}</div>
       <label class="champ-calage"><span>Texte libre (écrit en premier)</span><input type="text" maxlength="120" value="${echapper(t.texteLibre)}" data-titre="texteLibre"></label>`;
     }
     if (cle === 'cartouche') {
@@ -2391,10 +2393,14 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majFeuille();
     }
-    if (b.dataset.titreStyle || b.dataset.titreAlign) {
+    if (b.dataset.titreStyle || b.dataset.titreAlign || b.dataset.titrePlace) {
       if (!avantChangement()) return;
       const actuel = titrePageDe(plan().feuille?.titrePage);
-      plan().feuille = { ...(plan().feuille ?? {}), titrePage: { ...actuel, ...(b.dataset.titreStyle ? { style: b.dataset.titreStyle } : { alignement: b.dataset.titreAlign }) } };
+      let suite;
+      if (b.dataset.titreStyle) suite = { style: b.dataset.titreStyle };
+      else if (b.dataset.titrePlace) { const [cle, pos] = b.dataset.titrePlace.split(':'); suite = { positions: { ...actuel.positions, [cle]: pos } }; }
+      else suite = { alignement: b.dataset.titreAlign, positions: Object.fromEntries(Object.keys(actuel.positions).map((c) => [c, b.dataset.titreAlign])) }; // « Tout placer »
+      plan().feuille = { ...(plan().feuille ?? {}), titrePage: { ...actuel, ...suite } };
       enregistrer();
       majFeuille();
       return majPanneauFeuille();

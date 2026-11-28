@@ -15580,3 +15580,10 @@ html:has(dialog.page-pc[open]) dialog.popup-feuille.popup-large { width: 400px; 
 .mini-titre-encadre { background: #fff; border: 1.5px solid #1b2b36; }
 .mini-titre-souligne { background: linear-gradient(#f5c518, #f5c518) bottom / 100% 3px no-repeat; }
 .elements-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 2px 0 6px; }
+
+/* 0.364.0 : emplacement (gauche / centre / droite) de chaque élément du titre */
+.elements-titre { grid-template-columns: 1fr; }
+.ligne-element-titre { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.places-titre { display: inline-flex; gap: 2px; }
+.places-titre button { min-width: 24px; min-height: 20px; padding: 0 4px; border: 1px solid var(--bordure); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 0.8rem; }
+.places-titre button.actif { background: #b45309; color: #ffffff; border-color: #b45309; }
