@@ -14,7 +14,8 @@ import { groupesDe, groupeDe, membresDe, grouper, degrouper, reglerPhaseGroupe, 
 import { cartoucheActif, dansAffaire, pastillesAffaireCliquables, aPlusieursAffaires, affaireChoisie } from '../topo/affaires.js';
 import { aAcces } from '../reglages/reglages.js';
 import { habillerPage } from '../navigation/cadre-page.js';
-import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
+import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit , ajouterGabaritPartage, utiliserGabaritPartage } from '../topo/presentations.js';
+import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 import { echapper } from '../outils/echapper.js';
 import { pastillesCouleur } from './pastilles-couleur.js';
 import { surveillerCouleurs } from './couleurs-recentes.js';
@@ -1600,9 +1601,9 @@ export function ouvrirPlansChantier({
         ${bouton(`data-action="feuille-detail-centre" aria-pressed="${etat.feuilleMode === 'detail-centre'}"`, '<circle cx="12" cy="12" r="3"/><path d="M12 3V7M12 17V21M3 12H7M17 12H21"/>', 'Changer l\'endroit montré par le cadre de détail choisi : cliquez sur le plan', 'Lieu', !etat.detailChoisi).replace('class="outil-ruban"', `class="outil-ruban${etat.feuilleMode === 'detail-centre' ? ' actif' : ''}"`)}
         ${bouton('data-action="feuille-detail-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le cadre de détail choisi', 'Suppr. détail', !etat.detailChoisi)}
       </div>
-      <div class="groupe-ruban type-gabarit" role="group" aria-label="Gabarit"><span class="titre-groupe">Gabarit</span><label class="champ-bande" title="Gabarit : une présentation modèle du projet, à créer sur ce plan"><span>Gabarit</span>
-          <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).map((g) => `<option value="${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</select></label>
-        ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit du projet', 'Gabarit +')}
+      <div class="groupe-ruban type-gabarit" role="group" aria-label="Gabarit"><span class="titre-groupe">Gabarit</span><label class="champ-bande" title="Gabarit : une présentation modèle (de ce projet, ou de tous les projets par Drive), à créer sur ce plan"><span>Gabarit</span>
+          <select data-gabarit="utiliser" aria-label="Gabarit"><option value="">— choisir —</option>${gabaritsDe(leProjet()).length ? `<optgroup label="Ce projet">${gabaritsDe(leProjet()).map((g) => `<option value="p:${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</optgroup>` : ''}${gabaritsPartages().length ? `<optgroup label="Tous les projets (Drive)">${gabaritsPartages().map((g) => `<option value="d:${echapper(g.id)}">${echapper(g.nom)}</option>`).join('')}</optgroup>` : ''}</select></label>
+        ${bouton('data-action="gabarit-enregistrer"', '<path d="M12 5V19M5 12H19"/>', 'Enregistrer les réglages de la feuille comme gabarit (pour ce projet ou pour tous les projets)', 'Gabarit +')}
         ${bouton('data-action="gabarit-supprimer"', '<path d="M5 7H19M10 7V4H14V7M7 7L8 20H16L17 7"/>', 'Supprimer le gabarit choisi (les présentations déjà créées restent)', 'Suppr. gab.')}</div>
       <div class="groupe-ruban type-affichage" role="group" aria-label="Affichage"><span class="titre-groupe">Affichage</span><label class="case-bande" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (feuille et écran)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> <span>Effet 3D</span></label>
         <label class="champ-bande" title="Texte des symboles, en mm sur le papier"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm" size="4"></label></div>`;
@@ -2141,6 +2142,9 @@ export function ouvrirPlansChantier({
     return htmlPanneauDetails(r, p);
   }
 
+  /** Gabarits pour tous les projets (0.365.0, listes partagées par Drive). */
+  const gabaritsPartages = () => lireListesPartagees().gabarits ?? [];
+
   /** 0.362.0 : logos du cartouche : plusieurs possibles (4 au plus), ajouter un logo livré ou importer une image. */
   function htmlLogos(r) {
     const noms = { perrin: 'Perrin', natalini: 'Natalini', ronchi: 'Ronchi' };
@@ -2294,8 +2298,21 @@ export function ouvrirPlansChantier({
       return dessinerApercu();
     }
     if (b.dataset.action === 'gabarit-enregistrer') { // 0.338.0 : les réglages de cette feuille deviennent un gabarit du projet
+      // 0.365.0 : pour ce projet seulement, ou pour tous les projets (listes partagées par Drive)
+      const ou = await demanderChoix({ titre: 'Gabarit pour…', boutons: [
+        { cle: 'tous', texte: 'Tous les projets', detail: 'Partagé par Drive avec tous vos appareils', principal: true },
+        { cle: 'projet', texte: 'Ce projet seulement' },
+        { cle: 'annuler', texte: 'Annuler' },
+      ] });
+      if (!ou || ou === 'annuler') return;
       const nom = await demanderTexte({ titre: 'Nom du gabarit', valeur: presentationActive(p)?.nom ?? 'Gabarit' });
       if (!nom) return;
+      if (ou === 'tous') {
+        const { liste, gabarit } = ajouterGabaritPartage(gabaritsPartages(), p, nom);
+        ecrireListesPartagees({ ...lireListesPartagees(), gabarits: liste });
+        message(`Gabarit « ${gabarit.nom} » enregistré pour tous les projets (envoyé sur Drive).`, 4000, { ok: true });
+        return majBandeFeuille();
+      }
       enregistrerGabarit(leProjet(), p, nom);
       modifie();
       message('Gabarit enregistré : il est disponible sur tous les plans du projet.', 3500, { ok: true });
@@ -2304,7 +2321,14 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'gabarit-supprimer') {
       const id = page.querySelector('[data-gabarit="utiliser"]')?.value;
       if (!id) return message('Choisissez d\'abord un gabarit dans la liste.', 3000);
-      supprimerGabarit(leProjet(), id);
+      if (id.startsWith('d:')) {
+        const g = gabaritsPartages().find((x) => x.id === id.slice(2));
+        const r = await demanderChoix({ titre: `Supprimer « ${g?.nom ?? 'ce gabarit'} » ?`, texte: 'Il disparaît pour tous les projets et tous vos appareils. Les présentations déjà créées restent.', boutons: [{ cle: 'non', texte: 'Garder', principal: true }, { cle: 'oui', texte: 'Supprimer' }] });
+        if (r !== 'oui') return;
+        ecrireListesPartagees({ ...lireListesPartagees(), gabarits: gabaritsPartages().filter((x) => x.id !== id.slice(2)) });
+        return majBandeFeuille();
+      }
+      supprimerGabarit(leProjet(), id.replace(/^p:/, ''));
       modifie();
       return majBandeFeuille();
     }
@@ -4001,9 +4025,11 @@ export function ouvrirPlansChantier({
       return etat.ecran === 'feuille' ? majFeuille() : vue?.redessinerDessus();
     }
     if (c.dataset.gabarit !== undefined) { // 0.338.0 : créer une présentation à partir du gabarit choisi
-      const g = gabaritsDe(leProjet()).find((x) => x.id === c.value);
+      const partage = c.value.startsWith('d:');
+      const id = c.value.replace(/^[pd]:/, '');
+      const g = (partage ? gabaritsPartages() : gabaritsDe(leProjet())).find((x) => x.id === id);
       if (!g || !avantChangement()) return majBandeFeuille();
-      utiliserGabarit(plan(), g);
+      if (partage) utiliserGabaritPartage(plan(), g); else utiliserGabarit(plan(), g);
       enregistrer();
       message(`Présentation « ${g.nom} » créée sur ce plan à partir du gabarit.`, 3500, { ok: true });
       return majFeuille();

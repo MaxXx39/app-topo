@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.364.0 — Titre : chaque élément à gauche, au centre ou à droite (demande du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.365.0 — Gabarits de présentation pour tous les projets, par Drive (choix 2 du 28.11)
+- Nouvelle partie `gabarits` des listes partagées (`reglages/listes-partagees.js`, fusion partie par partie comme les autres) : { id, nom, feuille, echelle }.
+- « Gabarit + » demande : **Tous les projets** (Drive) ou **Ce projet seulement** (comme avant, `projet.gabaritsPresentation`). La liste « Gabarit » montre deux groupes : « Ce projet » et « Tous les projets (Drive) » (valeurs `p:` / `d:`). Supprimer un gabarit partagé demande confirmation.
+- Un gabarit partagé ne garde pas ce qui appartient à un chantier (`PROPRES_AU_PLAN` : centre, détails et leurs places, plans montrés, phase, pages, rotation, titre du plan, nom du chantier, date, indice) ; en l'utilisant, le plan garde les siens (`feuilleSansChantier`, `utiliserGabaritPartage` dans `topo/presentations.js`). **Choix fait sans l'utilisateur, à valider.**
+- Les logos importés (images) partent dans le gabarit partagé : liste Drive plus lourde si beaucoup de logos.
+
+## 0.364.0 — Titre : chaque élément à gauche, au centre ou à droite (demande du 28.11)
 - `feuille.titrePage.positions` { clé: 'g' | 'c' | 'd' } (clés : les 8 éléments + `libre`) ; sans choix, l'alignement général. Trois boutons ⇤ ↔ ⇥ à droite de chaque élément ; « Tout placer » remet tous les éléments au même endroit. `zonesTitrePage` répartit le texte, `dessinerTitrePage` écrit les 3 zones sur la même ligne (taille réduite si ça ne tient pas).
 
 ## 0.363.0 — Cote collée à la ligne, titre de présentation, dernières couleurs (demandes du 28.11)

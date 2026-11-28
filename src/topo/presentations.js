@@ -87,15 +87,54 @@ export function supprimerPresentation(plan, id) {
 // qu'on crée d'un clic sur un autre plan de chantier du même projet. Un gabarit = { id, nom, feuille, echelle }.
 export const gabaritsDe = (projet) => (Array.isArray(projet?.gabaritsPresentation) ? projet.gabaritsPresentation : []);
 
-/** Enregistre les réglages de la feuille du plan (échelle comprise) comme gabarit du projet, sous un nom libre. */
-export function enregistrerGabarit(projet, plan, nom) {
+/** Nouveau gabarit (nom unique dans la liste) fait des réglages de la feuille du plan ; feuille : celle à garder. */
+function nouveauGabarit(liste, plan, nom, feuille, prefixe = 'gab') {
   const base = String(nom ?? '').trim().slice(0, 60) || 'Gabarit';
-  const pris = new Set(gabaritsDe(projet).map((g) => g.nom.toLowerCase()));
+  const pris = new Set(liste.map((g) => g.nom.toLowerCase()));
   let n = base;
   for (let i = 2; pris.has(n.toLowerCase()); i++) n = `${base} (${i})`;
-  const g = { id: `gab-${Date.now().toString(36)}-${gabaritsDe(projet).length + 1}`, nom: n, feuille: copie(plan.feuille ?? {}), echelle: plan.echelle };
+  return { id: `${prefixe}-${Date.now().toString(36)}-${liste.length + 1}`, nom: n, feuille, echelle: plan.echelle };
+}
+
+/** Enregistre les réglages de la feuille du plan (échelle comprise) comme gabarit du projet, sous un nom libre. */
+export function enregistrerGabarit(projet, plan, nom) {
+  const g = nouveauGabarit(gabaritsDe(projet), plan, nom, copie(plan.feuille ?? {}));
   projet.gabaritsPresentation = [...gabaritsDe(projet), g];
   return g;
+}
+
+// ---- Gabarits pour tous les projets (0.365.0, demande du 28.11) : gardés dans les listes partagées par Drive.
+// Ce qui appartient à un chantier précis (endroit montré, cadres de détail, plans du projet, phase, rotation, titre,
+// nom du chantier, date, indice) n'est pas mis dans le gabarit, et reste celui du plan quand on l'utilise.
+export const PROPRES_AU_PLAN = ['centre', 'details', 'plans', 'phase', 'pages', 'rotation', 'titre', 'chantier', 'date', 'indice'];
+
+/** Réglages de la feuille sans ce qui est propre au chantier. */
+export function feuilleSansChantier(feuille = {}) {
+  const f = copie(feuille);
+  for (const cle of PROPRES_AU_PLAN) delete f[cle];
+  if (f.positions) { // les cadres de détail ne passent pas d'un projet à l'autre : leurs places non plus
+    f.positions = Object.fromEntries(Object.entries(f.positions).filter(([cle]) => !cle.startsWith('det:')));
+  }
+  return f;
+}
+
+/** Ajoute à la liste partagée un gabarit fait du plan ; renvoie { liste, gabarit }. */
+export function ajouterGabaritPartage(liste, plan, nom) {
+  const g = nouveauGabarit(liste ?? [], plan, nom, feuilleSansChantier(plan.feuille ?? {}), 'gabp');
+  return { liste: [...(liste ?? []), g], gabarit: g };
+}
+
+/** Crée sur le plan une présentation à partir d'un gabarit partagé : la mise en page du gabarit, ce qui est propre au plan gardé. */
+export function utiliserGabaritPartage(plan, gabarit) {
+  const avant = plan.feuille ?? {};
+  const p = creerPresentation(plan, gabarit.nom);
+  const propres = Object.fromEntries(PROPRES_AU_PLAN.filter((c) => avant[c] !== undefined).map((c) => [c, copie(avant[c])]));
+  const positionsDetails = Object.fromEntries(Object.entries(avant.positions ?? {}).filter(([cle]) => cle.startsWith('det:')));
+  const f = { ...copie(gabarit.feuille ?? {}), ...propres };
+  if (Object.keys(positionsDetails).length) f.positions = { ...(f.positions ?? {}), ...positionsDetails };
+  plan.feuille = f;
+  if (gabarit.echelle) plan.echelle = gabarit.echelle;
+  return p;
 }
 
 /** Crée sur le plan une présentation à partir du gabarit (copie indépendante, qui devient la présentation choisie). */
