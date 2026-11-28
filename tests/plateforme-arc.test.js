@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nouvellePlateforme, courberCoteEnArc, baseArc, arcsValides, facettesDArcs, poigneesArcsPf, FACETTES_ARC } from '../src/topo/plateforme.js';
+import { nouvellePlateforme, courberCoteEnArc, redresserArc, baseArc, arcsValides, facettesDArcs, poigneesArcsPf, FACETTES_ARC } from '../src/topo/plateforme.js';
 
 function carre() {
   const pf = nouvellePlateforme([], 'p1');
@@ -49,5 +49,17 @@ describe('arc sur un côté de plateforme', () => {
     courberCoteEnArc([pf], pf, 'A-1', 'A-2', [5, -2], baseArc(pf));
     pf.sommets.splice(3, 1);
     expect(arcsValides(pf)).toHaveLength(0);
+  });
+});
+
+describe('revenir au segment (0.358.0)', () => {
+  it('double-clic sur la poignée : les facettes et leurs talus partent, le côté est droit', () => {
+    const pf = carre();
+    courberCoteEnArc([pf], pf, 'A-1', 'A-2', [5, -2], baseArc(pf));
+    expect(redresserArc(pf, 'A-1', 'A-2')).toBe(true);
+    expect(pf.sommets.map((s) => s.nom)).toEqual(['A-1', 'A-2', 'A-3', 'A-4']);
+    expect(arcsValides(pf)).toHaveLength(0);
+    expect(Object.keys(pf.talus ?? {}).every((n) => ['A-1', 'A-2', 'A-3', 'A-4'].includes(n))).toBe(true);
+    expect(redresserArc(pf, 'A-1', 'A-2')).toBe(false);
   });
 });

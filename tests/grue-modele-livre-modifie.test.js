@@ -43,3 +43,21 @@ describe('dessin d\'une grue créée par l\'utilisateur (0.355.0)', () => {
     expect(bornesX('grue-b')).toBeGreaterThan(-5);
   });
 });
+
+describe('radier sous la grue (0.358.0)', () => {
+  it('dalle L × B centrée sous l\'axe, cotée, et remplace les massifs', async () => {
+    const { grueFiche, reglagesGrue } = await import('../src/topo/grue-fiche.js');
+    const { bornesPrimitives } = await import('../src/topo/blocs-dxf.js');
+    definirModelesPerso([]);
+    const sans = grueFiche({ fleche: 40, rotationFleche: 0 });
+    const avec = grueFiche({ fleche: 40, radier: true, radierL: 12, radierB: 8, massifs: true });
+    expect(reglagesGrue({ radier: true, massifs: true }).massifs).toBe(false);
+    const textes = avec.primitives.filter((p) => p.g === 't').map((p) => p.t);
+    expect(textes).toContain('12.00 m');
+    expect(textes).toContain('8.00 m');
+    // la dalle de 12 m descend plus bas que la grue sans radier (bas de la tour), centrée sur l'axe
+    const b = bornesPrimitives(avec.primitives.filter((p) => p.g !== 't'));
+    expect(b.yMin).toBeLessThanOrEqual(-4 + 1e-6);
+    expect(bornesPrimitives(sans.primitives.filter((p) => p.g !== 't')).yMin).toBeGreaterThan(b.yMin - 1e-9);
+  });
+});

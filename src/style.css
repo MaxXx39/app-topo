@@ -15498,3 +15498,16 @@ dialog.page-pc .travail-chantier { gap: 6px; }
 .bulle-survol b { font-weight: 600; }
 .bulle-survol small { color: #cbd5e1; font-size: 10px; }
 .bulle-survol .phases-element { margin: 0; padding: 0; color: #94a3b8; }
+
+/* 0.358.0 : applis plein écran : plus de flèche jaune de retour en haut (doublon du bouton ☰ en bas à gauche) ;
+   le bouton du bas à gauche a la même hauteur et la même police que dans les autres applis (54 px, 15 px). */
+.page-habillee .retour-reglages[data-action='retour'] { display: none; }
+.bande-appli.bande-page .bouton-appli, .bande-page:has(.type-vue) .bouton-appli { height: 54px; min-height: 54px; align-self: center; }
+html .bande-appli.bande-page .partie-appli { font-size: 15px; font-weight: 400; }
+.fenetre-modeles-grues .actions-tour { white-space: nowrap; }
+/* 0.358.0 : réglages d'un élément en onglets (une partie à la fois : le bandeau ne grandit pas) */
+.page-chantier .ruban-element .onglets-bandeau { flex: 0 0 100%; display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; border-bottom: 1px solid var(--bordure, #cbd5e1); }
+.page-chantier .ruban-element .onglets-bandeau button { padding: 2px 10px; border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0; background: transparent; color: #475569; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.page-chantier .ruban-element .onglets-bandeau button.actif { border-color: var(--bordure, #cbd5e1); background: var(--surface, #fff); color: #b45309; font-weight: 700; margin-bottom: -1px; }
+.page-chantier .ruban-element .partie-onglet { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 10px; padding-top: 4px; }
+.page-chantier .ruban-element.bandeau-grue .partie-onglet .champ-calage { flex-direction: column; align-items: flex-start; gap: 1px; }

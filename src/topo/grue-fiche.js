@@ -81,7 +81,9 @@ export function reglagesGrue(o = {}) {
     afficherCharge: o.afficherCharge !== false, afficherHsc: o.afficherHsc !== false,
     couleurTexte: /^#[0-9a-f]{6}$/i.test(o.couleurTexte ?? '') ? o.couleurTexte : COULEUR_TEXTE,
     // 0.313.0 : 4 massifs carrés (côté massifL, 2 m au départ) sous le pied, dans l'orientation du pied ; massifH : seulement pour la vue de côté
-    massifs: Boolean(o.massifs), massifL: nombreOu(o.massifL, 2), massifB: nombreOu(o.massifL, 2), massifH: nombreOu(o.massifH, 1),
+    massifs: Boolean(o.massifs) && !o.radier, massifL: nombreOu(o.massifL, 2), massifB: nombreOu(o.massifL, 2), massifH: nombreOu(o.massifH, 1),
+    // 0.358.0 : radier = une seule dalle sous toute la grue (dimensions extérieures radierL × radierB, 5 × 5 m au départ), centrée sur l'axe
+    radier: Boolean(o.radier), radierL: nombreOu(o.radierL, 5), radierB: nombreOu(o.radierB, 5),
   };
 }
 
@@ -157,10 +159,10 @@ export function ficheGrue(o) {
   l.push({ titre: 'Flèche', valeur: `${fixe1(f.nom)} m (portée maximale ${fixe1(f.rMax ?? rMax)} m)`, detail: f.sections ? `éléments ${f.sections.map((i) => CERCLES[i - 1]).join(' ')}${pf ? `, ${Math.round(pf)} kg` : ''}` : null });
   if (cp) l.push({ titre: 'Contrepoids', valeur: `${fixe2(cp.t)} t`, detail: cp.texte });
   const pied = tour.pied.type === 'FA' ? 'ancrage fixe' : tour.pied.type === 'UC' ? `châssis roulant ${fixe2(tour.pied.c)} m` : tour.pied.type === 'CB' ? `croix de fondation ${fixe2(tour.pied.c)} m` : `stabilisateurs ${fixe2(tour.pied.c)} × ${fixe2(tour.pied.c)} m`;
-  l.push({ titre: 'Pied', valeur: pied, detail: `mât ${fixe2(tour.mat)} m de large${g.massifs ? ` · 4 massifs ${fixe2(g.massifL)} × ${fixe2(g.massifL)} m` : ''}` });
+  l.push({ titre: 'Pied', valeur: pied, detail: `mât ${fixe2(tour.mat)} m de large${g.massifs ? ` · 4 massifs ${fixe2(g.massifL)} × ${fixe2(g.massifL)} m` : ''}${g.radier ? ` · radier ${fixe2(g.radierL)} × ${fixe2(g.radierB)} m` : ''}` });
   for (const [titre, valeur] of modele.infos ?? []) l.push({ titre, valeur });
   const estimes = (modele.estimes ?? []).map((k) => NOMS_ESTIMES[k] ?? k);
-  if (estimes.length) pas.push(`Dimensions estimées (pas dans la fiche) : ${estimes.join(', ')}. À corriger dans « Modèles de grues… ».`);
+  if (estimes.length) pas.push(`Dimensions estimées (pas dans la fiche) : ${estimes.join(', ')}. À corriger dans « Régl. grues » (ruban, Symboles).`);
   return { lignes: l, pasDansLaFiche: pas };
 }
 
@@ -209,20 +211,27 @@ function massifs(g) {
   return res;
 }
 
-/** Cote d'un massif carré de côté c centré en [x, y] : une cote au-dessus et une à droite (« 2.00 m »). */
-function coteDuMassif([x, y], c) {
+/** Radier : une dalle béton L × B (m) centrée sous l'axe de la grue, dans l'orientation du pied (0.358.0). */
+function radier(g) {
+  return piece(BETON, 'peinture', rectArrondi(-g.radierL / 2, -g.radierB / 2, g.radierL / 2, g.radierB / 2, 0.03, 1), '#6b7280');
+}
+
+/**
+ * Cote d'un massif (ou du radier) de L × B (m, B = L par défaut) centré en [x, y] : une cote au-dessus (L) et une à
+ * droite (B), « 2.00 m ».
+ */
+function coteDuMassif([x, y], L, B = L) {
   const k = '#0f172a';
-  const h = Math.max(0.3, c * 0.18);
+  const h = Math.max(0.3, Math.min(L, B) * 0.18);
   const tic = h * 0.5;
-  const yc = y + c / 2 + 0.5;
-  const xc = x + c / 2 + 0.5;
-  const t = `${c.toFixed(2)} m`;
+  const yc = y + B / 2 + 0.5;
+  const xc = x + L / 2 + 0.5;
   const l = (p) => ({ g: 'l', k, p, f: false, mat: 'trait' });
   return [
-    l([x - c / 2, yc, x + c / 2, yc]), l([x - c / 2, yc - tic, x - c / 2, yc + tic]), l([x + c / 2, yc - tic, x + c / 2, yc + tic]),
-    { g: 't', k, x, y: yc + h, h, a: 0, t, ah: 1, av: 2 },
-    l([xc, y - c / 2, xc, y + c / 2]), l([xc - tic, y - c / 2, xc + tic, y - c / 2]), l([xc - tic, y + c / 2, xc + tic, y + c / 2]),
-    { g: 't', k, x: xc + h, y, h, a: 90, t, ah: 1, av: 2 },
+    l([x - L / 2, yc, x + L / 2, yc]), l([x - L / 2, yc - tic, x - L / 2, yc + tic]), l([x + L / 2, yc - tic, x + L / 2, yc + tic]),
+    { g: 't', k, x, y: yc + h, h, a: 0, t: `${L.toFixed(2)} m`, ah: 1, av: 2 },
+    l([xc, y - B / 2, xc, y + B / 2]), l([xc - tic, y - B / 2, xc + tic, y - B / 2]), l([xc - tic, y + B / 2, xc + tic, y + B / 2]),
+    { g: 't', k, x: xc + h, y, h, a: 90, t: `${B.toFixed(2)} m`, ah: 1, av: 2 },
   ];
 }
 
@@ -357,14 +366,15 @@ function cerclesDeCharge(g) {
  */
 export function grueFiche(o = {}) {
   const g = reglagesGrue(o);
-  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesMode, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB]);
+  const cle = JSON.stringify([g.modele.id, versionModeles(), g.fleche.nom, g.tour.id, g.hauteur.h, g.r, g.mode, g.cerclesMode, g.afficherCrochet, g.texteFleche, g.rotationFleche, g.afficherCharge, g.afficherHsc, g.couleurTexte, g.massifs, g.massifL, g.massifB, g.radier, g.radierL, g.radierB]);
   return garder(cle, () => {
-    const dessous = g.massifs ? massifs(g) : [];
+    const dessous = g.radier ? radier(g) : g.massifs ? massifs(g) : [];
     const base = pied(g.tour);
     // Pied toujours coté (côté du carré d'appui) ; massifs : leur taille écrite
     const bornes = bornesPrimitives([...dessous, ...base]);
     const cote = g.tour.pied.type === 'FA' ? [] : coteDuChassis(g.tour.pied.c, bornes);
     if (g.massifs) cote.push(...coteDuMassif(appuisDuPied(g.tour)[0], g.massifL));
+    if (g.radier) cote.push(...coteDuMassif([0, 0], g.radierL, g.radierB));
     const bas = [...dessous, ...base, ...mat(g.tour.mat), ...cote];
     let haut = partieHaute(g);
     // 0.315.0 : UNE étiquette le long de la flèche (côté opposé au texte du crochet) : longueur de flèche + HSC

@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.357.0 — Lot « Général » du 28.11 : dossiers plus petits, applis PC compactes, infobulle et Tab
+Lire seulement la section utile : `grep -n '^## 0.358.0 — Demandes du 28.11 (suite) : flèche retour, bouton du bas, arc → segment, onglets, radier, tours
+- **Applis plein écran** : flèche jaune « retour » du haut cachée (`page-habillee`, doublon du bouton ☰ du bas) ; bouton du bas à gauche = 54 px et 15 px comme les autres applis (il faisait 58 px / 13 px).
+- **Plateformes** : double-clic sur la poignée ronde d'un arc = retour au côté droit (`redresserArc`).
+- **Plans de chantier** : réglages de l'élément choisi en **onglets** dans le bandeau (`htmlOngletsBandeau` : chaque `.groupe-grue` = un onglet ; zone : Genre et texte / Aspect / Stock ; grue d'après fiche : Modèle / Flèche et charge / Tour et châssis / Affichage ; onglet gardé par genre) ; **radier** sous la grue (« Fondation » : Aucune / Massifs / Radier ; dalle `radierL` × `radierB`, 5 × 5 m au départ, centrée sous l'axe dans l'orientation du pied, béton, cotée ; aussi dans la vue de côté) ; **dupliquer une tour** (⧉ dans Régl. grues) ; bouton « **Régl. grues** » (grue + engrenage) ; case « Sans texte » (au lieu de « Sans le texte du bloc »).
+
+## 0.357.0 — Lot « Général » du 28.11 : dossiers plus petits, applis PC compactes, infobulle et Tab
 - **Dossiers du projet** (page Applications, TER., CANA…) : puces plus petites (28 px, texte 0.8 rem, sans gras), plus serrées ; flèches ‹ › quand la ligne ne tient pas (`.cadre-dossiers`, `data-defiler-dossiers`).
 - **Applis de PC compactes** (Plans de chantier, Calage, Plateformes, Comparer, Matériel ; pas sur l'APK) : `habillerPage` pose `page-pc` (sauf si `window.AppliAndroid`) ; quand une telle page est ouverte, `html:has(dialog.page-pc[open])` : taille de base 13 px, boutons, champs, fenêtres (popups), marges, ruban plus petits ; boutons du bas des fenêtres à cases alignés à droite.
 - **Infobulle au survol** (Plans de chantier, Expert, souris) : 0,6 s immobile sans outil → petite bulle transparente (nom, phases, groupe, « 1 / 2 · Tab = dessous ») et contour bleu léger ; **Tab / Maj+Tab** = objet suivant / précédent sous la souris (`objetsSousLePoint`), **clic** = choisir l'objet montré (le groupe entier si l'objet est groupé). Rien au doigt.

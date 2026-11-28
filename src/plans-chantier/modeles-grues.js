@@ -148,7 +148,7 @@ export function ouvrirModelesGrues(acces) {
               <td><select data-t="${i}:pied" ${ok ? '' : 'disabled'}>${PIEDS.map(([v, n]) => `<option value="${v}" ${t.pied?.type === v ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
               <td>${champ(`data-t="${i}:_c"`, t._c, { type: 'number', pas: '0.01', largeur: '4.5em', ok })}</td>
               <td><textarea rows="2" data-t="${i}:_hauteurs" ${ok ? '' : 'disabled'}>${echapper(t._hauteurs)}</textarea></td>
-              <td><button type="button" class="suppr-calage" data-suppr-tour="${i}" aria-label="Retirer cette tour" ${ok ? '' : 'disabled'}>✕</button></td></tr>`).join('')}</tbody>
+              <td class="actions-tour"><button type="button" class="suppr-calage" data-dupl-tour="${i}" title="Dupliquer cette tour (copie juste en dessous)" aria-label="Dupliquer cette tour" ${ok ? '' : 'disabled'}>⧉</button><button type="button" class="suppr-calage" data-suppr-tour="${i}" aria-label="Retirer cette tour" ${ok ? '' : 'disabled'}>✕</button></td></tr>`).join('')}</tbody>
           </table></div>
           <button type="button" class="lien-calage" data-act="ajout-tour" ${ok ? '' : 'disabled'}>＋ Ajouter une tour</button>
           <h3>Autres caractéristiques (affichées dans la fiche)</h3>
@@ -244,6 +244,14 @@ export function ouvrirModelesGrues(acces) {
     if (b.dataset.modele) return ouvrirModele(b.dataset.modele);
     if (b.dataset.supprFleche !== undefined && modifiable()) {
       brouillon.fleches.splice(Number(b.dataset.supprFleche), 1);
+      dessiner();
+      return enregistrerModele();
+    }
+    if (b.dataset.duplTour !== undefined && modifiable()) { // 0.358.0 : dupliquer une tour (copie juste en dessous, nouveau nom)
+      const i = Number(b.dataset.duplTour);
+      const t = brouillon.tours[i];
+      const copie = { ...JSON.parse(JSON.stringify(t)), id: `tour${brouillon.tours.length + 1}-${Date.now().toString(36)}`, nom: `${t.nom} (copie)` };
+      brouillon.tours.splice(i + 1, 0, copie);
       dessiner();
       return enregistrerModele();
     }

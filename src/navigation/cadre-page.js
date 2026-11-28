@@ -53,6 +53,7 @@ export function habillerPage(page, { couleur, titre, contenuBande = null }) {
   // 0.357.0 : applis de PC (site, Topo Bureau, Topo Tablette) : tout plus compact, comme un logiciel de bureau (style.css « page-pc »).
   // Sur la tablette Android (APK), on garde les grandes tailles pour le doigt.
   if (!window.AppliAndroid) page.classList.add('page-pc');
+  page.classList.add('page-habillee'); // 0.358.0 : la flèche jaune « retour » du haut est cachée (le bouton ☰ du bas fait la même chose)
   page.style.setProperty('--couleur-appli', couleur);
   page.style.setProperty('--texte-appli', '#ffffff');
   const observateur = new MutationObserver(() => {

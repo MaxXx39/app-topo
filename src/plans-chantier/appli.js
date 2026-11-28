@@ -635,7 +635,7 @@ export function ouvrirPlansChantier({
     // Mots courts sous les icônes (le nom complet est dans l'infobulle) : un juste milieu entre icônes seules et textes longs.
     const COURTS = {
       'Sélectionner': 'Choisir', 'Effacer': 'Effacer', 'Annuler (Ctrl+Z)': 'Annuler', 'Zone': 'Zone', 'Ligne': 'Ligne', 'Flèche': 'Flèche', 'Texte': 'Texte',
-      'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Mesure': 'Mesure', 'Bibliothèque de symboles': 'Symboles', 'Grue : réglage des modèles de grues': 'Grue', 'Groupes d\'éléments (liste, Ctrl+G = grouper)': 'Groupes',
+      'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Mesure': 'Mesure', 'Bibliothèque de symboles': 'Symboles', 'Grue : réglage des modèles de grues': 'Régl. grues', 'Groupes d\'éléments (liste, Ctrl+G = grouper)': 'Groupes',
       'Accroche : point levé': 'Point', 'Accroche : sommet': 'Sommet', 'Accroche : milieu': 'Milieu', 'Accroche : sur la ligne': 'Ligne', 'Accroche : croisement': 'Croisem.', 'Accroche : perpendiculaire': 'Perpend.',
       'Plans du projet dessous (par phase)': 'Plans', 'Calques des plans affichés (masquer, couleur)': 'Calques', 'Points levés': 'Points', 'Fond : carte nationale': 'Carte', 'Fond : photo aérienne': 'Ortho', 'Fond : cadastre': 'Cadastre', 'Fond : surfaces du projet': 'Surfaces',
       'Repère à 0° : Nord / Sud / Est / Ouest': 'N S E O', 'Montrer / cacher les lignes de construction (jamais imprimées)': 'Constr.', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne': 'Coupe', 'Tracer une ligne de coupe (2 points, avec les accroches)': 'Tracer', 'Zoom avant': '+', 'Zoom arrière': '−', 'Tout voir': 'Tout',
@@ -665,7 +665,7 @@ export function ouvrirPlansChantier({
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
         ${groupe('Tracer', OUTILS.filter(([c]) => ['zone', 'rectangle', 'rond', 'ligne', 'fleche', 'decaler'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-trace')}
         ${groupe('Annoter', OUTILS.filter(([c]) => ['texte', 'cotation', 'mesure'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-annoter')}
-        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles') + bt('data-action="modeles-grues"', '<path d="M5 21V5M5 5H20M5 5L3 9M9 5V9M16 5V11"/><rect x="14.5" y="11" width="3" height="2"/><circle cx="17.5" cy="17.5" r="2.2"/><path d="M17.5 13.8V15M17.5 20V21.2M13.8 17.5H15M20 17.5H21.2"/>', 'Grue : réglage des modèles de grues') + (aAcces('expert') ? bt(`data-action="volet-groupes" aria-pressed="${etat.voletGroupes}"`, '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M2 2H22V22H2Z" stroke-dasharray="3 2"/>', 'Groupes d\'éléments (liste, Ctrl+G = grouper)') : ''), 'type-symboles')}
+        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles') + bt('data-action="modeles-grues"', '<path d="M3 21V4M3 4H12M3 4L1.5 7M7 4V7"/><circle cx="16.5" cy="15.5" r="2.6"/><path d="M16.5 10V11.6M16.5 19.4V21M11 15.5H12.6M20.4 15.5H22M12.6 11.6L13.7 12.7M19.3 18.3L20.4 19.4M12.6 19.4L13.7 18.3M19.3 12.7L20.4 11.6"/>', 'Grue : réglage des modèles de grues') + (aAcces('expert') ? bt(`data-action="volet-groupes" aria-pressed="${etat.voletGroupes}"`, '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M2 2H22V22H2Z" stroke-dasharray="3 2"/>', 'Groupes d\'éléments (liste, Ctrl+G = grouper)') : ''), 'type-symboles')}
         ${groupe('Construction', `${outil('construction', OUTILS.find(([c]) => c === 'construction')[1], 'Construction')}${bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)')}`, 'type-construction')}
         ${groupe('Coupe', `${bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne')}
           ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`, 'type-construction')}
@@ -2821,22 +2821,22 @@ export function ouvrirPlansChantier({
         construction: `<label class="champ-calage"><span>Couleur</span><select data-prop="couleur">${COULEURS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.couleur ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           <label class="champ-calage"><span>Trait</span><select data-prop="trait">${TRAITS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.trait ?? 'tirets') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           ${champCase('Droite infinie', 'prop-case', 'infinie', Boolean(o.infinie))}`,
-        zone: `${selectGenres('zone', o.categorie)}
+        zone: `<div class="groupe-grue"><b>Genre et texte</b>${selectGenres('zone', o.categorie)}
           ${o.categorie === 'batiment' ? `<label class="champ-calage" title="Z du bas et du haut du bâtiment, visibles sur la vue de côté"><span>Z bas</span><input type="number" min="-500" max="5000" step="0.01" value="${o.zBas ?? ''}" data-prop="zBas"></label>
           <label class="champ-calage"><span>Z haut</span><input type="number" min="-500" max="5000" step="0.01" value="${o.zHaut ?? ''}" data-prop="zHaut"></label>` : ''}
           <label class="champ-calage"><span>Texte de la zone (au centre)</span><input type="text" maxlength="60" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Stock de sable" data-prop="etiquette"></label>
-          ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
+          ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}</div>
+          <div class="groupe-grue"><b>Aspect</b>${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
-          ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}
           ${o.cercle ? champNombre('Rayon du rond', 'prop', 'rayonRond', o.cercle.rayon, 0.01, 10000, 0.1, 'm') : ''}
-          ${champsStyleZone('hachure', o.traitContour, o.hachure, couleurObjet(p, o))}
-          <label class="champ-calage"><span>Matériau du stock</span><select data-prop="materiau"><option value="">— (couleur du genre)</option>
+          ${champsStyleZone('hachure', o.traitContour, o.hachure, couleurObjet(p, o))}</div>
+          <div class="groupe-grue"><b>Stock</b><label class="champ-calage"><span>Matériau du stock</span><select data-prop="materiau"><option value="">— (couleur du genre)</option>
             ${MATERIAUX_TAS.map((m) => `<option value="${m.cle}" ${o.materiau === m.cle ? 'selected' : ''}>${m.nom}</option>`).join('')}</select></label>
           ${champCase('Effet de tas', 'prop-case', 'tasOui', o.tasH > 0)}
           ${o.tasH > 0 ? `${champNombre('Hauteur du tas', 'prop', 'tasH', o.tasH, 0.2, 30, 0.1, 'm')}
             ${champNombre('Talus (m horizontal pour 1 m de haut)', 'prop', 'tasTalus', o.tasTalus ?? TAS_TALUS, 0.1, 10, 0.1, '/ 1')}
             ${champCase('Écrire la hauteur', 'prop-case', 'afficherHauteur', o.afficherHauteur)}
-            ${aAcces('expert') ? champCase('Écrire le volume', 'prop-case', 'afficherVolume', o.afficherVolume) + texteVolumeTas(o) : ''}` : ''}`,
+            ${aAcces('expert') ? champCase('Écrire le volume', 'prop-case', 'afficherVolume', o.afficherVolume) + texteVolumeTas(o) : ''}` : ''}</div>`,
         ligne: `${selectGenres('ligne', styleLigne(o.style).cle)}
           ${styleLigne(o.style).motif?.largeurM ? champNombre('Largeur de la bande', 'prop', 'largeurM', o.largeurM ?? styleLigne(o.style).motif.largeurM, 0.1, 20, 0.1, 'm') : champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
@@ -2917,7 +2917,7 @@ export function ouvrirPlansChantier({
     const poseHtml = pose ? `${petit('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
       ${bouton('data-tourner="90"', '⟲ 90°', 'Tourner de 90° à gauche')}${bouton('data-tourner="-90"', '⟳ 90°', 'Tourner de 90° à droite')}
       <label class="champ-bandeau" title="Taille du texte de ce bloc, en mm sur le papier ; vide = celle du plan (Texte des symboles)"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${o.texteMm ?? ''}" placeholder="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-prop="texteMm"></label>
-      ${champCase('Sans le texte du bloc', 'prop-case', 'sansTexte', Boolean(o.sansTexte))}
+      ${champCase('Sans texte', 'prop-case', 'sansTexte', Boolean(o.sansTexte))}
       ${o.type === 'grue' ? '' : petit('Échelle', 'prop', 'echelle', k, 0.1, 10, 0.05, '×')}${k !== 1 && o.type !== 'grue' ? bouton('data-echelle-reelle', '1×', 'Taille réelle') : ''}
       ${bouton(`data-orienter="point" class="${etat.orienter?.mode === 'point' ? 'actif' : ''}"`, 'Vers un point', 'Orienter vers un point (cliquer ensuite le point visé)')}
       ${bouton(`data-orienter="ligne" class="${etat.orienter?.mode === 'ligne' ? 'actif' : ''}"`, 'Aligner', 'Aligner sur une ligne (cliquer ensuite une ligne)')}` : '';
@@ -2928,10 +2928,31 @@ export function ouvrirPlansChantier({
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
       ${bouton(`data-action="verrou" class="${o.verrou ? 'actif' : ''}"`, icoCadenas(o.verrou), o.verrou ? 'Déverrouiller' : 'Verrouiller', o.verrou ? 'Déverrouiller : on pourra de nouveau le déplacer' : 'Verrouiller : l\'élément ne peut plus être déplacé (ni ses points, ni tourné)')}
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
-      ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
+      ${propre ? htmlOngletsBandeau(o, propre) : ''}`;
     // 0.317.0 : élément verrouillé = rien de ce qui le déplace (rotation, échelle, orientation) ; effacer, genre, couleur restent possibles.
     if (o.verrou) zone.querySelectorAll('[data-tourner], [data-prop="rotation"], [data-prop="echelle"], [data-orienter], [data-echelle-reelle]').forEach((c) => { c.disabled = true; });
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose))); // vignettes des 8 poses de l'escalier
+  }
+
+  /**
+   * Réglages propres d'un élément rangés en onglets (0.358.0, demande du 28.11) : chaque partie (`.groupe-grue` avec son titre
+   * en <b>) devient un onglet ; on ne voit qu'une partie à la fois, le bandeau ne grandit pas. Onglet choisi gardé par genre.
+   */
+  function htmlOngletsBandeau(o, propre) {
+    const t = document.createElement('div');
+    t.innerHTML = propre;
+    const blocs = [...t.children].filter((x) => x.classList.contains('groupe-grue'));
+    if (blocs.length < 2) return `<div class="propre-element">${propre}</div>`;
+    const cle = o.type === 'grue' ? `grue-${o.modele}` : o.type;
+    etat.ongletsBandeau ??= {};
+    const noms = blocs.map((b) => b.querySelector(':scope > b')?.textContent ?? '');
+    let i = noms.indexOf(etat.ongletsBandeau[cle]);
+    if (i < 0) i = 0;
+    blocs.forEach((b) => b.querySelector(':scope > b')?.remove());
+    // ce qui n'est pas dans une partie (rare) reste visible avec la première
+    const reste = [...t.children].filter((x) => !blocs.includes(x)).map((x) => x.outerHTML).join('');
+    return `<div class="onglets-bandeau" role="tablist">${noms.map((n, k) => `<button type="button" role="tab" class="${k === i ? 'actif' : ''}" aria-selected="${k === i}" data-onglet-bandeau="${echapper(n)}" data-onglet-cle="${cle}">${echapper(n)}</button>`).join('')}</div>
+      <div class="propre-element partie-onglet">${blocs[i].innerHTML}${i === 0 ? reste : ''}</div>`;
   }
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
@@ -2967,8 +2988,9 @@ export function ouvrirPlansChantier({
         + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
         <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
         ${champNombre('Z châssis', 'prop', 'zPied', g.zPied, -500, 5000, 0.01, 'm')}
-        ${champCase('Massifs sous le pied', 'prop-case', 'massifs', g.massifs)}
-        ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}`)
+        <label class="champ-calage"><span>Fondation</span><select data-prop="fondation">${opt('aucune', 'Aucune', !g.massifs && !g.radier)}${opt('massifs', 'Massifs', g.massifs)}${opt('radier', 'Radier', g.radier)}</select></label>
+        ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}
+        ${g.radier ? `${champNombre('Radier : longueur', 'prop', 'radierL', g.radierL, 0.5, 60, 0.1, 'm')}${champNombre('Radier : largeur', 'prop', 'radierB', g.radierB, 0.5, 60, 0.1, 'm')}` : ''}`)
         + bloc('Affichage', `${champCase('Charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
         ${champCase('HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
         ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
@@ -3387,6 +3409,10 @@ export function ouvrirPlansChantier({
       return majOutils();
     }
     if (b.dataset.zoom) return b.dataset.zoom === 'tout' ? vue?.cadrer() : vue?.zoom(Number(b.dataset.zoom));
+    if (b.dataset.ongletBandeau !== undefined) { // 0.358.0 : onglet du bandeau de l'élément choisi
+      etat.ongletsBandeau = { ...(etat.ongletsBandeau ?? {}), [b.dataset.ongletCle]: b.dataset.ongletBandeau };
+      return majPanneau();
+    }
     if (b.dataset.choisir) {
       etat.outil = 'choisir';
       etat.saisie = null;
@@ -3913,6 +3939,11 @@ export function ouvrirPlansChantier({
         }
       }
       if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
+      if (cle === 'fondation') { // 0.358.0 : massifs OU radier sous la grue
+        if (valeur === 'massifs') o.massifs = true; else delete o.massifs;
+        if (valeur === 'radier') o.radier = true; else delete o.radier;
+        delete o.fondation;
+      }
       if (cle === 'fin' && !valeur) delete o.fin;
       if (o.groupe && (cle === 'phase' || cle === 'fin')) reglerPhaseGroupe(p, o.groupe, { [cle]: valeur ?? '' }); // 0.356.0 : tout le groupe suit
       // 0.353.0 : la fin ne peut pas être avant le début ; si on avance le début au-delà de la fin, la fin est enlevée
