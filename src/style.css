@@ -14703,6 +14703,7 @@ dialog.page-chantier[open] {
 .toile-chantier { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #ffffff; cursor: grab; touch-action: none; }
 .toile-chantier:active { cursor: grabbing; }
 .toile-chantier[data-outil]:not([data-outil='choisir']) { cursor: crosshair; }
+.toile-chantier[data-outil][data-selection='oui'] { cursor: default; } /* 0.361.0 : choisir une ligne = flèche, pas croix */
 .toile-chantier canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .etat-chantier { display: flex; gap: 14px; flex-wrap: wrap; min-height: 26px; padding: 4px 10px; font-size: 0.82rem; color: var(--gris); border-top: 1px solid var(--bordure); }
 .panneau-chantier { overflow-y: auto; }
@@ -15229,6 +15230,7 @@ body.appli-windows .bande-page .zone-bande-page .outil-ruban { min-height: 40px;
 
 /* 0.336.0 : outils de Dessin rangés par type, avec une couleur par type ; petite fenêtre de la Présentation */
 .ruban-chantier .groupe-ruban.type-trace { background: #ffedd5; border-radius: 8px; }
+.ruban-chantier .groupe-ruban.type-modifier { background: #dcfce7; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-annoter { background: #dbeafe; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-construction { background: #cffafe; border-radius: 8px; }
 .ruban-chantier .groupe-ruban.type-symboles { background: #ede9fe; border-radius: 8px; }
@@ -15406,3 +15408,189 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .bloc-nom-liste { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1 1 auto; line-height: 1.15; margin-top: -2px; }
 .bloc-nom-liste .nom-liste-menu { font-size: 0.8rem; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bloc-nom-liste .etiquette-nature { margin: 1px 0 0; font-size: 0.52rem; font-weight: 600; padding: 0 4px; }
+
+/* 0.350.0 : pastilles d'affaire cliquables (changer directement) ; « + affaire » */
+.affaires-cliquables { display: inline-flex; align-items: center; cursor: pointer; }
+.affaires-cliquables.ajout-affaire { padding: 0 6px; border: 1px dashed #94a3b8; border-radius: 999px; font-size: 0.6rem; color: #475569; margin-right: 4px; }
+.dossiers-cliquables { cursor: pointer; }
+
+/* Plans de chantier 0.354.0 : accroches plus petites (comme AutoCAD), flèches de phase, liste des phases sur une ligne */
+.groupe-accroches { gap: 2px; }
+.groupe-accroches .outil-ruban { min-width: 28px; height: 28px; padding: 2px 4px; border-radius: 5px; }
+.groupe-accroches .outil-ruban span { display: none; }
+.groupe-accroches .outil-ruban svg { width: 18px; height: 18px; }
+.petit-nav { min-width: 26px; height: 28px; padding: 0 4px; font-size: 0.75rem; }
+.fenetre-phases-chantier { width: min(720px, 96vw); }
+.liste-phases-chantier.compact { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.liste-phases-chantier.compact li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 6px; font-size: 0.8rem; }
+.liste-phases-chantier.compact li.active { background: color-mix(in srgb, #2563eb 10%, var(--surface)); }
+.liste-phases-chantier.compact .num-phase { min-width: 2ch; font-weight: 600; color: var(--discret, #64748b); }
+.liste-phases-chantier.compact input[type="color"] { width: 24px; height: 24px; padding: 0; }
+.liste-phases-chantier.compact input[type="text"] { flex: 1 1 140px; min-width: 120px; padding: 3px 6px; font-size: 0.85rem; }
+.liste-phases-chantier.compact .bouton-secondaire.petit { padding: 2px 6px; min-height: 0; font-size: 0.75rem; }
+/* 0.355.0 : panneau Éléments replié : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place */
+.travail-chantier.avec-biblio.panneau-replie { grid-template-columns: 250px minmax(0, 1fr) !important; }
+@media (max-width: 1100px) { .travail-chantier.avec-biblio.panneau-replie { grid-template-columns: 210px minmax(0, 1fr) !important; } }
+.panneau-replie .bouton-replier-panneau { height: auto; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bouton-replier-panneau .mot-repli { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; }
+.tri-elements { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #475569; margin: 0 0 4px; }
+.tri-elements select { font-size: 0.75rem; padding: 2px 4px; }
+.elements-chantier .phases-element { margin-left: auto; padding-left: 6px; font-size: 0.68rem; color: #94a3b8; white-space: nowrap; }
+.fenetre-modeles-grues .etat-modele { margin-right: auto; font-size: 0.8rem; color: #475569; }
+.bande-page .zone-bande-page .groupe-ruban.groupe-accroches .outil-ruban { min-width: 28px; width: 30px; height: 28px; min-height: 0; padding: 2px; }
+.page-chantier .bande-page .groupe-accroches .outil-ruban svg { width: 18px; height: 18px; }
+.bande-page .zone-bande-page .groupe-ruban.groupe-accroches .outil-ruban span { display: none; }
+.outils-entete .phases-entete select[data-phase-select] { max-width: 170px; }
+.liste-phases-chantier.compact .case { display: inline-flex; flex-direction: row; align-items: center; gap: 3px; font-size: 0.78rem; }
+/* 0.356.0 : groupes d'éléments */
+.bandeau-dans-groupe { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, #ea580c 14%, var(--surface)); color: #c2410c; font-weight: 700; font-size: 0.8rem; }
+.bandeau-dans-groupe button { margin-left: auto; }
+.liste-groupes, .liste-groupes ul { list-style: none; margin: 0; padding: 0; }
+.liste-groupes > li { border-bottom: 1px solid var(--bordure); padding: 2px 0; }
+.liste-groupes summary { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.82rem; }
+.liste-groupes summary small { margin-left: auto; color: #94a3b8; font-size: 0.7rem; white-space: nowrap; }
+.liste-groupes button { border: 0; background: transparent; color: var(--encre); text-align: left; padding: 2px 4px; border-radius: 4px; cursor: pointer; font: inherit; }
+.liste-groupes button.actif { background: color-mix(in srgb, #ea580c 16%, var(--surface)); color: #c2410c; font-weight: 700; }
+.liste-groupes ul { padding-left: 16px; font-size: 0.78rem; }
+.elements-chantier .marque-groupe { color: #ea580c; margin-right: 3px; font-size: 0.8em; }
+
+/* 0.357.0 : dossiers du projet (TER., CANA…) plus petits, sans gras, plus serrés ; flèches ‹ › quand ils ne tiennent pas */
+.cadre-dossiers { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.cadre-dossiers .puces-dossiers { flex: 1 1 auto; min-width: 0; gap: 4px; padding: 2px 2px 6px; }
+.cadre-dossiers .puces-dossiers .puce-dossier { min-height: 28px; padding: 2px 8px; gap: 4px; font-weight: 500; font-size: 0.8rem; border-width: 1px; }
+.cadre-dossiers .puce-dossier i { width: 10px; height: 10px; border-width: 1px; }
+body.appli-windows .cadre-dossiers .puces-dossiers .puce-dossier { min-height: 24px; padding: 1px 7px; font-size: 0.78rem; }
+.fleche-dossiers { display: none; flex: none; width: 26px; height: 28px; margin-bottom: 4px; padding: 0; border: 1px solid var(--bordure, #cbd5e1); border-radius: 6px; background: var(--surface, #fff); color: var(--encre, #1b2b36); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.cadre-dossiers.reste-gauche .fleche-dossiers.gauche, .cadre-dossiers.reste-droite .fleche-dossiers.droite { display: block; }
+
+/* ================================================================================================================
+   0.357.0 : applis de PC compactes (Plans de chantier, Calage, Plateformes, Comparer, Matériel ; pas sur l'APK).
+   Demande du 28.11 : textes, boutons, marges et fenêtres beaucoup plus petits, comme AutoCAD. Tout ce qui est en rem
+   suit la taille de base (13 px au lieu de 15 px) ; les tailles en px sont réduites ici. Les fenêtres (popups) ouvertes
+   par-dessus l'appli suivent aussi (elles sont dans body, d'où le html:has(...)).
+   ================================================================================================================ */
+html:has(dialog.page-pc[open]), html:has(dialog.page-pc[open]) body { font-size: 13px; line-height: 1.3; }
+html:has(dialog.page-pc[open]) :is(.bouton, button.bouton, .bouton-secondaire) { min-height: 26px; padding: 3px 10px; border-radius: 6px; font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .bouton-secondaire.petit { min-height: 22px; padding: 1px 6px; font-size: 0.8rem; }
+html:has(dialog.page-pc[open]) :is(input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='range']), select, textarea) { min-height: 24px; padding: 2px 6px; font-size: 0.9rem; border-radius: 5px; }
+html:has(dialog.page-pc[open]) input[type='color'] { width: 28px; height: 22px; padding: 0 1px; }
+html:has(dialog.page-pc[open]) input[type='checkbox'] { width: 14px; height: 14px; }
+html:has(dialog.page-pc[open]) .fenetre-choix { padding: 10px 12px; border-radius: 8px; }
+html:has(dialog.page-pc[open]) .fenetre-choix h2 { font-size: 1rem; margin: 0 0 6px; }
+html:has(dialog.page-pc[open]) .fenetre-choix h3 { font-size: 0.85rem; margin: 8px 0 4px; }
+html:has(dialog.page-pc[open]) .entete-fenetre-champs { margin-bottom: 4px; }
+html:has(dialog.page-pc[open]) .bouton-retour { width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .boutons-choix { gap: 5px; }
+html:has(dialog.page-pc[open]) .boutons-choix button { padding: 4px 10px; }
+html:has(dialog.page-pc[open]) .boutons-choix .bouton strong { font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .fenetre-champs .boutons-choix { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+html:has(dialog.page-pc[open]) .fenetre-champs .boutons-choix button { width: auto; }
+html:has(dialog.page-pc[open]) .aide-calage { font-size: 0.8rem; margin: 2px 0; }
+dialog.page-pc .carte-calage { padding: 7px 9px; gap: 5px; border-radius: 6px; }
+dialog.page-pc .carte-calage h3 { font-size: 0.75rem; margin: 2px 0; }
+dialog.page-pc .champ-calage { gap: 1px; font-size: 0.85rem; }
+dialog.page-pc:not(._) .outil-ruban { height: 38px; min-width: 34px; padding: 1px 4px; border-radius: 5px; }
+dialog.page-pc:not(._) .outil-ruban svg { width: 18px; height: 18px; }
+dialog.page-pc:not(._) .outil-ruban span { font-size: 0.62rem; }
+dialog.page-pc .groupe-ruban { padding: 1px 5px; gap: 2px; }
+dialog.page-pc .groupe-ruban .mini-titre, dialog.page-pc .mini-titre { font-size: 0.55rem; }
+dialog.page-pc .travail-chantier { gap: 6px; }
+/* 0.357.0 : infobulle au survol d'un objet (petite, transparente, ne bloque pas la souris) */
+.bulle-survol { position: absolute; z-index: 9; max-width: 230px; display: flex; flex-direction: column; gap: 1px; padding: 3px 7px; border-radius: 5px; background: rgba(15, 23, 42, 0.72); color: #f8fafc; font-size: 11px; line-height: 1.25; pointer-events: none; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); }
+.bulle-survol b { font-weight: 600; }
+.bulle-survol small { color: #cbd5e1; font-size: 10px; }
+.bulle-survol .phases-element { margin: 0; padding: 0; color: #94a3b8; }
+
+/* 0.358.0 : applis plein écran : plus de flèche jaune de retour en haut (doublon du bouton ☰ en bas à gauche) ;
+   le bouton du bas à gauche a la même hauteur et la même police que dans les autres applis (54 px, 15 px). */
+.page-habillee .retour-reglages[data-action='retour'] { display: none; }
+.bande-appli.bande-page .bouton-appli, .bande-page:has(.type-vue) .bouton-appli { height: 54px; min-height: 54px; align-self: center; }
+html .bande-appli.bande-page .partie-appli { font-size: 15px; font-weight: 400; }
+.fenetre-modeles-grues .actions-tour { white-space: nowrap; }
+/* 0.358.0 : réglages d'un élément en onglets (une partie à la fois : le bandeau ne grandit pas) */
+.page-chantier .ruban-element .onglets-bandeau { flex: 0 0 100%; display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; border-bottom: 1px solid var(--bordure, #cbd5e1); }
+.page-chantier .ruban-element .onglets-bandeau button { padding: 2px 10px; border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0; background: transparent; color: #475569; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.page-chantier .ruban-element .onglets-bandeau button.actif { border-color: var(--bordure, #cbd5e1); background: var(--surface, #fff); color: #b45309; font-weight: 700; margin-bottom: -1px; }
+.page-chantier .ruban-element .partie-onglet { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 10px; padding-top: 4px; }
+.page-chantier .ruban-element.bandeau-grue .partie-onglet .champ-calage { flex-direction: column; align-items: flex-start; gap: 1px; }
+
+/* 0.360.0 : rotation, 90°, Vers un point et Aligner rangés ensemble dans le bandeau de l'élément. */
+.groupe-rotation-bloc {
+  display: inline-flex;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+}
+
+/* 0.360.0 : choix de couleur par pastilles dans Plans de chantier (la liste cachée garde la valeur). */
+.pastilles-select .palette-flottante {
+  display: inline-flex;
+  padding: 0;
+}
+
+.biblio-chantier h3 { display: flex; align-items: center; justify-content: space-between; }
+.fermer-volet { border: 0; background: transparent; font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer; color: inherit; }
+
+/* 0.361.0 : fenêtres plus petites, façon AutoCAD / Mensura (texte 12 px, marges serrées) */
+.cartouche-perso { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.cartouche-perso > b { font-size: 0.78rem; }
+.ligne-cartouche { display: grid; grid-template-columns: 22px minmax(0, 1fr) 54px 30px; column-gap: 6px; align-items: center; gap: 4px; }
+.ligne-cartouche > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne-cartouche input[type='number'] { width: 54px; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille { inset: 120px 330px auto auto; width: 270px; max-height: 70vh; padding: 6px 8px; border-radius: 6px; font-size: 0.78rem; box-shadow: 0 4px 16px rgba(16, 24, 20, 0.3); }
+html:has(dialog.page-pc[open]) dialog.popup-feuille .entete-popup { margin-bottom: 3px; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille .entete-popup b { font-size: 0.82rem; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille .champ-calage { margin: 0 0 3px; gap: 1px; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille .champ-calage > span { font-size: 0.72rem; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille :is(input:not([type='checkbox']), select) { min-height: 22px; padding: 1px 5px; font-size: 0.78rem; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille .bouton-secondaire.petit { min-height: 20px; padding: 0 4px; }
+html:has(dialog.page-pc[open]) .menu-phases { width: 260px; padding: 6px 8px; gap: 3px; font-size: 0.78rem; border-radius: 6px; }
+html:has(dialog.page-pc[open]) .fenetre-choix { max-width: 340px; padding: 8px 10px; font-size: 0.82rem; }
+html:has(dialog.page-pc[open]) .boutons-choix :is(.bouton, .bouton-secondaire) strong { font-size: 0.82rem; font-weight: 600; }
+html:has(dialog.page-pc[open]) .boutons-choix :is(.bouton, .bouton-secondaire) { min-height: 24px; padding: 2px 10px; }
+html:has(dialog.page-pc[open]) .panneau-chantier { font-size: 0.8rem; }
+html:has(dialog.page-pc[open]) .panneau-chantier .champ-calage { margin-bottom: 3px; }
+
+/* 0.362.0 : cases à cocher sans chevauchement, aperçu en gros du cartouche, logos, texte du dessus */
+.ligne-cartouche input[type='checkbox'] { width: 16px; height: 16px; min-width: 16px; margin: 0; justify-self: center; }
+.ligne-cartouche input[type='color'] { width: 30px; height: 22px; padding: 0 1px; }
+.apercu-cartouche { position: sticky; top: 0; z-index: 1; display: block; width: 100%; border: 1px solid var(--bordure); border-radius: 4px; background: #ffffff; margin-bottom: 6px; }
+.ligne-logo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ligne-tc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ligne-tc label { display: inline-flex; align-items: center; gap: 4px; }
+.ligne-tc input[type='number'] { width: 58px; }
+.cartouche-perso textarea { width: 100%; resize: vertical; font: inherit; }
+dialog.popup-feuille.popup-large { width: 400px; }
+html:has(dialog.page-pc[open]) dialog.popup-feuille.popup-large { width: 400px; }
+
+/* 0.363.0 : dernières couleurs, style de cote, titre de la présentation */
+/* Fenêtre de choix de couleur (0.366.0) : dernières couleurs + palette + autre couleur */
+.popup-couleur { position: fixed; z-index: 60; width: 214px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); color: var(--texte); border: 1px solid var(--bordure); border-radius: 8px; box-shadow: 0 6px 22px rgba(16, 24, 20, 0.35); font-size: 0.78rem; }
+.popup-couleur > b { font-size: 0.72rem; color: var(--gris); }
+.rang-couleurs { display: flex; flex-wrap: wrap; gap: 5px; min-height: 24px; align-items: center; }
+.rang-couleurs.grille { display: grid; grid-template-columns: repeat(8, 1fr); }
+.pastille-choix { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.35); cursor: pointer; }
+.pastille-choix:hover { outline: 2px solid #b45309; outline-offset: 1px; }
+.aucune-couleur { color: var(--gris); font-style: italic; }
+.autre-couleur { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; cursor: pointer; }
+.autre-couleur input[type='color'] { width: 40px; height: 22px; padding: 0 1px; }
+.style-cote > summary { cursor: pointer; font-size: 0.8rem; margin: 2px 0; }
+.styles-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+.style-titre { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 0.72rem; }
+.style-titre.actif { border-color: #b45309; box-shadow: 0 0 0 2px #b4530944; }
+.style-titre i { display: block; height: 14px; border-radius: 2px; }
+.mini-titre-simple { background: linear-gradient(#1b2b36, #1b2b36) center / 60% 3px no-repeat; }
+.mini-titre-bandeau { background: #f5c518; }
+.mini-titre-encadre { background: #fff; border: 1.5px solid #1b2b36; }
+.mini-titre-souligne { background: linear-gradient(#f5c518, #f5c518) bottom / 100% 3px no-repeat; }
+.elements-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 2px 0 6px; }
+
+/* 0.364.0 : emplacement (gauche / centre / droite) de chaque élément du titre */
+.elements-titre { grid-template-columns: 1fr; }
+.ligne-element-titre { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.places-titre { display: inline-flex; gap: 2px; }
+.places-titre button { min-width: 24px; min-height: 20px; padding: 0 4px; border: 1px solid var(--bordure); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 0.8rem; }
+.places-titre button.actif { background: #b45309; color: #ffffff; border-color: #b45309; }

@@ -11,7 +11,7 @@ import { repereDuDetail } from '../topo/details-feuille.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, optionsMiseEnPage, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
-  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche,
+  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche, hauteurTexteCartouche, texteTitrePage, zonesTitrePage, taillePourTitre,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
@@ -37,6 +37,11 @@ export function chargerImage(adresse) {
 }
 /** Logos livrés (0.327.0 : + Natalini et Ronchi) ; sinon une image choisie (data:…). */
 export const LOGOS_LIVRES = { perrin: logoPerrin, natalini: logoNatalini, ronchi: logoRonchi };
+/** Images de tous les logos du cartouche (0.362.0 : plusieurs logos), dans l'ordre ; une image illisible est ignorée. */
+export async function chargerLogos(r) {
+  const images = await Promise.all(r.logos.map((l) => chargerImage(adresseLogo(l))));
+  return images.filter(Boolean);
+}
 export const adresseLogo = (logo) => (logo === 'aucun' ? null : !logo ? logoPerrin : LOGOS_LIVRES[logo] ?? logo);
 
 /**
@@ -127,9 +132,9 @@ function dessinerContenuDuPlan(ctx, vue, plan, donnees, plansPage, s, fond, quan
 
 /**
  * Dessine une page dans ctx (pixels, 1 mm = pxParMm px). avecTextes : écrire aussi les textes (aperçu) ; sinon ils sont
- * seulement rangés dans prep.textes (le PDF les écrit en vrai texte). logo : image chargée ou null.
+ * seulement rangés dans prep.textes (le PDF les écrit en vrai texte). logos : images chargées (0.362.0 : plusieurs).
  */
-export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, logo = null, quandTuile = null } = {}) {
+export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, logos = [], quandTuile = null } = {}) {
   const { plan, bib } = donnees;
   const { mise, vue, legende } = prep;
   const s = pxParMm;
@@ -269,25 +274,14 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     });
   }
 
+  // --- Titre de la présentation (0.363.0) : bande au-dessus du cadre du plan.
+  if (mise.titrePage) dessinerTitrePage(ctx, s, mise.titrePage, mise.k, prep.r.titrePage, prep.champs, texte);
+
   // --- Cartouche : logo à gauche, textes à droite (0.337.0 : facultatif).
   const K = mise.cartouche;
   if (!prep.r.cartoucheActif) { ctx.restore(); return prep; }
-  boite(ctx, K, s);
-  ctx.strokeStyle = '#1b2b36';
-  ctx.lineWidth = Math.max(1, 0.25 * s);
-  ctx.beginPath();
-  ctx.moveTo(mm(K.x + K.l * 0.4), mm(K.y));
-  ctx.lineTo(mm(K.x + K.l * 0.4), mm(K.y + K.h));
-  ctx.stroke();
-  if (logo) {
-    const lx = K.l * 0.4 - 6 * mise.k;
-    const ly = K.h - 6 * mise.k;
-    const r = Math.min(lx / logo.width, ly / logo.height);
-    const w = logo.width * r;
-    const h = logo.height * r;
-    ctx.drawImage(logo, mm(K.x + (K.l * 0.4 - w) / 2), mm(K.y + (K.h - h) / 2), mm(w), mm(h));
-  }
-  for (const t of textesCartouche(K, mise.k, prep.champs)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
+  dessinerCartouche(ctx, s, K, mise.k, prep.r, prep.champs, logos, texte);
+  if (mise.texteCartouche) dessinerTexteCartouche(ctx, s, mise.texteCartouche, mise.k, prep.r.texteCartouche, texte);
   ctx.restore();
   return prep;
 }
@@ -427,6 +421,98 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
 }
 
 /** Cadre blanc à liseré (légende, cartouche). */
+/** Titre de la présentation : style simple / bandeau plein / encadré / souligné, texte aligné à gauche, centré ou à droite. */
+export function dessinerTitrePage(ctx, s, B, k, tp, champs, texte) {
+  const t = texteTitrePage(tp, champs);
+  ctx.save();
+  if (tp.style === 'bandeau') {
+    ctx.fillStyle = tp.couleurFond;
+    ctx.fillRect(B.x * s, B.y * s, B.l * s, B.h * s);
+  } else if (tp.style === 'encadre') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(B.x * s, B.y * s, B.l * s, B.h * s);
+    ctx.strokeStyle = tp.couleur;
+    ctx.lineWidth = Math.max(1, 0.35 * s);
+    ctx.strokeRect(B.x * s, B.y * s, B.l * s, B.h * s);
+  } else if (tp.style === 'souligne') {
+    ctx.fillStyle = tp.couleurFond;
+    ctx.fillRect(B.x * s, (B.y + B.h - 0.9 * k) * s, B.l * s, 0.9 * k * s);
+  }
+  ctx.restore();
+  if (!t) return;
+  // 0.364.0 : trois zones (gauche, centre, droite) ; la taille est réduite pour que tout tienne sur la ligne
+  const zones = zonesTitrePage(tp, champs);
+  const taille = taillePourTitre(tp, `${zones.g}  ${zones.c}  ${zones.d}`, B.l, k);
+  const y = B.y + (B.h - (tp.style === 'souligne' ? 0.9 * k : 0)) / 2;
+  const places = { g: [B.x + 3 * k, 'left'], c: [B.x + B.l / 2, 'center'], d: [B.x + B.l - 3 * k, 'right'] };
+  for (const z of ['g', 'c', 'd']) if (zones[z]) texte(zones[z], places[z][0], y, taille, { gras: true, couleur: tp.couleur, align: places[z][1] });
+}
+
+/** Cartouche : cadre, logos à gauche (même zone, chacun centré dans sa part), textes à droite. texte : fonction d'écriture. */
+export function dessinerCartouche(ctx, s, K, k, r, champs, logos, texte) {
+  const mm = (v) => v * s;
+  boite(ctx, K, s);
+  ctx.strokeStyle = '#1b2b36';
+  ctx.lineWidth = Math.max(1, 0.25 * s);
+  ctx.beginPath();
+  ctx.moveTo(mm(K.x + K.l * 0.4), mm(K.y));
+  ctx.lineTo(mm(K.x + K.l * 0.4), mm(K.y + K.h));
+  ctx.stroke();
+  // 0.362.0 : plusieurs logos côte à côte ; chacun garde ses proportions dans sa part de la zone (même marge qu'avant)
+  const n = logos.length;
+  logos.forEach((logo, i) => {
+    const part = (K.l * 0.4) / n;
+    const lx = part - 6 * k;
+    const ly = K.h - 6 * k;
+    const q = Math.min(lx / logo.width, ly / logo.height);
+    const w = logo.width * q;
+    const h = logo.height * q;
+    ctx.drawImage(logo, mm(K.x + i * part + (part - w) / 2), mm(K.y + (K.h - h) / 2), mm(w), mm(h));
+  });
+  for (const t of textesCartouche(K, k, champs, r.cartouchePerso)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
+}
+
+/** Texte posé au-dessus du cartouche (0.362.0) : fond blanc plus ou moins transparent, une ligne par ligne tapée. */
+export function dessinerTexteCartouche(ctx, s, B, k, tc, texte) {
+  ctx.save();
+  if (tc.fond) {
+    ctx.globalAlpha = tc.opaciteFond / 100;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(B.x * s, B.y * s, B.l * s, B.h * s);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  const lignes = tc.texte.split('\n');
+  const hLigne = tc.taille * k * 0.3528 * 1.4;
+  lignes.forEach((l, i) => { if (l.trim()) texte(l, B.x + 2 * k, B.y + 1.5 * k + hLigne * (i + 0.5), tc.taille * k, { couleur: tc.couleur }); });
+}
+
+/**
+ * Aperçu en gros du cartouche (0.362.0) dans une toile : texte du dessus + cartouche, tels qu'ils seront sur la feuille.
+ * dim : { l, h, k } du cartouche (mm, taille k). champs, logos : ceux de la page.
+ */
+export function dessinerApercuCartouche(canvas, { r, champs, logos, dim }) {
+  const ex = hauteurTexteCartouche(r.texteCartouche, dim.k);
+  const dpr = window.devicePixelRatio || 1;
+  const largeur = canvas.clientWidth || 300;
+  const s = (largeur * dpr) / dim.l;
+  canvas.width = Math.round(dim.l * s);
+  canvas.height = Math.round((dim.h + ex) * s);
+  canvas.style.aspectRatio = `${dim.l} / ${dim.h + ex}`;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const texte = (t, x, y, taille, { gras = false, couleur = '#1b2b36' } = {}) => {
+    ctx.fillStyle = couleur;
+    ctx.font = `${gras ? 700 : 400} ${(taille * 0.3528 * s).toFixed(2)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t, x * s, y * s);
+  };
+  if (ex) dessinerTexteCartouche(ctx, s, { x: 0, y: 0, l: dim.l, h: ex }, dim.k, r.texteCartouche, texte);
+  dessinerCartouche(ctx, s, { x: 0, y: ex, l: dim.l, h: dim.h }, dim.k, r, champs, logos, texte);
+}
+
 function boite(ctx, b, s) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(b.x * s, b.y * s, b.l * s, b.h * s);
@@ -609,7 +695,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
   const pages = pagesDeLaFeuille(donnees.plan, r.pages);
   const dpi = DPI_PDF[r.format] ?? 200;
   const s = dpi / 25.4;
-  const logo = await chargerImage(adresseLogo(r.logo));
+  const logos = await chargerLogos(r);
   let doc = null;
   const remarques = [];
   let derniere = null;
@@ -632,7 +718,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
     toile.width = Math.round(page.largeur * s);
     toile.height = Math.round(page.hauteur * s);
     const ctx = toile.getContext('2d');
-    dessinerPage(ctx, donnees, prep, s, { avecTextes: false, logo });
+    dessinerPage(ctx, donnees, prep, s, { avecTextes: false, logos });
     const orientation = page.largeur > page.hauteur ? 'landscape' : 'portrait';
     if (!doc) doc = new jsPDF({ orientation, unit: 'mm', format: [page.largeur, page.hauteur], compress: true });
     else doc.addPage([page.largeur, page.hauteur], orientation);
@@ -645,7 +731,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
       const sans = { ...donnees, plan: { ...donnees.plan, fond: { ...donnees.plan.fond, ortho: false, cadastre: false, carte: false } } };
       const prepSans = { ...prep, r: { ...prep.r, situation: { ...prep.r.situation, actif: false } } };
       const sans2 = { ...sans, plan: { ...sans.plan, fond: { ...sans.plan.fond, carte: false } } };
-      dessinerPage(ctx, sans2, prepSans, s, { avecTextes: false, logo });
+      dessinerPage(ctx, sans2, prepSans, s, { avecTextes: false, logos });
       image = toile.toDataURL('image/jpeg', 0.9);
     }
     doc.addImage(image, 'JPEG', 0, 0, page.largeur, page.hauteur, undefined, 'FAST');

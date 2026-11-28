@@ -27,7 +27,7 @@ import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
 import { lireSousDossiers, sousDossiersEffectifs, pastilleSousDossier } from '../topo/sous-dossiers.js';
-import { pastillesAffaireHtml, pastillesDe } from '../topo/affaires.js';
+import { pastillesAffaireHtml, pastillesAffaireCliquables, pastillesDe } from '../topo/affaires.js';
 import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
@@ -46,12 +46,26 @@ import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe,
  *
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
+// 0.350.0 : « + affaire » montré sur les lignes (projet à plusieurs affaires, Expert) : réglé par main.js.
+let ajoutAffaireEcran = () => false;
+
 export function creerEcranImport(conteneur, contenu, actions) {
+  ajoutAffaireEcran = () => Boolean(actions.ajoutAffaire?.());
   // Les deux zones reçoivent les mêmes écouteurs (boutons, champs, cases).
   const zones = [conteneur, contenu];
   const ecouter = (type, fonction, capture = false) => zones.forEach((zone) => zone.addEventListener(type, fonction, capture));
   // Catégories de « Contenu du projet » repliées par l'utilisateur (ouvertes au départ).
   const categoriesFermees = new Set();
+  // 0.350.0 : pastilles d'affaire et de dossier touchées dans les pages du projet : le bon choix s'ouvre tout de suite.
+  ecouter('click', (evenement) => {
+    const affaire = evenement.target.closest('[data-affaire-de]');
+    const dossiers = evenement.target.closest('[data-dossiers-de]');
+    if (!affaire && !dossiers) return;
+    evenement.preventDefault();
+    evenement.stopPropagation();
+    if (affaire) actions.choisirAffaires?.(affaire.dataset.affaireDe);
+    else actions.choisirDossiers?.(dossiers.dataset.dossiersDe);
+  }, true);
   ecouter('toggle', (evenement) => {
     const categorie = evenement.target.dataset?.categorie;
     if (!categorie) return;
@@ -471,7 +485,8 @@ function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a
   // 0.251.0 : dossiers de la ligne : pastilles (tous les modes) et, dans le menu ⚙, cases pour la ranger (Expert).
   const dossiers = projet && element ? sousDossiersEffectifs(projet, element, genre) : [];
   const liste = projet && element ? lireSousDossiers(projet) : [];
-  const pastilles = pastillesAffaireHtml(projet && element ? pastillesDe(projet, element, genre) : []) + dossiers.map((nom) => pastilleSousDossier(nom, liste)).join('');
+  // 0.350.0 : toucher une pastille (affaire ou dossier) = la changer directement.
+  const pastilles = (projet && element ? pastillesAffaireCliquables(element.id, pastillesDe(projet, element, genre), ajoutAffaireEcran()) : '') + (dossiers.length > 0 && element ? `<span class="dossiers-cliquables" data-dossiers-de="${element.id}">${dossiers.map((nom) => pastilleSousDossier(nom, liste)).join('')}</span>` : '');
   // 0.252.0 : liste déroulante (bouton « Dossiers : Canalo, Terrassement ▾ ») avec une case à cocher par dossier ; reste ouverte tant qu'on coche.
   const cleListe = `dos:${cle}`;
   const listeOuverte = ouverts.has(cleListe);
@@ -847,7 +862,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <strong class="nom-plan-dxf">${echapper(plan.nom)}</strong>
           <span class="pastille-gerer" style="background: ${plan.couleur ?? '#64748b'}" title="Couleur du plan"></span>
         </div>
-        ${(plan.sousDossiers ?? []).length > 0 || (plan.pastilles ?? []).length > 0 ? `<div class="ligne-type-dxf">${pastillesAffaireHtml(plan.pastilles)}${(plan.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, dossiersListe)).join('')}</div>` : ''}
+        ${(plan.sousDossiers ?? []).length > 0 || (plan.pastilles ?? []).length > 0 ? `<div class="ligne-type-dxf">${pastillesAffaireCliquables(plan.id, plan.pastilles, ajoutAffaireEcran())}${(plan.sousDossiers ?? []).length ? `<span class="dossiers-cliquables" data-dossiers-de="${plan.id}">${plan.sousDossiers.map((nom) => pastilleSousDossier(nom, dossiersListe)).join('')}</span>` : ''}</div>` : ''}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

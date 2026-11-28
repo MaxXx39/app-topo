@@ -5,6 +5,8 @@
 //   voir reglages/listes-partagees.js) : tous les appareils voient le même classement, et ranger un
 //   projet ne touche pas au projet lui-même (même s'il est ouvert sur un autre appareil).
 //   Forme : dossiers = { liste: [{ id, nom }], projets: { idDuProjet: idDuDossier } }.
+//   0.352.0 : une ligne d'affaire d'un projet à plusieurs affaires a sa propre clé « idDuProjet#idDeLAffaire » (sinon : le
+//   dossier du projet).
 // - Créer, renommer, supprimer un dossier et ranger un projet : Expert. Un dossier qui contient
 //   encore des projets ne peut pas être supprimé (choix de l'utilisateur).
 // - Choisir le dossier d'un nouveau projet : dès Intermédiaire (qui peut créer un projet).
@@ -38,7 +40,7 @@ export function dossiersTries(dossiers) {
 
 /** Dossier d'un projet (son id), ou SANS_DOSSIER. */
 export function dossierDuProjet(dossiers, projetId) {
-  return dossiers.projets[projetId] ?? SANS_DOSSIER;
+  return dossiers.projets[projetId] ?? dossiers.projets[String(projetId).split('#')[0]] ?? SANS_DOSSIER;
 }
 
 /**
@@ -50,7 +52,7 @@ export function regrouperParDossier(projets, dossiers) {
   const groupes = dossiersTries(dossiers).map((d) => ({ id: d.id, nom: d.nom, projets: [] }));
   const parId = new Map(groupes.map((g) => [g.id, g]));
   const sans = { id: SANS_DOSSIER, nom: 'Sans dossier', projets: [] };
-  for (const p of projets) (parId.get(dossierDuProjet(dossiers, p.id)) ?? sans).projets.push(p);
+  for (const p of projets) (parId.get(dossierDuProjet(dossiers, p.cleDossier ?? p.id)) ?? sans).projets.push(p);
   return sans.projets.length > 0 ? [...groupes, sans] : groupes;
 }
 
@@ -77,7 +79,7 @@ export function renommerDossier(dossiers, id, nom) {
  */
 export function supprimerDossier(dossiers, id, projetsExistants) {
   const existants = new Set(projetsExistants);
-  const dedans = Object.entries(dossiers.projets).filter(([projetId, d]) => d === id && existants.has(projetId)).length;
+  const dedans = Object.entries(dossiers.projets).filter(([projetId, d]) => d === id && existants.has(projetId.split('#')[0])).length;
   if (dedans > 0) return { erreur: `Ce dossier contient encore ${dedans} projet${dedans > 1 ? 's' : ''} : déplace-les d'abord` };
   const projets = Object.fromEntries(Object.entries(dossiers.projets).filter(([, d]) => d !== id));
   return { dossiers: { liste: dossiers.liste.filter((d) => d.id !== id), projets } };

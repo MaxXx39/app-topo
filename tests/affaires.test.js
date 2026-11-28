@@ -108,3 +108,27 @@ describe('affaires d\'un projet (catégories et pastilles)', () => {
     expect(p.leves[0].pastilles).toEqual(['Autres']);
   });
 });
+
+import { pastillesVisibles } from '../src/topo/affaires.js';
+import { resumerProjet, completerProjet, creerProjet } from '../src/projet/projet.js';
+
+describe('affaires : listes visibles et lignes d\'« Ouvrir » (0.351.0)', () => {
+  it('une liste sans pastille se voit partout ; avec pastille, seulement dans son affaire', () => {
+    const p = projetDe('8114', 'a');
+    const b = ajouterAffaire(p, '10203', 'BÂT');
+    expect(pastillesVisibles(p, [], b.id)).toBe(true);
+    expect(pastillesVisibles(p, ['GC'], b.id)).toBe(false);
+    expect(pastillesVisibles(p, ['GC', 'BÂT'], b.id)).toBe(true);
+    expect(pastillesVisibles(p, ['GC'], '')).toBe(true);
+  });
+
+  it('le résumé d\'un projet à plusieurs affaires ne dépend pas de l\'affaire choisie', () => {
+    const p = completerProjet({ ...creerProjet(''), cartouche: { affaire: '8114', lieu: 'Paris' }, categoriePrincipale: 'GC', affaires: [{ id: 'b', numero: '10203', categorie: 'BÂT' }] });
+    definirAffaire('b');
+    const r = resumerProjet(p);
+    definirAffaire('');
+    expect(r.titre).toBe('8114 / 10203 - Paris');
+    expect(r.lieu).toBe('Paris');
+    expect(r.affaires.map((a) => a.numero)).toEqual(['8114', '10203']);
+  });
+});

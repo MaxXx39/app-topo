@@ -243,8 +243,10 @@ describe('feuille', () => {
     const p3 = ajouterPhase(plan);
     plan.feuille = { pages: 'phases' };
     const pages = pagesDeLaFeuille(plan);
-    expect(pages.map((x) => x.titre)).toEqual([p2.nom, p3.nom]);
+    expect(pages.map((x) => x.titre)).toEqual(['2 - Phase', '3 - Phase']); // 0.355.0 : titre = numéro automatique + nom
     expect(pages[0].phases).toEqual([p1.id, p2.id]);
+    plan.feuille = { pages: 'une', phase: p3.id }; // 0.355.0 : une seule phase choisie dans la présentation
+    expect(pagesDeLaFeuille(plan).map((x) => [x.titre, x.phase])).toEqual([['3 - Phase', p3.id]]);
     ajouterObjet(plan, { type: 'zone', phase: p1.id, points: [[0, 0], [1, 0], [1, 1]], categorie: 'emprise' });
     ajouterObjet(plan, { type: 'zone', phase: p3.id, points: [[0, 0], [1, 0], [1, 1]], categorie: 'stockage' });
     expect(objetsDeLaPage(plan, pages[0])).toHaveLength(1);
@@ -605,7 +607,7 @@ describe('gestion des phases (0.293.0)', () => {
     const { m, plan, p1, p2, p3, a } = await planPhases();
     a.fin = p2;
     m.reglerVue(plan, p3, p1, { mode: 'normal', fini: 'assombri' });
-    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(false); // pas de règle pour p2 : départ = la phase en cours seule
+    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(true); // 0.353.0 : début p1, fin p2 = en place en phase 2, même sans règle
     expect(m.objetsVus(plan, p3).find((o) => o.id === a.id).rendu.mode).toBe('assombri'); // fini en phase 3
     m.reglerVue(plan, p3, p1, { genresCaches: ['zone'] });
     expect(m.objetsVus(plan, p3).some((o) => o.id === a.id)).toBe(false);
@@ -613,6 +615,47 @@ describe('gestion des phases (0.293.0)', () => {
     expect(m.couleurObjet(plan, m.objetsVus(plan, p3).find((o) => o.id === a.id))).toBe('#0000ff');
     m.reinitialiserVues(plan, p3);
     expect(plan.vues[p3]).toBeUndefined();
+  });
+
+  it('début → fin (0.353.0) : en place de la phase de début à la phase de fin, puis plus là', async () => {
+    const { m, plan, p1, p2, p3, a, b } = await planPhases();
+    m.ajouterPhase(plan, 'Phase 4');
+    const p4 = plan.phases[3].id;
+    a.fin = p3; // début 1, fin 3
+    expect([p1, p2, p3, p4].map((p) => m.objetsVus(plan, p).some((o) => o.id === a.id))).toEqual([true, true, true, false]);
+    expect(m.objetsVus(plan, p2).find((o) => o.id === a.id).rendu).toBeUndefined(); // en normal
+    // même chose sur la page d'une phase de la feuille
+    expect(objetsDeLaPage(plan, { phase: p3, phases: [p3] }).map((o) => o.id)).toContain(a.id);
+    expect(objetsDeLaPage(plan, { phase: p4, phases: [p4] }).map((o) => o.id)).not.toContain(a.id);
+    // une fin avant le début est ignorée
+    b.fin = p1;
+    expect(m.objetsVus(plan, p2).some((o) => o.id === b.id)).toBe(true);
+    expect(m.objetsVus(plan, p3).some((o) => o.id === b.id)).toBe(false);
+    // une case réglée à la main fait la loi : estompé
+    m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
+    expect(m.objetsVus(plan, p2).find((o) => o.id === a.id).rendu.mode).toBe('estompe');
+  });
+
+  it('phases précédentes (0.353.0) : case cochée = phases d\'avant estompées ou en couleur, cases à la main gardées', async () => {
+    const { m, plan, p1, p2, p3, a, b, c } = await planPhases();
+    expect(m.objetsVus(plan, p3).map((o) => o.id)).toEqual([c.id]); // décoché : rien ne change
+    plan.precedentes = { actif: true };
+    let vus = m.objetsVus(plan, p3);
+    expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]); // 1 et 2 estompées, 3 normale
+    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.35, couleur: plan.phases[0].couleur });
+    expect(vus[2].rendu).toBeUndefined();
+    expect(m.objetsVus(plan, p1).map((o) => o.id)).toEqual([a.id]); // la phase 1 n'a rien avant, les suivantes restent cachées
+    plan.precedentes = { actif: true, mode: 'couleur-estompe', opacite: 0.5, couleur: '#888888' };
+    vus = m.objetsVus(plan, p3);
+    expect(vus[0].rendu).toEqual({ mode: 'couleur', opacite: 0.5, couleur: '#888888', estompe: true });
+    expect(m.couleurObjet(plan, vus[1])).toBe('#888888');
+    plan.precedentes = { actif: true, mode: 'couleur', couleur: '#112233' };
+    expect(m.objetsVus(plan, p3)[0].rendu.estompe).toBeUndefined();
+    // une case réglée à la main (phase 2 cachée en phase 3) garde son réglage ; les autres suivent la case cochée
+    m.reglerVue(plan, p3, p2, { mode: 'cache' });
+    expect(m.objetsVus(plan, p3).map((o) => o.id)).toEqual([a.id, c.id]);
+    plan.precedentes.actif = false; // décocher : la phase 1 redevient cachée (rien n'est resté « collé » dans la ligne)
+    expect(m.objetsVus(plan, p3).map((o) => o.id)).toEqual([c.id]);
   });
 
   it('dates de phase dans le cartouche et page par phase selon la matrice', async () => {

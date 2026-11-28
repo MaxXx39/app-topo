@@ -44,7 +44,7 @@ import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 import { retirerDessins } from './retrait-dessins.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
-import { numeroAffaireActif, affairesDe, migrerAffaires } from '../topo/affaires.js';
+import { numeroAffaireActif, affairesDe, migrerAffaires, affaireChoisie } from '../topo/affaires.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -103,7 +103,10 @@ export function ajouterLeve(projet, nomFichier, points) {
  */
 export function titreProjet(projet) {
   // 0.344.0 : le numéro d'affaire est celui de l'affaire choisie sur cette tablette
-  const affaireLieu = [affairesDe(projet).length > 1 ? numeroAffaireActif(projet) : projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
+  // « Toutes » (Expert) : tous les numéros (« 8114 / 10203 - Paris »)
+  const plusieurs = affairesDe(projet).length > 1;
+  const numero = plusieurs ? (affaireChoisie() ? numeroAffaireActif(projet) : affairesDe(projet).map((a) => a.numero).join(' / ')) : projet.cartouche?.affaire;
+  const affaireLieu = [numero, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
   return affaireLieu || (projet.nom ?? '').trim() || projet.nomAuto || 'Projet sans nom';
 }
 
@@ -251,12 +254,14 @@ export function resumerProjet(projet) {
   return {
     id: projet.id,
     nom: projet.nom,
-    titre: titreProjet(projet),
+    // 0.351.0 : projet à plusieurs affaires : « 8114 / 10203 - Paris » (le titre ne dépend pas de l'affaire choisie sur la tablette)
+    titre: (projet.affaires ?? []).length > 0 ? [affairesDe(projet).map((a) => a.numero).join(' / '), String(projet.cartouche?.lieu ?? '').trim()].filter(Boolean).join(' - ') : titreProjet(projet),
     sousTitre: sousTitreProjet(projet),
     modifieLe: projet.modifieLe,
     nombreLeves: projet.leves.length,
     nombreSurfaces: projet.surfaces.length,
     affaires: (projet.affaires ?? []).length > 0 ? affairesDe(projet).map((a) => ({ id: a.id, numero: a.numero, categorie: a.categorie })) : [], // 0.346.0 : une ligne par affaire dans « Ouvrir »
+    lieu: String(projet.cartouche?.lieu ?? '').trim() || String(projet.nom ?? '').trim(), // 0.351.0 : titre de chaque ligne d'affaire (« numéro - lieu »)
     centre: centreDuProjet(projet), // 0.216.0 : pour la carte des projets (null si rien en Suisse)
   };
 }

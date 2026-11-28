@@ -97,6 +97,10 @@ export function formesGrue(o, a, u) {
   const formes = [];
   const c = tour.pied.c ?? tour.mat + 1;
   if (g.massifs) formes.push(rect(s0 - (c * proj + g.massifL) / 2, s0 + (c * proj + g.massifL) / 2, nv.pied - g.massifH, nv.pied, 'massif'));
+  if (g.radier) { // 0.358.0 : radier coupé : largeur apparente du rectangle tourné
+    const w = g.radierL * Math.abs(Math.cos(rho)) + g.radierB * Math.abs(Math.sin(rho));
+    formes.push(rect(s0 - w / 2, s0 + w / 2, nv.pied - g.massifH, nv.pied, 'massif'));
+  }
   const bout = boutDeFleche(M, f);
   const arr = D.contreFlecheArriere;
   const [j1, j2] = largeurMin(X(D.flecheDebut), X(bout));
@@ -174,7 +178,7 @@ export function coupeChantier(plan, ligne, surfaces = []) {
       const gr = formesGrue(o, a, u);
       grues.push({ id: o.id, ...gr });
       zs.push(gr.niveaux.pied, gr.niveaux.haut);
-      if (o.massifs) zs.push(gr.niveaux.pied - (Number(o.massifH) > 0 ? Number(o.massifH) : 1));
+      if (o.massifs || o.radier) zs.push(gr.niveaux.pied - (Number(o.massifH) > 0 ? Number(o.massifH) : 1));
     }
   }
   const profils = [];

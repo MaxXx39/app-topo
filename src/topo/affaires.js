@@ -148,6 +148,13 @@ export function dansAffaire(projet, element, genre = '', choix = choisie) {
   return Boolean(categorie) && pastilles.includes(categorie);
 }
 
+/** Des pastilles (catégories) sont-elles visibles dans l'affaire choisie ? (sans pastille : oui ; « Toutes » : oui) */
+export function pastillesVisibles(projet, pastilles = [], choix = choisie) {
+  if (!choix || (pastilles ?? []).length === 0) return true;
+  const categorie = affaireParId(projet, choix)?.categorie;
+  return Boolean(categorie) && pastilles.includes(categorie);
+}
+
 /** Numéro d'affaire à écrire sur les exports et le cartouche : celui de l'affaire choisie, sinon celui de l'affaire principale. */
 export function numeroAffaireActif(projet, choix = choisie) {
   const numero = choix ? numeroDeLAffaire(projet, choix) : null;
@@ -242,6 +249,16 @@ const echappeAffaire = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp
 /** HTML des pastilles d'affaire d'un élément : un rond par catégorie, avec ses 3 premières lettres (nom complet au toucher). */
 export function pastillesAffaireHtml(categories = []) {
   return (categories ?? []).map((c) => `<span class="pastille-affaire-el" style="background: ${couleurCategorie(c)}" title="Affaire ${echappeAffaire(c)}">${echappeAffaire(String(c).slice(0, 3))}</span>`).join('');
+}
+
+/**
+ * 0.350.0 : pastilles d'affaire qu'on TOUCHE pour les changer directement (Expert) : le groupe porte data-affaire-de.
+ * Élément sans pastille : « + affaire » si `ajout` (projet à plusieurs affaires, Expert), sinon rien.
+ */
+export function pastillesAffaireCliquables(id, categories = [], ajout = false) {
+  const ronds = pastillesAffaireHtml(categories);
+  if (ronds) return `<span class="affaires-cliquables" data-affaire-de="${echappeAffaire(id)}" title="Changer les affaires">${ronds}</span>`;
+  return ajout ? `<span class="affaires-cliquables ajout-affaire" data-affaire-de="${echappeAffaire(id)}">+ affaire</span>` : '';
 }
 
 // --- Choix gardé sur la tablette (comme le sous-dossier) ---

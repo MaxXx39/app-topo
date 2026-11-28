@@ -855,6 +855,20 @@ export function baseArc(pf) {
 }
 
 /**
+ * Remet en segment droit le côté « debut → fin » courbé en arc (0.358.0, double-clic sur la poignée de l'arc) : ses points
+ * de facette et leurs talus sont retirés. Renvoie vrai si un arc a été retiré.
+ */
+export function redresserArc(pf, debut, fin) {
+  const i = (pf.arcs ?? []).findIndex((a) => a.debut === debut && a.fin === fin);
+  if (i < 0) return false;
+  const noms = new Set(pf.arcs[i].noms);
+  for (const nom of noms) delete pf.talus?.[nom];
+  pf.sommets = pf.sommets.filter((s) => !noms.has(s.nom));
+  pf.arcs.splice(i, 1);
+  return true;
+}
+
+/**
  * Le côté « debut → fin » passe par le point m (est, nord) : il est remplacé par un arc de cercle de FACETTES_ARC côtés.
  * `base` = baseArc(pf) pris AVANT le geste (on repart toujours de lui). Le talus du début est copié sur chaque facette,
  * l'altitude suit la longueur entre les deux bouts (sans altitude : vide). Renvoie null si c'est fait, sinon un texte d'erreur.

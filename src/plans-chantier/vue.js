@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, multi = () => [], saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, survol = () => null, surbrillance = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -156,11 +156,53 @@ export function creerVueChantier(conteneur, options) {
     ctx.lineCap = 'round';
     const pc = planChantier();
     if (pc) {
-      const visibles = objetsVisibles(pc);
+      // 0.356.0 : groupes. groupe() = { id, dedans } : dedans (double-clic dans le groupe), tout le reste est estompé.
+      const g = groupe();
+      const visibles = objetsVisibles(pc).map((o) => (g?.dedans && o.groupe !== g.id && !o.rendu ? { ...o, rendu: { mode: 'estompe', opacite: 0.25 } } : o));
       const d = contexteDessin(ctx, pc);
       dessinerObjets(d, visibles);
+      if (g) {
+        // cadre orange en tirets autour du groupe, avec son nom
+        const b = bornesObjets(visibles.filter((o) => o.groupe === g.id));
+        if (b) {
+          const a1 = ecran([b.estMin, b.nordMax]);
+          const a2 = ecran([b.estMax, b.nordMin]);
+          const m = 14;
+          ctx.save();
+          ctx.strokeStyle = ORANGE;
+          ctx.lineWidth = g.dedans ? 2.5 : 1.5;
+          ctx.setLineDash([8, 5]);
+          ctx.strokeRect(a1.x - m, a1.y - m, a2.x - a1.x + 2 * m, a2.y - a1.y + 2 * m);
+          ctx.setLineDash([]);
+          if (g.nom) {
+            ctx.font = 'bold 11px system-ui, sans-serif';
+            const t = g.dedans ? `${g.nom} (dans le groupe)` : g.nom;
+            const w = ctx.measureText(t).width + 10;
+            ctx.fillStyle = ORANGE;
+            const yb = a2.y + m + 1; // sous le cadre (au-dessus, il passerait sous les boutons Fond / Plan / Points)
+            ctx.fillRect(a1.x - m, yb, w, 16);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(t, a1.x - m + 5, yb + 12);
+          }
+          ctx.restore();
+        }
+      }
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
+      const sv = survol(); // 0.357.0 : objet sous la souris (infobulle) : contour bleu léger
+      if (sv) dessinerSurvol(ctx, sv);
+      const ligneVisee = surbrillance(); // 0.360.0 : ligne qui servira à aligner un bloc (orange, avant le clic)
+      if (ligneVisee) {
+        ctx.save();
+        ctx.strokeStyle = ORANGE;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ligneVisee.forEach(([e, n], i) => { const q = versEcran(e, n, vue); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+        ctx.stroke();
+        ctx.restore();
+      }
       for (const id of multi()) { // plusieurs éléments choisis (Ctrl + clic)
         const autre = visibles.find((o) => o.id === id);
         if (autre) dessinerChoix(ctx, autre);
@@ -245,6 +287,26 @@ export function creerVueChantier(conteneur, options) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  /** Contour bleu clair, sans poignées, de l'objet survolé (0.357.0). */
+  function dessinerSurvol(ctx, o) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(37, 99, 235, 0.55)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([]);
+    const s = estPose(o) ? symboleDeLObjet(bibliotheque(), o) : null;
+    const pts = s ? coinsSymbole(o, s) : pointsDe(o);
+    if (pts.length > 1) {
+      chemin(ctx, pts, Boolean(s) || o.type === 'zone');
+      ctx.stroke();
+    } else if (pts.length) {
+      const q = ecran(pts[0]);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 12, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function dessinerChoix(ctx, o) {

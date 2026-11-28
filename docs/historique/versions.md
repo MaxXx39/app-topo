@@ -1,6 +1,117 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.349.0 — Menus Fond / Plan / Points / Surface plus serrés (demande du 27.11)
+Lire seulement la section utile : `grep -n '^## 0.366.0 — Dernières couleurs seulement dans la fenêtre de choix (demande du 28.11)
+- Les petites pastilles sous chaque sélecteur de couleur (0.363.0) sont **retirées de l'appli**. Un clic sur un sélecteur de couleur ouvre maintenant **notre fenêtre** (`plans-chantier/couleurs-recentes.js`) : « Dernières couleurs » (6 au plus, gardées sur l'appareil, `topo-couleurs-recentes`), « Palette » (16 couleurs) et « Autre couleur… » (le sélecteur du navigateur). Échap ou clic à côté ferme. Les pastilles de l'appli (cadres de détail, constructions) comptent aussi dans les dernières couleurs.
+- Le sélecteur natif du navigateur ne peut pas recevoir de rangée en plus : d'où la fenêtre à nous.
+
+## 0.365.0 — Gabarits de présentation pour tous les projets, par Drive (choix 2 du 28.11)
+- Nouvelle partie `gabarits` des listes partagées (`reglages/listes-partagees.js`, fusion partie par partie comme les autres) : { id, nom, feuille, echelle }.
+- « Gabarit + » demande : **Tous les projets** (Drive) ou **Ce projet seulement** (comme avant, `projet.gabaritsPresentation`). La liste « Gabarit » montre deux groupes : « Ce projet » et « Tous les projets (Drive) » (valeurs `p:` / `d:`). Supprimer un gabarit partagé demande confirmation.
+- Un gabarit partagé ne garde pas ce qui appartient à un chantier (`PROPRES_AU_PLAN` : centre, détails et leurs places, plans montrés, phase, pages, rotation, titre du plan, nom du chantier, date, indice) ; en l'utilisant, le plan garde les siens (`feuilleSansChantier`, `utiliserGabaritPartage` dans `topo/presentations.js`). **Choix fait sans l'utilisateur, à valider.**
+- Les logos importés (images) partent dans le gabarit partagé : liste Drive plus lourde si beaucoup de logos.
+
+## 0.364.0 — Titre : chaque élément à gauche, au centre ou à droite (demande du 28.11)
+- `feuille.titrePage.positions` { clé: 'g' | 'c' | 'd' } (clés : les 8 éléments + `libre`) ; sans choix, l'alignement général. Trois boutons ⇤ ↔ ⇥ à droite de chaque élément ; « Tout placer » remet tous les éléments au même endroit. `zonesTitrePage` répartit le texte, `dessinerTitrePage` écrit les 3 zones sur la même ligne (taille réduite si ça ne tient pas).
+
+## 0.363.0 — Cote collée à la ligne, titre de présentation, dernières couleurs (demandes du 28.11)
+- **Cotation** : la valeur est collée à la ligne (écart de 0,5 hauteur de texte), au choix **Dessus / Dessous** (`o.cotePos`, bandeau) ; le style de la valeur (cadre, ligne coupée…), les bouts, leur taille et les coins sont rangés dans « ⚙ Style de cote » (décidé le 28.11). Les cotes déjà dessinées gardent leur style ; les nouvelles partent en « Au-dessus, sans cadre ».
+- **Titre de présentation** : `feuille.titrePage` { actif, style (simple / bandeau / encadré / souligné), taille, couleur, couleurFond, alignement g / c / d, elements (nom, chantier, phase, échelle, format, indice, date, auteur), texteLibre } ; le titre prend une bande au-dessus du cadre du plan (`miseEnPageFeuille` renvoie `titrePage`, le cadre commence dessous) ; texte réduit s'il ne tient pas. Les 4 styles proposés ont tous été retenus (28.11). Case « Titre » dans les éléments de la feuille.
+- **Dernières couleurs** (`plans-chantier/couleurs-recentes.js`) : 8 couleurs gardées sur l'appareil (`topo-couleurs-recentes`), petite rangée sous chaque `input[type=color]` de l'appli (observateur), un clic remet la couleur ; les pastilles de couleur (0.360.0) comptent aussi.
+- À essayer : PDF exporté avec le titre ; doigt sur tablette (rangée de couleurs petite : 16 px).
+
+## 0.362.0 — Cartouche : plusieurs logos, texte au-dessus, couleurs, aperçu en gros (demandes du 28.11)
+- **Logos** : `feuille.logos` (liste, 4 au plus ; livrés `perrin` / `natalini` / `ronchi` ou image importée réduite à 600 px) ; l'ancien `feuille.logo` est lu tant que `logos` n'existe pas (`listeLogos`). Chaque logo est centré dans sa part de la zone de gauche du cartouche, mêmes marges et proportions qu'avant (`dessinerCartouche` dans `plans-chantier/feuille.js`).
+- **Texte au-dessus du cartouche** : `feuille.texteCartouche` { texte (plusieurs lignes), taille, couleur, fond, opaciteFond }, posé contre le cartouche du côté du plan ; la légende se décale derrière (`miseEnPageFeuille` renvoie `texteCartouche`).
+- **Couleur de chaque information** du cartouche (`cartouchePerso.champs[clé].couleur`).
+- **Aperçu en gros** en haut de la fenêtre du cartouche (`dessinerApercuCartouche`), collé en haut quand on fait défiler.
+- Cases à cocher de la liste des informations : plus de chevauchement avec les noms.
+- À essayer : PDF exporté avec plusieurs logos et le texte du dessus ; image PNG transparente comme logo.
+
+## 0.361.1 — Cartouche : plus d'ordre, seulement montrer / cacher et la taille (demande du 28.11)
+- Les positions du cartouche redeviennent celles d'avant (échelle / format et date / dessiné par côte à côte). `feuille.cartouchePerso` = { champs: { clé: { visible, taille } } } ; plus d'`ordre` (un ancien réglage avec `ordre` est simplement ignoré).
+
+## 0.361.0 — Demandes du 28.11 (suite) : choix par surbrillance, benne, fenêtres compactes, cartouche sur mesure
+- **Choisir la ligne à décaler / prolonger / ajuster** : curseur flèche (plus de croix) et élément visé en contour bleu (Décaler : segment orange) avant le clic.
+- **Benne à béton (grue)** rangée dans « Engins » (plus dans « Grues »).
+- **Fenêtres plus petites** (style AutoCAD / Mensura) dans les applis de PC : fenêtres Cartouche & co, menu des phases, fenêtres de choix, boutons OK / Annuler.
+- **Cartouche sur mesure** : `feuille.cartouchePerso` { ordre, champs: { clé: { visible, taille } } } (`cartouchePersoDe`, `textesCartouchePerso` dans `topo/feuille-chantier.js`) ; sans réglage = cartouche standard inchangé ; dans le sur mesure, une information par ligne, tailles réduites ensemble si ça ne tient pas. Test : `tests/feuille-chantier.test.js`.
+- Bug trouvé à l'essai et corrigé avant envoi : `r` non défini dans `feuille.js` (utiliser `prep.r`).
+- À essayer : le doigt sur tablette ; PDF exporté avec cartouche sur mesure.
+
+## 0.360.0 — Demandes du 28.11 : pastilles de couleur, Modifier (Prolonger / Ajuster), aligner, grue
+- **Pastilles de couleur** à la place des noms (bord des cadres de détail, couleur des constructions) : `plans-chantier/pastilles-couleur.js` (liste cachée + `change`).
+- **Croix ✕** pour fermer la bibliothèque de symboles.
+- **Groupe « Modifier »** du ruban Dessin : Décaler (sorti de Tracer), **Prolonger** et **Ajuster** (Intermédiaire, décidé le 28.11). On choisit l'outil, on clique la ou les lignes (ligne, flèche, piste, construction segment), Espace / Entrée, puis on clique jusqu'où : une ligne du plan (droite infinie) ou un point libre ; Ajuster enlève le bout du côté du clic (décidé le 28.11). Calculs : `topo/modifier-plan.js` + `tests/modifier-plan.test.js`.
+- **Bloc : Rotation, 90°, Vers un point et Aligner rangés ensemble** ; au survol, la ligne qui servira à aligner s'allume en orange (aussi pour Prolonger / Ajuster : la limite visée).
+- **Grue (fiche)** : une grue nouvellement posée a Crochet et HSC décochés ; texte de la flèche : case « Nom du modèle » (cochée pour les nouvelles grues, pas pour les anciennes), Z châssis / Z HSC / Z haut grue (`niveauxGrue`) ; textes de la flèche et de la charge plus près de la flèche (0,85 m et 0,6 m).
+- À essayer : le doigt sur tablette pour Prolonger / Ajuster ; Plateformes : aucune liste de couleurs en texte trouvée (seulement la pastille ronde du sélecteur), à préciser si une autre liste est visée.
+
+## 0.359.1 — Liebherr 81 K.1 : choix validés (HSC page 1, estimés, rayon arrière 3,50 m), notes du modèle à jour
+
+## 0.359.0 — Grue Liebherr 81 K.1 ajoutée (fiche technique reçue le 28.11)
+- **Modèle livré** `src/topo/grue-liebherr-81k-donnees.js` (`MODELE_LIEBHERR_81K`, id `liebherr-81k1`, automontante) : flèches 31 / 37 / 42 / 45 / 48 m ; tableaux **LM 1** (Tableau 1) et **Load-Plus** (Tableau 2), 6 t de 3,0 m jusqu'à 12,0 / 13,3 / 14,1 / 15,1 / 16,3 m (`rPlein`) ; HSC de la page 1 (montage bas 0–3 : 17,4 → 24,6 m ; montage haut 0–6 : 26,0 → 40,4 m*) ; châssis 4,5 × 4,5 m, mât 1,10 m, flèche 0,87 × 0,84 m, cabine 2,65 × 2,00 m, rayon arrière 3,50 m (lest 35 t ; 40 t à 2,75 m) ; infos (poids 20,3 t, treuil, flèche relevée à 30°, alimentation).
+- **Validé par l'utilisateur le 28.11** : HSC = page 1 (pas la page 2, 1,5 m plus bas) ; estimés gardés (début de la flèche 0, arrière tournant 2,5 m de large, tête 3,2 m au-dessus de la flèche) ; rayon arrière 3,50 m (lest 35 t).
+- Liste « Charges » : noms des tableaux du modèle (`nomsTableaux`, ici « LM 1 / Load-Plus ») ; repère « * » d'une HSC avec son explication (`etoile` en texte).
+
+## 0.358.0 — Demandes du 28.11 (suite) : flèche retour, bouton du bas, arc → segment, onglets, radier, tours
+- **Applis plein écran** : flèche jaune « retour » du haut cachée (`page-habillee`, doublon du bouton ☰ du bas) ; bouton du bas à gauche = 54 px et 15 px comme les autres applis (il faisait 58 px / 13 px).
+- **Plateformes** : double-clic sur la poignée ronde d'un arc = retour au côté droit (`redresserArc`).
+- **Plans de chantier** : réglages de l'élément choisi en **onglets** dans le bandeau (`htmlOngletsBandeau` : chaque `.groupe-grue` = un onglet ; zone : Genre et texte / Aspect / Stock ; grue d'après fiche : Modèle / Flèche et charge / Tour et châssis / Affichage ; onglet gardé par genre) ; **radier** sous la grue (« Fondation » : Aucune / Massifs / Radier ; dalle `radierL` × `radierB`, 5 × 5 m au départ, centrée sous l'axe dans l'orientation du pied, béton, cotée ; aussi dans la vue de côté) ; **dupliquer une tour** (⧉ dans Régl. grues) ; bouton « **Régl. grues** » (grue + engrenage) ; case « Sans texte » (au lieu de « Sans le texte du bloc »).
+
+## 0.357.0 — Lot « Général » du 28.11 : dossiers plus petits, applis PC compactes, infobulle et Tab
+- **Dossiers du projet** (page Applications, TER., CANA…) : puces plus petites (28 px, texte 0.8 rem, sans gras), plus serrées ; flèches ‹ › quand la ligne ne tient pas (`.cadre-dossiers`, `data-defiler-dossiers`).
+- **Applis de PC compactes** (Plans de chantier, Calage, Plateformes, Comparer, Matériel ; pas sur l'APK) : `habillerPage` pose `page-pc` (sauf si `window.AppliAndroid`) ; quand une telle page est ouverte, `html:has(dialog.page-pc[open])` : taille de base 13 px, boutons, champs, fenêtres (popups), marges, ruban plus petits ; boutons du bas des fenêtres à cases alignés à droite.
+- **Infobulle au survol** (Plans de chantier, Expert, souris) : 0,6 s immobile sans outil → petite bulle transparente (nom, phases, groupe, « 1 / 2 · Tab = dessous ») et contour bleu léger ; **Tab / Maj+Tab** = objet suivant / précédent sous la souris (`objetsSousLePoint`), **clic** = choisir l'objet montré (le groupe entier si l'objet est groupé). Rien au doigt.
+- Pas encore : infobulle / Tab dans les autres applis (Calage, Plateformes, plan de Terrain) : à faire si l'essai plaît.
+
+## 0.356.0 — Plans de chantier : groupes d'éléments (Expert, maquette validée le 28.11)
+- **Données** (`topo/groupes-chantier.js`) : `plan.groupes` [{ id, nom, phase, fin }], `objet.groupe`. Un objet = un seul groupe (pas de groupe dans un groupe) ; **tout le groupe a la même phase de début / fin** (celles du groupe, remises à chaque enregistrement par `harmoniserGroupes` ; groupe de moins de 2 éléments retiré).
+- **Grouper** : choisir plusieurs éléments (Ctrl + clic) puis Ctrl+G ou « ⊞ Grouper » ; phase = celle du premier. **Dégrouper** : Ctrl+Maj+G ou bouton du panneau.
+- **Clic** sur un élément groupé = tout le groupe (cadre orange en tirets, nom sous le cadre ; glisser / Suppr / Ctrl+C sur tout). **Double-clic** = entrer dans le groupe (un élément seul, le reste du plan estompé à 25 %, bandeau « Dans le groupe … » + Sortir) ; Échap ou clic dehors = sortir.
+- **Panneau du groupe** : nom, phase de début / fin pour tout le groupe, Entrer, Dégrouper. **Volet Groupes** (bouton « Groupes » à côté de Symboles et Grue) : liste, nombre d'éléments, phases, éléments de chaque groupe. Liste Éléments : ⊞ devant un élément groupé.
+- **Copies** (Ctrl+V, dupliquer une phase) : nouveau groupe « … (copie) », jamais l'original (`regrouperCopies`).
+
+## 0.355.0 — Plans de chantier : lot 2 des demandes du 28.11 (volume des tas, grues, Éléments, présentation)
+- **Volume d'un tas** (Expert, `volumeDuTas` dans `topo/plan-chantier.js`) : talus 1/1 par défaut (`TAS_TALUS` = 1, champ « Talus » modifiable), V = h / 6 × (A bas + 4 A milieu + A haut) (prismatoïde : exact pour une base décalée vers l'intérieur ; **formule exacte validée par l'utilisateur le 28.11**, plutôt que le tronc de pyramide qui donnait 361.8 au lieu de 366 m³ sur un rectangle 20 × 10 m h 3 m). Tas pointu (zone trop étroite) : tranches jusqu'à la hauteur atteinte. Case « Écrire le volume » et ligne de résultat dans le panneau.
+- **Texte (mm)** remonté dans Affichage (bandeau du haut).
+- **Panneau de droite replié** : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place (le volet Symboles prenait toute la page).
+- **Liste Éléments** : phase début → fin en petit gris (« 1 → 3 »), tri « Dernier dessiné en haut / Par type / Par phase ».
+- **Grues** : bouton **Grue** (icône grue) dans le groupe Symboles du ruban (le bouton « Modèles de grues… » du panneau est retiré) ; **enregistrement automatique** à chaque champ (sans redessiner la fenêtre) ; **modèles livrés modifiables** (copie du projet au même id, `base: true`, « ↺ Revenir à l'original ») ; grue créée par l'utilisateur (`estModeleGenerique`) : grue à tour avec cabine (2.4 × 2 m si rien n'est donné), automontante sans contre-flèche.
+- **Présentation** : « Phase montrée » = Toutes (une page) / Une page par phase / une seule phase ; la phase s'écrit dans le cartouche (« Phase : 2 - Bâtiment ») ; plus de choix de phase dans le bandeau en Présentation.
+
+## 0.354.0 — Plans de chantier : lot 1 des demandes du 28.11 (phases, Ortho, accroches, points)
+- **Numéro des phases automatique** (`libellePhase`, `nomSansNumero` dans `topo/phases-chantier.js`) : on écrit « Terrassement », l'appli affiche « 1 - Terrassement » d'après l'ordre ; un numéro tapé à la main est retiré ; l'ancien « Phase 3 » devient « Phase ».
+- **Choix de phase** : flèches ◀ ▶ à côté de la liste, option « Toutes (on voit tout) » (`plan.voirToutes`, vue seulement : on dessine toujours dans la phase active).
+- **Fenêtre Phases** : une phase = une ligne (flex qui passe à la ligne si l'écran est étroit), fenêtre plus large.
+- **Ortho** : un seul choix à la fois (rien / N S E O / repère). F8 et le bouton Ortho tournent : rien → N S E O → repère (si un repère a été choisi) → rien ; N S E O et Repère recliqués s'éteignent ; le repère reste coché après le choix de la ligne, l'angle taper = repère choisi.
+- **Accroches** plus petites (28 px, icônes seules). **Points levés cachés** au départ d'un nouveau plan.
+- Pas encore fait (lots suivants) : texte dans Affichage, grue modifiable + réglage Grue, mot « Éléments » sur le volet replié, Éléments avec phase début / fin + tri, groupes (maquette à valider), volume de zone stock (tronc de pyramide, formule à valider), Présentation (phase par page, phase au cartouche), appli PC plus compacte, infobulle au survol, Tab sur objets superposés.
+
+## 0.353.0 — Plans de chantier : phase de début → phase de fin, et phases précédentes (demandes du 28.11)
+- **Début → fin** : un élément avec une phase de fin est **présent en normal de sa phase de début à sa phase de fin** (sur l'écran, les pages de la feuille PDF), sans régler chaque phase dans Gestion des phases ; après la fin, il suit « Éléments terminés » (caché au départ). Sans fin : comme avant (sa phase seule + ce que dit Gestion des phases). Fin avant le début : ignorée (la liste ne propose que les phases ≥ début ; avancer le début au-delà de la fin enlève la fin avec un message). Une case de Gestion des phases réglée à la main fait toujours la loi.
+- **Panneau de l'objet** : « Phase de début » / « Phase de fin » (« — (pas de fin) »).
+- **Phases précédentes** (Gestion des phases, `plan.precedentes` { actif, mode, opacite, couleur }, décoché au départ) : toutes les phases d'AVANT la phase en cours en **estompé** (couleurs d'origine), **couleur unique** ou **couleur unique estompée**. Réglage de départ : une case du tableau réglée à la main (`manuel`) le garde ; un élément « en place » (début → fin) reste normal. Fonctions : `precedentesDe`, `regleDeVue` (couche), `objetsVus` ; `dessin.js` (`rendu.estompe`).
+- Hypothèses à valider : mode « couleur estompée » = ma lecture de « x couleur / estompé couleur » ; réglage global au plan (pas par phase).
+
+## 0.352.0 — Affaires : un dossier de projets par affaire ; après une fusion, que faire de l'original ? (demandes du 28.11)
+- **Dossiers de projets** : chaque ligne d'affaire d'« Ouvrir » a son ⋮ et se range dans son propre dossier (clé `idProjet#idAffaire` dans `dossiers.projets` ; sans rangement propre : le dossier du projet). Ex. « 8114 - Arzier Bix GC » dans « Perrin - GC », « 662 524 - Arzier Bix BÂT » dans « Perrin - Bât ». Un dossier qui contient encore une ligne d'affaire ne peut pas être supprimé.
+- **Fusion** : l'original restait sans rien dire. Maintenant une fenêtre demande « Que faire de « … » ? » : le garder (par défaut), le supprimer de cet appareil, ou partout (appareil + Drive, si Drive est connecté ; confirmation ensuite). La nouvelle ligne d'affaire reprend le dossier de projets de l'original.
+- Vérifié en Playwright (2 dossiers, rangement de chaque ligne, fusion puis suppression de l'original).
+
+## 0.351.0 — Revue complète des affaires (projets liés), simulée de A à Z (Expert, Intermédiaire, Base)
+Simulations Playwright sur un vrai projet (2 affaires GC 8114 / BÂT 10203, 3 plans, 2 levés) + un 2e projet à fusionner. Corrigé :
+- **« Ouvrir »** : chaque ligne d'affaire prenait le numéro de l'affaire ouverte (« 10203 - Paris » sur les deux lignes) : chaque ligne a maintenant SON numéro (« 8114 - Paris GC », « 10203 - Paris BÂT ») et la ligne ouverte est marquée « ouvert ». Le titre du projet dans les listes / la carte : « 8114 / 10203 - Paris » (`resumerProjet`, champ `lieu`). En « Toutes » (Expert), l'en-tête montre aussi tous les numéros.
+- **Éléments d'une autre affaire** : avant, seulement décochés (on pouvait les recocher, même en Base) ; maintenant **ni listés ni dessinés** dans une affaire : menus Plan / Points / Surface, pages du projet (Liste de points, Plans, Gérer : `projetDeLAffaire`), plans de fond des applis plein écran (`plansDuProjet`), liste de Calage, liste de Plans de chantier, surfaces de Plateformes. En « Toutes » : tout.
+- **Liste déroulante des affaires dans une appli plein écran** : elle s'ouvrait DERRIÈRE la page (impossible à toucher) ; elle s'ouvre maintenant dans la page, sous sa pastille.
+- **Plans de chantier** : liste filtrée par affaire, pastilles d'affaire sur chaque plan (touchables, Expert), liste redessinée quand on change d'affaire. Calage : liste redessinée aussi.
+- Vérifié : nouveau plan de chantier créé dans BÂT = pastille BÂT, absent en GC ; fusion (numéro proposé, catégories libres seulement) ; changer la catégorie renomme les pastilles ; retrait d'une affaire non vide refusé avec message ; Base : affaire fixe, pastille non touchable, « Seul l'Expert… » en touchant un rond, aucune trace des autres affaires ; Expert démarre en « Toutes ».
+- Pas filtré (volontairement) : Plateformes entre elles (angles liés d'une plateforme à l'autre), Comparer des PDF, Matériel (pas lié aux affaires).
+
+## 0.350.0 — Toucher une pastille = la changer directement ; menu Plan à jour (demandes du 27.11)
+- Toucher un **rond d'affaire** d'un élément ouvre tout de suite ses cases d'affaires (Expert ; plus de fenêtre « dossiers ou affaires ? ») ; toucher une **pastille de dossier** ouvre tout de suite ses cases de dossiers. Vaut dans le menu Plan / Points / Surface du plan ET dans la page Plans / Gérer du projet. Élément sans pastille d'affaire (projet à plusieurs affaires, Expert) : « + affaire » à toucher. `pastillesAffaireCliquables`, `choisirAffairesDeLElement`.
+- **Bug corrigé** : après un changement d'affaire, le menu Plan du plan gardait les anciennes pastilles (sa liste ne se redessinait pas : les pastilles manquaient dans `signatureMenuPlans`). Reproduit et vérifié en Playwright avec un vrai DXF.
+
+## 0.349.0 — Menus Fond / Plan / Points / Surface plus serrés (demande du 27.11)
 - Plan : la flèche ▾ des calques est à droite de la réglette Trans. (plus sur une ligne à part).
 - Les 4 menus : marges, espaces entre lignes et hauteur des titres réduits.
 - Points : le nom du levé est un peu remonté et la nature est dessous (petite étiquette) ; texte du nom plus petit, sans gras (`.bloc-nom-liste`).

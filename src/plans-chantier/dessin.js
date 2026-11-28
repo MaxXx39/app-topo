@@ -7,7 +7,7 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, volumeDuTas, TAS_HAUTEUR, TAS_TALUS,
   hachureZone, hachureDeLaZone, tiretsContour, ancreEtiquette,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
@@ -215,13 +215,13 @@ export function dessinerObjets(d, objets) {
   for (const o of objets) {
     if (!o.rendu) normaux.push(o);
     else {
-      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}`;
+      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}|${o.rendu.estompe ? 1 : 0}`;
       if (!groupes.has(cle)) groupes.set(cle, []);
       groupes.get(cle).push(o);
     }
   }
   for (const liste of groupes.values()) {
-    const { mode, opacite } = liste[0].rendu;
+    const { mode, opacite, estompe } = liste[0].rendu;
     const toile = document.createElement('canvas');
     toile.width = d.ctx.canvas.width;
     toile.height = d.ctx.canvas.height;
@@ -230,7 +230,7 @@ export function dessinerObjets(d, objets) {
     for (const o of liste) dessinerObjet({ ...d, ctx: tctx }, o);
     d.ctx.save();
     d.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    d.ctx.globalAlpha = mode === 'estompe' ? opacite : mode === 'assombri' ? 0.8 : 1;
+    d.ctx.globalAlpha = mode === 'estompe' || (mode === 'couleur' && estompe) ? opacite : mode === 'assombri' ? 0.8 : 1; // « couleur estompée » (phases précédentes, 0.353.0)
     if (mode === 'assombri') d.ctx.filter = 'grayscale(1) brightness(0.7)';
     d.ctx.drawImage(toile, 0, 0);
     d.ctx.restore();
@@ -284,6 +284,7 @@ export function dessinerObjet(d, o) {
     if (o.etiquette) parties.push(o.etiquette); // 0.293.0 : texte libre de la zone ou du tas
     if (o.afficherSurface) parties.push(texteSurface(o.points));
     if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
+    if (o.tasH > 0 && o.afficherVolume) parties.push(`V ${Math.round(volumeDuTas(o.points, o.tasH, o.tasTalus ?? TAS_TALUS).volume).toLocaleString('fr-CH')} m³`);
     if (parties.length) {
       const c = ecran(ancreEtiquette(o)); // 0.320.5 : texte déplaçable par sa poignée
       plaque(ctx, parties.join(' · '), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
@@ -448,7 +449,9 @@ export function dessinerObjet(d, o) {
     ctx.rotate((-g.texte.angle * Math.PI) / 180);
     // 'dessus' : posé au-dessus de la ligne (pas dessus) ; 'sur' : sur la ligne avec cadre ; 'coupee' : la ligne est cachée sous le texte.
     const dessus = style === 'dessus' || style === 'dessus-cadre';
-    const decalage = dessus && !courte && o.genre !== 'angle' ? -(h * 0.78 + 0.5 * mm) : 0;
+    // 0.363.0 : valeur collée à la ligne (presque sans vide), dessus ou dessous (`o.cotePos`) ; avec cadre, un peu plus loin pour ne pas la recouvrir
+    const ecart = style === 'dessus-cadre' ? h * 0.78 + 0.5 * mm : h * 0.5 + 0.25 * mm;
+    const decalage = dessus && !courte && o.genre !== 'angle' ? (o.cotePos === 'dessous' ? 1 : -1) * ecart : 0;
     plaque(ctx, g.texte.t, 0, decalage, h, 600, '#1b2b36', style === 'dessus' ? true : style === 'dessus-cadre' ? false : style === 'coupee' ? false : Boolean(o.nu), o.arrondi ?? 'peu', style === 'coupee');
     ctx.restore();
   } else if (o.type === 'texte') {

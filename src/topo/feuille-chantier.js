@@ -2,6 +2,7 @@
 // Feuille A4 / A3 / A1 paysage ou portrait, plan à l'échelle du plan de chantier (plan.echelle), cartouche avec logo,
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
+import { libellePhase } from './phases-chantier.js';
 import { modeleDe } from './grue-modele.js';
 import { detailsDe } from './details-feuille.js';
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
@@ -30,10 +31,120 @@ export function reglagesFeuille(plan) {
   const f = plan.feuille ?? {};
   return {
     ...reglagesElements(f),
-    format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
+    format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une', phase: f.phase ?? '',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
+    cartouchePerso: cartouchePersoDe(f.cartouchePerso), texteCartouche: texteCartoucheDe(f.texteCartouche), titrePage: titrePageDe(f.titrePage), logos: listeLogos(f), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
+}
+
+// 0.361.0 : cartouche sur mesure. Chaque information : [clé, nom, taille de départ (points), gras].
+export const CHAMPS_CARTOUCHE = [
+  ['affaire', 'Affaire - désignation', 8, true], ['projet', 'Projet', 6.5, false], ['titre', 'Titre du plan', 9.5, true], ['indice', 'Indice', 8, true],
+  ['phase', 'Phase', 7, false], ['echelle', 'Échelle', 6.5, false], ['format', 'Format', 6.5, false], ['date', 'Date', 6.5, false], ['auteur', 'Dessiné par', 6.5, false],
+];
+export const COULEUR_TEXTE_CARTOUCHE = '#1b2b36';
+export const COULEURS_DEFAUT_CARTOUCHE = { phase: '#b45309' }; // les autres : COULEUR_TEXTE_CARTOUCHE
+export const TAILLE_CARTOUCHE_MIN = 4;
+export const TAILLE_CARTOUCHE_MAX = 16;
+
+/**
+ * Réglage « sur mesure » du cartouche, complété : { champs: { clé: { visible, taille } } }. Les positions restent celles du
+ * cartouche standard. Une taille hors limites est ramenée entre 4 et 16 points. Sans réglage : null (taille de départ partout).
+ */
+export function cartouchePersoDe(f) {
+  if (!f || typeof f !== 'object') return null;
+  const champs = {};
+  for (const [c, , taille] of CHAMPS_CARTOUCHE) {
+    const v = f.champs?.[c] ?? {};
+    const t = Number(v.taille);
+    champs[c] = { visible: v.visible !== false, couleur: /^#[0-9a-f]{6}$/i.test(v.couleur ?? '') ? v.couleur : null, taille: Number.isFinite(t) && t > 0 ? Math.min(TAILLE_CARTOUCHE_MAX, Math.max(TAILLE_CARTOUCHE_MIN, t)) : taille };
+  }
+  return { champs };
+}
+
+/**
+ * Texte au-dessus du cartouche (0.362.0) : { texte, taille (pt), couleur, fond (case), opaciteFond (0 à 100 %, blanc) }.
+ * Sans texte : pas de cadre.
+ */
+export function texteCartoucheDe(f) {
+  const t = f && typeof f === 'object' ? f : {};
+  const taille = Number(t.taille);
+  const opacite = Number(t.opaciteFond);
+  return {
+    texte: String(t.texte ?? '').slice(0, 300),
+    taille: Number.isFinite(taille) && taille > 0 ? Math.min(20, Math.max(4, taille)) : 9,
+    couleur: /^#[0-9a-f]{6}$/i.test(t.couleur ?? '') ? t.couleur : COULEUR_TEXTE_CARTOUCHE,
+    fond: t.fond !== false,
+    opaciteFond: Number.isFinite(opacite) && t.opaciteFond !== '' && t.opaciteFond != null ? Math.min(100, Math.max(0, opacite)) : 85,
+  };
+}
+
+/** Hauteur (mm) du cadre du texte posé au-dessus du cartouche ; 0 s'il n'y a pas de texte. k : taille des éléments (A3 = 1). */
+export function hauteurTexteCartouche(tc, k) {
+  if (!tc || !String(tc.texte ?? '').trim()) return 0;
+  const lignes = String(tc.texte).split('\n').length;
+  return lignes * tc.taille * k * 0.3528 * 1.4 + 3 * k;
+}
+
+/** Logos du cartouche, dans l'ordre : le réglage « logos » s'il existe, sinon l'ancien réglage « logo » (aucun = liste vide). 4 au plus. */
+export function listeLogos(f) {
+  if (Array.isArray(f?.logos)) return f.logos.filter((x) => typeof x === 'string' && x).slice(0, 4);
+  const l = f?.logo ?? 'perrin';
+  return l === 'aucun' ? [] : [l];
+}
+
+// ---- Titre de la présentation (0.363.0) : bandeau posé au-dessus du cadre du plan.
+export const ELEMENTS_TITRE = [['nom', 'Nom du plan'], ['chantier', 'Chantier'], ['phase', 'Phase'], ['echelle', 'Échelle'], ['format', 'Format'], ['indice', 'Indice'], ['date', 'Date'], ['auteur', 'Dessiné par']];
+export const STYLES_TITRE = [['simple', 'Simple'], ['bandeau', 'Bandeau plein'], ['encadre', 'Encadré'], ['souligne', 'Souligné']];
+export const ALIGNEMENTS_TITRE = [['g', 'À gauche'], ['c', 'Centré'], ['d', 'À droite']];
+
+/** Réglages du titre, complétés : { actif, style, taille (pt, 8 à 40), couleur (texte), couleurFond (fond ou trait), alignement, elements, texteLibre }. */
+export function titrePageDe(f) {
+  const t = f && typeof f === 'object' ? f : {};
+  const taille = Number(t.taille);
+  const couleur = (c, defaut) => (/^#[0-9a-f]{6}$/i.test(c ?? '') ? c : defaut);
+  return {
+    actif: Boolean(t.actif),
+    style: STYLES_TITRE.some(([c]) => c === t.style) ? t.style : 'bandeau',
+    taille: Number.isFinite(taille) && taille > 0 ? Math.min(40, Math.max(8, taille)) : 16,
+    couleur: couleur(t.couleur, '#1b2b36'),
+    couleurFond: couleur(t.couleurFond, '#f5c518'),
+    alignement: ALIGNEMENTS_TITRE.some(([c]) => c === t.alignement) ? t.alignement : 'c',
+    elements: Array.isArray(t.elements) ? ELEMENTS_TITRE.map(([c]) => c).filter((c) => t.elements.includes(c)) : ['nom', 'phase'],
+    texteLibre: String(t.texteLibre ?? '').slice(0, 120),
+    // 0.364.0 : emplacement de chaque élément (g = gauche, c = centre, d = droite) ; sans choix : l'alignement général
+    positions: Object.fromEntries([...ELEMENTS_TITRE.map(([c]) => c), 'libre'].map((c) => [c, ['g', 'c', 'd'].includes(t.positions?.[c]) ? t.positions[c] : (ALIGNEMENTS_TITRE.some(([a]) => a === t.alignement) ? t.alignement : 'c')])),
+  };
+}
+
+/**
+ * Titre réparti en trois zones { g, c, d } (0.364.0) : chaque élément coché va à gauche, au centre ou à droite selon son
+ * emplacement ; dans une zone, le texte libre d'abord puis les éléments dans l'ordre de la liste, séparés par « · ».
+ */
+export function zonesTitrePage(tp, champs) {
+  const morceaux = { nom: champs.titre, chantier: champs.affaire, phase: champs.phase, echelle: `Échelle 1:${champs.echelle}`, format: `Format ${champs.format}`, indice: `Indice ${champs.indice}`, date: `Date ${champs.date}`, auteur: champs.auteur ? `Dessiné par ${champs.auteur}` : '' };
+  const zones = { g: [], c: [], d: [] };
+  const ajouter = (cle, texte) => { const t = String(texte ?? '').trim(); if (t) zones[tp.positions[cle]].push(t); };
+  ajouter('libre', tp.texteLibre);
+  for (const c of tp.elements) ajouter(c, morceaux[c]);
+  return { g: zones.g.join(' · '), c: zones.c.join(' · '), d: zones.d.join(' · ') };
+}
+
+/** Texte du titre : le texte libre puis les éléments cochés (dans l'ordre de la liste), séparés par « · ». champs : ceux du cartouche. */
+export function texteTitrePage(tp, champs) {
+  const morceaux = { nom: champs.titre, chantier: champs.affaire, phase: champs.phase, echelle: `Échelle 1:${champs.echelle}`, format: `Format ${champs.format}`, indice: `Indice ${champs.indice}`, date: `Date ${champs.date}`, auteur: champs.auteur ? `Dessiné par ${champs.auteur}` : '' };
+  return [tp.texteLibre.trim(), ...tp.elements.map((c) => String(morceaux[c] ?? '').trim())].filter(Boolean).join(' · ');
+}
+
+/** Hauteur (mm) du bandeau du titre ; 0 si le titre n'est pas actif. k : taille des éléments (A3 = 1). */
+export function hauteurTitrePage(tp, k) {
+  return tp?.actif ? tp.taille * k * 0.3528 * 1.4 + 5 * k : 0;
+}
+
+/** Taille (points sur le papier) qui fait tenir le texte dans la largeur (mm) : la taille choisie, réduite si besoin. */
+export function taillePourTitre(tp, texte, largeur, k) {
+  const tient = (largeur - 6 * k) / (Math.max(1, texte.length) * 0.3528 * 0.58);
+  return Math.min(tp.taille * k, tient);
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
@@ -103,7 +214,9 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const page = tailleFeuille(format, orientation);
   const k = Math.max(page.largeur, page.hauteur) / 420;
   const marge = Math.max(7, 10 * Math.sqrt(k));
-  const cadre = { x: marge, y: marge, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge };
+  const ht = hauteurTitrePage(opts.titrePage, k); // 0.363.0 : le titre prend une bande en haut ; le cadre du plan commence dessous
+  const cadre = { x: marge, y: marge + ht, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge - ht };
+  const titrePage = ht ? { x: marge, y: marge, l: cadre.l, h: ht } : null;
   const lc = Math.min(cadre.l * 0.45, 135 * k);
   const hc = cartoucheActif ? 36 * k : 0; // sans cartouche : la légende prend sa place
   const enBas = coin.startsWith('b');
@@ -112,8 +225,11 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const ligne = 6 * k * (legendeTaille / 100); // hauteur d'une ligne de la légende
   const colonnes = legendeColonnes === '1' ? 1 : legendeColonnes === '2' ? 2 : lignesLegende > 8 ? 2 : 1;
   const nLignes = Math.ceil(lignesLegende / colonnes);
-  const hl = lignesLegende ? Math.min(cadre.h - hc - 10 * k, 9 * k + nLignes * ligne) : 0;
-  const legende = { x: cartouche.x, y: enBas ? cartouche.y - hl : cartouche.y + hc, l: lc, h: hl, ligne, colonnes };
+  const hl = lignesLegende ? Math.min(cadre.h - hc - hauteurTexteCartouche(opts.texteCartouche, k) - 10 * k, 9 * k + nLignes * ligne) : 0;
+  // 0.362.0 : texte posé contre le cartouche, du côté du plan (au-dessus si le cartouche est en bas) ; la légende se place derrière lui
+  const ex = cartoucheActif ? hauteurTexteCartouche(opts.texteCartouche, k) : 0;
+  const texteCartouche = ex ? { x: cartouche.x, y: enBas ? cartouche.y - ex : cartouche.y + hc, l: lc, h: ex } : null;
+  const legende = { x: cartouche.x, y: enBas ? cartouche.y - ex - hl : cartouche.y + hc + ex, l: lc, h: hl, ligne, colonnes };
   const maxBarre = Math.min(70 * k, cadre.l * 0.25);
   // Planning des phases (0.294.1) : dans la rangée du cartouche, à côté de lui (après la barre d'échelle si elle est en bas).
   const reserve = enBas ? maxBarre + 21 * k : 6 * k; // la barre d'échelle (bas gauche) reste devant lui
@@ -138,7 +254,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
     nomsDetails.push(nom);
     if (d.pos) positions = { ...positions, [nom]: d.pos };
   }
-  const occupes = [cartouche, ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
+  const occupes = [cartouche, ...(texteCartouche ? [texteCartouche] : []), ...(hl ? [legende] : []), ...(planning.l > 40 * k ? [planning] : [])];
   const dansCoin = (nom, c) => {
     const { l, h } = tailles[nom];
     const m = (nom === 'situation' || nom.startsWith('det:') ? 3 : nom === 'nord' ? 1 : 4) * k;
@@ -179,7 +295,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const nord = boites.nord ? { x: boites.nord.x + 0.85 * tNord, y: boites.nord.y + 1.25 * tNord, t: tNord } : { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: tNord };
   const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k * (barreTaille / 100), max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
   return {
-    page, k, cadre, cartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
+    page, k, cadre, titrePage, cartouche, texteCartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
     // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
     boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null, ...Object.fromEntries(nomsDetails.map((n) => [n, boites[n]])) }, fixes: occupes,
   };
@@ -221,18 +337,22 @@ export function accrocherBoite(boite, autres, cadre, tolerance) {
 }
 
 /** Pages à faire : une par phase (avec les phases « sur toutes les pages »), ou une seule (phases visibles). */
-export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
+export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages, phase = reglagesFeuille(plan).phase) {
+  const communes = plan.phases.filter((p) => p.commune).map((p) => p.id);
   if (pages !== 'phases' || plan.phases.length < 2) {
+    // 0.355.0 : la présentation peut montrer une seule phase (choisie dans la présentation, pas dans le bandeau)
+    const ph = phase ? plan.phases.find((p) => p.id === phase) : null;
+    if (ph) return [{ titre: libellePhase(plan, ph), phase: ph.id, phases: [...new Set([...communes, ph.id])] }];
     return [{ titre: '', phases: plan.phases.filter((p) => p.visible !== false).map((p) => p.id) }];
   }
-  const communes = plan.phases.filter((p) => p.commune).map((p) => p.id);
-  return plan.phases.filter((p) => !p.commune).map((p) => ({ titre: p.nom, phase: p.id, phases: [...communes, p.id] }));
+  return plan.phases.filter((p) => !p.commune).map((p) => ({ titre: libellePhase(plan, p), phase: p.id, phases: [...communes, p.id] }));
 }
 
 /** Objets d'une page (phases de la page). */
 export function objetsDeLaPage(plan, page) {
   // Gestion des phases : une page par phase avec des règles = « on voit quoi » dans cette phase.
-  if (page.phase && plan.vues?.[page.phase]) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
+  // 0.353.0 : sans règle, objetsVus donne la même chose qu'avant (phase + phases communes), plus les éléments « en place » (début → fin) et les phases précédentes si elles sont cochées.
+  if (page.phase) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
   const ids = new Set(page.phases);
   return plan.objets.filter((o) => o.type !== 'construction' && ids.has(o.phase)); // construction : jamais imprimée
 }
@@ -303,28 +423,30 @@ export function barreDeLaFeuille(echelle, maxMm, longueurM = 0) {
 }
 
 /** Options de mise en page tirées des réglages de la feuille (une seule source pour l'écran et le PDF). */
-export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
+export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, texteCartouche: r.texteCartouche, titrePage: r.titrePage, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
 
 /**
  * Textes du cartouche (mm de papier, y vers le bas ; taille en points) : affaire, titre du plan, phase, échelle, format,
  * date, indice, auteur. cartouche : cadre du cartouche ; k : taille (A3 = 1) ; champs : { affaire, projet, titre, phase,
  * echelle, format, date, indice, auteur }. La partie gauche (40 %) est pour le logo.
  */
-export function textesCartouche(cartouche, k, champs) {
+export function textesCartouche(cartouche, k, champs, perso = null) {
   const x0 = cartouche.x + cartouche.l * 0.4 + 3 * k;
   const y = (f) => cartouche.y + cartouche.h * f;
-  const t = (texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: String(texte ?? ''), x, y: yy, taille: taille * k, gras, couleur });
+  // 0.361.1 : positions toujours celles du cartouche standard ; le réglage ne change que la taille du texte et sa visibilité
+  const reg = (cle) => perso?.champs?.[cle];
+  const t = (cle, texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: reg(cle)?.visible === false ? '' : String(texte ?? ''), x, y: yy, taille: (reg(cle)?.taille ?? taille) * k, gras, couleur: reg(cle)?.couleur ?? couleur });
   const xm = x0 + (cartouche.x + cartouche.l - x0) / 2;
   return [
-    t(champs.affaire, x0, y(0.15), 8, true), // 0.329.0 : « affaire - désignation » (modifiable), sur une seule ligne
-    t(champs.projet, x0, y(0.27), 6.5),
-    t(champs.titre, x0, y(0.41), 9.5, true),
-    t(`Indice ${champs.indice}`, x0, y(0.54), 8, true), // 0.297.0 : l'indice sous le numéro et le nom du plan
-    t(champs.phase, x0, y(0.67), 7, false, '#b45309'),
-    t(`Échelle 1:${champs.echelle}`, x0, y(0.81), 6.5),
-    t(`Format ${champs.format}`, xm, y(0.81), 6.5),
-    t(`Date ${champs.date}`, x0, y(0.93), 6.5),
-    ...(champs.auteur ? [t(`Dessiné par ${champs.auteur}`, xm, y(0.93), 6.5)] : []),
+    t('affaire', champs.affaire, x0, y(0.15), 8, true), // 0.329.0 : « affaire - désignation » (modifiable), sur une seule ligne
+    t('projet', champs.projet, x0, y(0.27), 6.5),
+    t('titre', champs.titre, x0, y(0.41), 9.5, true),
+    t('indice', `Indice ${champs.indice}`, x0, y(0.54), 8, true), // 0.297.0 : l'indice sous le numéro et le nom du plan
+    t('phase', champs.phase, x0, y(0.67), 7, false, '#b45309'),
+    t('echelle', `Échelle 1:${champs.echelle}`, x0, y(0.81), 6.5),
+    t('format', `Format ${champs.format}`, xm, y(0.81), 6.5),
+    t('date', `Date ${champs.date}`, x0, y(0.93), 6.5),
+    ...(champs.auteur ? [t('auteur', `Dessiné par ${champs.auteur}`, xm, y(0.93), 6.5)] : []),
   ].filter((x) => x.texte.trim() && !/ $/.test(x.texte));
 }
 
@@ -354,3 +476,4 @@ export function plansDeLaFeuille(tous, deLEcran, reglages) {
     return m.get(transparence);
   });
 }
+

@@ -316,6 +316,12 @@ export function creerNavigation(nav, actions) {
       else actions.fermerAppli?.();
       return;
     }
+    const fleche = evenement.target.closest('[data-defiler-dossiers]');
+    if (fleche) { // 0.357.0 : flèches pour aller voir les dossiers qui ne tiennent pas dans le cadre
+      const ligne = page.querySelector('.puces-dossiers');
+      ligne?.scrollBy({ left: Number(fleche.dataset.defilerDossiers) * ligne.clientWidth * 0.7, behavior: 'smooth' });
+      return;
+    }
     const puceDossier = evenement.target.closest('[data-dossier], [data-dossier-nouveau]');
     if (puceDossier) {
       if (puceDossier.hasAttribute('data-dossier-nouveau')) actions.nouveauSousDossier?.();
@@ -405,11 +411,11 @@ export function creerNavigation(nav, actions) {
     // Dossiers vides cachés (sauf celui qui est choisi) ; « Tout » n'a de sens que s'il y a des dossiers remplis.
     const remplis = (dossiers?.liste ?? []).filter((d) => d.nombre > 0 || d.nom === dossiers.choisi);
     const puces = dossiers?.visible
-      ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">
+      ? `<div class="cadre-dossiers"><button type="button" class="fleche-dossiers gauche" data-defiler-dossiers="-1" aria-label="Dossiers à gauche" title="Dossiers à gauche">‹</button><div class="puces-dossiers" role="group" aria-label="Dossier du projet">
           ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>` : ''}
           ${remplis.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}"${d.propre ? ' data-propre' : ''} aria-pressed="${dossiers.choisi === d.nom}"><i style="background: ${d.couleur}"></i>${echapper(d.nom)}</button>`).join('')}
           ${dossiers.peutCreer ? '<button type="button" class="puce-dossier nouveau-dossier" data-dossier-nouveau aria-label="Nouveau dossier" title="Nouveau dossier">＋</button>' : ''}
-        </div>`
+        </div><button type="button" class="fleche-dossiers droite" data-defiler-dossiers="1" aria-label="Dossiers à droite" title="Dossiers à droite">›</button></div>`
       : '';
     // 0.159.0 : tout ce qui touche au projet dans un seul encadré ; chaque bouton ouvre sa page.
     page.innerHTML = `
@@ -468,6 +474,9 @@ export function creerNavigation(nav, actions) {
     const majBords = () => {
       ligne.classList.toggle('reste-gauche', ligne.scrollLeft > 2);
       ligne.classList.toggle('reste-droite', ligne.scrollLeft + ligne.clientWidth < ligne.scrollWidth - 2);
+      const cadre = ligne.parentElement;
+      cadre?.classList.toggle('reste-gauche', ligne.scrollLeft > 2);
+      cadre?.classList.toggle('reste-droite', ligne.scrollLeft + ligne.clientWidth < ligne.scrollWidth - 2);
     };
     ligne.addEventListener('scroll', majBords, { passive: true });
     const choisie = ligne.querySelector('.puce-dossier.actif');

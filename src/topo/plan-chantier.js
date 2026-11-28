@@ -100,7 +100,7 @@ export const MATERIAUX_TAS = [
 ];
 export const materiauTas = (cle) => MATERIAUX_TAS.find((m) => m.cle === cle) ?? null;
 export const TAS_HAUTEUR = 3; // m, au départ
-export const TAS_TALUS = 1.5; // m horizontaux pour 1 m de hauteur, au départ (à valider)
+export const TAS_TALUS = 1; // m horizontaux pour 1 m de hauteur, au départ (0.355.0 : talus 1/1, demande du 28.11)
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
 export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
@@ -117,7 +117,7 @@ export function nouveauPlanChantier(nom, genre = 'installation', maintenant = ne
   const phase = { id: nouvelId('ph'), nom: 'Phase 1', couleur: COULEURS_PHASES[0], visible: true };
   return {
     id: nouvelId('pc'), nom: nom || 'Plan de chantier', genre, creeLe: maintenant, modifieLe: maintenant,
-    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true, ortho: true }, echelle: ECHELLE_PAPIER, // 0.289.0 : photo pâlie au départ
+    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: false, ortho: true }, echelle: ECHELLE_PAPIER, // 0.289.0 : photo pâlie au départ
   };
 }
 
@@ -165,16 +165,36 @@ export const MODES_VUE = [['cache', 'Caché'], ['normal', 'Normal'], ['estompe',
 export const OPACITE_VUE = 0.35;
 export const COULEUR_VUE = '#64748b';
 
-/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ). */
-export function regleDeVue(plan, courante, vue) {
-  const r = plan.vues?.[courante]?.[vue];
-  if (r) return r;
-  // 0.296.2 : par défaut, seule la phase en cours est montrée (ni les phases d'avant, ni celles d'après)
-  return { mode: vue === courante ? 'normal' : 'cache' };
+/** Rang (0, 1, 2…) d'une phase dans la liste des phases, -1 si elle n'existe pas. */
+const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+
+/**
+ * Phases précédentes (0.353.0) : réglage du plan (plan.precedentes), décoché au départ. Coché, toutes les phases d'AVANT la
+ * phase en cours sont montrées estompées (couleurs d'origine), en couleur unique, ou en couleur unique estompée.
+ * C'est un réglage de départ : une case de Gestion des phases réglée à la main (`manuel`) garde son propre réglage.
+ */
+export const MODES_PRECEDENTES = [['estompe', 'Estompé (couleurs d\'origine)'], ['couleur', 'Couleur unique'], ['couleur-estompe', 'Couleur unique estompée']];
+export const PRECEDENTES_DEPART = { actif: false, mode: 'estompe', opacite: OPACITE_VUE, couleur: COULEUR_VUE };
+export const precedentesDe = (plan) => ({ ...PRECEDENTES_DEPART, ...plan.precedentes });
+
+/** Règle enregistrée pour la case (courante, vue), ou celle de départ (0.296.2 : seule la phase en cours est montrée). */
+function regleDeBase(plan, courante, vue) {
+  return plan.vues?.[courante]?.[vue] ?? { mode: vue === courante ? 'normal' : 'cache' };
 }
 
-/** Phase après laquelle l'élément est « fini » : rang de la phase de fin, ou null. */
-const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+/** Vrai si la case a été réglée à la main (marque `manuel`, ou, pour un ancien plan sans marque, réglage différent du départ). */
+function estReglee(r, courante, vue) {
+  if (r.manuel !== undefined) return r.manuel;
+  return r.mode !== (vue === courante ? 'normal' : 'cache') || Boolean(r.genresCaches?.length || r.elementsCaches?.length || (r.fini && r.fini !== 'cache'));
+}
+
+/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ ; les phases précédentes suivent leur réglage si la case est cochée). */
+export function regleDeVue(plan, courante, vue) {
+  const r = regleDeBase(plan, courante, vue);
+  const pr = precedentesDe(plan);
+  if (!pr.actif || rangDe(plan, vue) < 0 || rangDe(plan, vue) >= rangDe(plan, courante) || estReglee(r, courante, vue)) return r;
+  return { ...r, mode: pr.mode === 'estompe' ? 'estompe' : 'couleur', opacite: pr.opacite, couleur: pr.mode === 'estompe' ? r.couleur : pr.couleur, estompe: pr.mode === 'couleur-estompe', auto: true };
+}
 
 /**
  * Objets à montrer dans la phase `courante` (la phase active à l'écran, celle de la page sur la feuille). Un élément
@@ -186,30 +206,44 @@ export function objetsVus(plan, courante = plan.phaseActive) {
   const rc = rangDe(plan, courante);
   return plan.objets.flatMap((o) => {
     if (o.type === 'construction') return construction ? [o] : [];
-    if (!reglee) return o.phase === courante || plan.phases.find((p) => p.id === o.phase)?.commune ? [o] : []; // départ : la phase en cours (et celles « sur toutes les pages »)
+    // 0.353.0 : un élément est « en place » de sa phase de début à sa phase de fin (fin avant le début = ignorée)
+    const rd = rangDe(plan, o.phase);
+    const rf = o.fin ? rangDe(plan, o.fin) : -1;
+    const aUneFin = rd >= 0 && rf >= rd;
+    const enPlace = aUneFin && rc >= rd && rc <= rf;
+    if (!reglee) {
+      // départ : la phase en cours, celles « sur toutes les pages », puis les éléments en place (sauf phases précédentes estompées)
+      if (o.phase === courante || plan.phases.find((p) => p.id === o.phase)?.commune) return [o];
+      if (enPlace) return [o];
+      if (!precedentesDe(plan).actif) return [];
+    }
     const r = regleDeVue(plan, courante, o.phase);
     if (r.genresCaches?.includes(o.type) || r.elementsCaches?.includes(o.id)) return [];
     let mode = r.mode;
-    if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
+    if (enPlace) { if (mode === 'cache' || r.auto) mode = 'normal'; } // en place : normal, sauf case réglée à la main
+    else if (aUneFin && rc > rf) mode = r.fini ?? 'cache';
     if (mode === 'cache') return [];
     if (mode === 'normal') return [o];
-    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE } }]; // couleur unique de départ = celle de la phase
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE, ...(r.estompe ? { estompe: true } : {}) } }]; // couleur unique de départ = celle de la phase
   });
 }
 
 /** Objets dont la phase est visible (dans la phase active). */
 export function objetsVisibles(plan) {
+  if (plan.voirToutes) return plan.objets.filter((o) => o.type !== 'construction' || plan.construction?.visible !== false); // 0.354.0 : « Toutes » les phases à l'écran
   return objetsVus(plan, plan.phaseActive);
 }
 
 /** Modifie une règle de vue (crée la ligne de la phase en cours au besoin, avec les règles de départ de toutes les phases). */
 export function reglerVue(plan, courante, vue, champs) {
   plan.vues ??= {};
+  const cible = regleDeVue(plan, courante, vue); // ce que l'utilisateur voyait (phases précédentes comprises)
   if (!plan.vues[courante]) {
     plan.vues[courante] = {};
-    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeVue(plan, courante, p.id) };
+    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeBase(plan, courante, p.id), manuel: false }; // départ brut : le réglage « phases précédentes » reste libre de changer
   }
-  plan.vues[courante][vue] = { ...(plan.vues[courante][vue] ?? { mode: 'normal' }), ...champs };
+  const { auto, ...sansAuto } = cible;
+  plan.vues[courante][vue] = { ...sansAuto, ...champs, manuel: true };
   return plan.vues[courante][vue];
 }
 
@@ -339,6 +373,16 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
     if (ferme && pts.length >= 3 && dansPolygone(p, pts)) return o;
   }
   return null;
+}
+
+/**
+ * Tous les objets sous le point (0.357.0), du dessus vers le dessous (même test que objetSousLePoint) : pour passer de l'un
+ * à l'autre avec Tab quand plusieurs objets sont l'un sur l'autre.
+ */
+export function objetsSousLePoint(objets, p, tolerance, surSymbole = null) {
+  const res = [];
+  for (let k = objets.length - 1; k >= 0; k--) if (objetSousLePoint([objets[k]], p, tolerance, surSymbole)) res.push(objets[k]);
+  return res;
 }
 
 /** Déplace un objet de (dEst, dNord) m (sans le copier). */
@@ -772,6 +816,46 @@ export function anneauxDuTas(points, hauteur = TAS_HAUTEUR, talus = TAS_TALUS, n
     aireAvant = a;
   }
   return { anneaux, largeur, sens };
+}
+
+/**
+ * Volume d'un tas de stock (0.355.0), en m³. Base = la zone dessinée (E, N en m), hauteur h (m), talus t (m horizontaux
+ * pour 1 m de hauteur). À la hauteur z, la section est la base décalée de z × t vers l'intérieur. Son aire varie en z²,
+ * donc la formule du prismatoïde (trois niveaux) est exacte : V = h / 6 × (A bas + 4 × A milieu + A haut).
+ * Si le tas devient pointu avant h (zone trop étroite), on additionne des tranches jusqu'à ce que la section disparaisse,
+ * et `hauteurReelle` donne la hauteur atteinte. Renvoie { volume, aireBas, aireHaut, hauteurReelle, pointu }.
+ */
+export function volumeDuTas(points, hauteur, talus = TAS_TALUS) {
+  const ferme = [...points, points[0]];
+  const aireBas = Math.abs(aireSignee(points));
+  const sens = aireSignee(points) >= 0 ? 1 : -1;
+  const aireA = (z) => {
+    if (z <= 0) return aireBas;
+    const r = decalerPolyligne(ferme, sens * z * talus);
+    if (r.length < 4) return 0;
+    const pts = r.slice(0, -1);
+    const a = aireSignee(pts);
+    return a * sens <= 0 || Math.abs(a) > aireBas ? 0 : Math.abs(a);
+  };
+  if (!(hauteur > 0) || aireBas <= 0) return { volume: 0, aireBas, aireHaut: aireBas, hauteurReelle: 0, pointu: false };
+  if (!(talus > 0)) return { volume: aireBas * hauteur, aireBas, aireHaut: aireBas, hauteurReelle: hauteur, pointu: false };
+  const aireHaut = aireA(hauteur);
+  if (aireHaut > 0) {
+    const volume = (hauteur / 6) * (aireBas + 4 * aireA(hauteur / 2) + aireHaut);
+    return { volume, aireBas, aireHaut, hauteurReelle: hauteur, pointu: false };
+  }
+  // Tas pointu : tranches fines (milieu de chaque tranche) jusqu'à la disparition de la section
+  const n = 400;
+  const dz = hauteur / n;
+  let volume = 0;
+  let hauteurReelle = 0;
+  for (let i = 0; i < n; i++) {
+    const a = aireA((i + 0.5) * dz);
+    if (a <= 0) break;
+    volume += a * dz;
+    hauteurReelle = (i + 1) * dz;
+  }
+  return { volume, aireBas, aireHaut: 0, hauteurReelle, pointu: true };
 }
 
 // ------------------------------------------------------------------ Cotations (0.293.0)
@@ -1236,7 +1320,7 @@ export function baseEtiquette(o) {
 
 /** Vrai si l'objet affiche un texte qu'on peut déplacer (zone avec surface / tas / texte, bloc avec texte). */
 export function etiquettePresente(o) {
-  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && o.afficherHauteur));
+  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && (o.afficherHauteur || o.afficherVolume)));
   return Boolean(estPose(o) && o.etiquette);
 }
 

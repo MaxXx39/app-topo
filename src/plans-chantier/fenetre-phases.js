@@ -2,7 +2,7 @@
 // montrer / cacher, monter, descendre, dupliquer, supprimer. En bas : ajouter, et les règles de vue entre phases (ancien tableau).
 import { echapper } from '../outils/echapper.js';
 import { ajouterPhase } from '../topo/plan-chantier.js';
-import { deplacerPhase, dupliquerPhase, renommerPhase } from '../topo/phases-chantier.js';
+import { deplacerPhase, dupliquerPhase, renommerPhase, nomSansNumero } from '../topo/phases-chantier.js';
 
 /**
  * Ouvre la fenêtre. acces : { plan() → plan, avantChangement() → bool, enregistrer(), rafraichir(), ouvrirRegles(), supprimer(id) → promesse de vrai si supprimée }.
@@ -20,11 +20,12 @@ export function ouvrirFenetrePhases(acces) {
     fenetre.innerHTML = `
       <div class="entete-fenetre-champs"><h2>Phases</h2><button type="button" class="bouton-retour" data-cle="fermer" aria-label="Fermer">✕</button></div>
       <p class="aide-calage">Dans la phase active, on dessine. Les éléments d'une phase sont supprimés avec elle.</p>
-      <ul class="liste-phases-chantier">${p.phases.map((ph, i) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
-        <input type="color" value="${ph.couleur}" data-couleur="${ph.id}" aria-label="Couleur de ${echapper(ph.nom)}">
-        <input type="text" maxlength="60" value="${echapper(ph.nom)}" data-nom="${ph.id}" aria-label="Nom de la phase">
+      <ul class="liste-phases-chantier compact">${p.phases.map((ph, i) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
+        <span class="num-phase">${i + 1} -</span>
+        <input type="color" value="${ph.couleur}" data-couleur="${ph.id}" aria-label="Couleur de ${echapper(nomSansNumero(ph.nom))}">
+        <input type="text" maxlength="60" value="${echapper(nomSansNumero(ph.nom))}" data-nom="${ph.id}" aria-label="Nom de la phase (le numéro se met tout seul)">
         <label class="case" title="Montrer cette phase"><input type="checkbox" data-visible="${ph.id}" ${ph.visible !== false ? 'checked' : ''}> Voir</label>
-        <button type="button" class="bouton-secondaire petit" data-active="${ph.id}" title="Dessiner dans cette phase">${ph.id === p.phaseActive ? '✎ active' : 'Choisir'}</button>
+        <button type="button" class="bouton-secondaire petit" data-active="${ph.id}" title="Dessiner dans cette phase">${ph.id === p.phaseActive ? '✎' : 'Choisir'}</button>
         <button type="button" class="bouton-secondaire petit" data-monter="${ph.id}" ${i === 0 ? 'disabled' : ''} title="Monter">▲</button>
         <button type="button" class="bouton-secondaire petit" data-descendre="${ph.id}" ${i === n - 1 ? 'disabled' : ''} title="Descendre">▼</button>
         <button type="button" class="bouton-secondaire petit" data-dupliquer="${ph.id}" title="Dupliquer (avec ses éléments)">⧉</button>

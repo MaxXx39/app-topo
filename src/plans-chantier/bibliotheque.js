@@ -39,7 +39,7 @@ export function entreesBibliotheque(bib) {
   // 0.311.0 : une entrée par modèle de grue d'après fiche technique (Liebherr, Condecta, ceux de l'utilisateur) : flèche, tour, HSC, charges.
   for (const m of tousLesModeles()) {
     const milieu = m.fleches[Math.floor(m.fleches.length / 2)].nom;
-    const pose = { type: 'grue', modele: 'fiche', modeleGrue: m.id, fleche: milieu, tour: m.tours[0].id, hauteur: 30, cercles: 'principaux', rayon: true };
+    const pose = { type: 'grue', modele: 'fiche', modeleGrue: m.id, fleche: milieu, tour: m.tours[0].id, hauteur: 30, cercles: 'principaux', rayon: true, afficherCrochet: false, afficherHsc: false, afficherModele: true }; // 0.360.0 : crochet et HSC décochés, nom du modèle écrit
     res.push({ cle: `grue:fiche:${m.id}`, nom: `Grue ${m.nom} (fiche technique)`, categorie: 'Grues', largeur: null, hauteur: null, detail: `${m.fleches.length} flèches, ${m.tours.length} tour(s), HSC et charges de la fiche`, pose, symbole: grueFiche(pose) });
   }
   // 0.293.0 : panneau de déviation suisse, texte et sens au choix (dans le panneau de droite une fois posé).

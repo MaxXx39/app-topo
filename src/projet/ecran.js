@@ -6,6 +6,7 @@
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
+import { affaireChoisie } from '../topo/affaires.js';
 import { ICONES_LIGNE } from '../outils/icones.js';
 import { valeurDansListe, CHOIX_AUTRE } from '../materiel/noms-tablette.js';
 import { echapper } from '../outils/echapper.js';
@@ -206,10 +207,12 @@ export function projetsReunis(resumes, partage, tri = 'date') {
 function pageProjets(projet, resumes, partage, menuOuvert, tri, ouverts) {
   const projets = projetsReunis(resumes, partage, tri);
   const dossiers = lireDossiers();
-  const groupes = regrouperParDossier(projets, dossiers);
+  // 0.352.0 : un projet à plusieurs affaires = une entrée par affaire, chacune dans son propre dossier.
+  const entrees = projets.flatMap((p) => ((p.local?.affaires ?? []).length > 0 ? p.local.affaires.map((a) => ({ ...p, affaireLigne: a, cleDossier: `${p.id}#${a.id}` })) : [p]));
+  const groupes = regrouperParDossier(entrees, dossiers);
   // Aucun dossier encore : la liste comme avant (pas de « Sans dossier » tout seul).
   const liste = dossiers.liste.length === 0
-    ? projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')
+    ? projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert, partage)).join('')
     : groupes.map((g) => blocDossier(g, ouverts.has(g.id), projet, menuOuvert, partage)).join('');
   return `<div class="entete-page-projets">
     <button type="button" class="bouton-retour-partie" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
@@ -248,7 +251,7 @@ function blocDossier(groupe, ouvert, projet, menuOuvert, partage) {
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="renommer-dossier" data-dossier="${echapper(groupe.id)}">renommer</button>
         <button type="button" class="bouton-lien" data-action="supprimer-dossier" data-dossier="${echapper(groupe.id)}">supprimer</button>
       </div>` : ''}
-      ${groupe.projets.length > 0 ? groupe.projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('') : '<p class="aide vide-dossier">Aucun projet</p>'}
+      ${groupe.projets.length > 0 ? groupe.projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert, partage)).join('') : '<p class="aide vide-dossier">Aucun projet</p>'}
     </div>` : ''}
   </div>`;
 }
@@ -264,14 +267,18 @@ function ligneDossier(projetId) {
 }
 
 /** Une ligne : on la touche pour ouvrir le projet ; ⋮ ouvre le menu. */
-function ligneProjet(p, estOuvert, menu, partage) {
+function ligneProjet(p, estOuvert, menuOuvert, partage) {
   // 0.346.0 : un projet à plusieurs affaires apparaît une fois par affaire (Base / Intermédiaire entrent par l'une ou l'autre).
+  // 0.352.0 : chaque ligne d'affaire a son ⋮ (et son dossier : clé « projet#affaire »).
+  // La ligne de l'affaire ouverte sur cette tablette est marquée « ouvert » (l'autre reste à toucher pour y passer).
+  const ligneAffaire = (a) => ligneProjetUne(p, estOuvert && a.id === affaireChoisie(), menuOuvert === `${p.id}#${a.id}`, partage, a, `${p.id}#${a.id}`);
+  if (p.affaireLigne) return ligneAffaire(p.affaireLigne);
   const affaires = p.local?.affaires ?? [];
-  if (affaires.length === 0) return ligneProjetUne(p, estOuvert, menu, partage, null, true);
-  return affaires.map((a, i) => ligneProjetUne(p, false, menu, partage, a, i === 0)).join('');
+  if (affaires.length === 0) return ligneProjetUne(p, estOuvert, menuOuvert === p.id, partage, null, p.id);
+  return affaires.map(ligneAffaire).join('');
 }
 
-function ligneProjetUne(p, estOuvert, menu, partage, affaire, avecMenu) {
+function ligneProjetUne(p, estOuvert, menu, partage, affaire, cle) {
   const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
   const ou = `${p.local ? ICONES_LIGNE.tablette : ''}${p.drive ? ICONES_LIGNE.nuage : ''}`;
   const verrou = p.drive?.verrou;
@@ -282,16 +289,16 @@ function ligneProjetUne(p, estOuvert, menu, partage, affaire, avecMenu) {
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
     ailleurs ? `<span class="verrou-drive">${ICONES_LIGNE.cadenas} Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
-  const ouvrir = affaire ? `data-action="ouvrir-affaire" data-id="${p.id}" data-affaire="${echapper(affaire.id)}"` : estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
+  const ouvrir = affaire && estOuvert ? 'disabled' : affaire ? `data-action="ouvrir-affaire" data-id="${p.id}" data-affaire="${echapper(affaire.id)}"` : estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
     <button type="button" class="infos-projet" ${ouvrir}>
-      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${affaire ? ` <span class="etiquette-affaire">${echapper(affaire.categorie || '—')} · ${echapper(affaire.numero)}</span>` : ''}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
+      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(affaire ? [affaire.numero, p.local?.lieu].filter(Boolean).join(' - ') : p.titre)}${affaire ? ` <span class="etiquette-affaire">${echapper(affaire.categorie || '—')}</span>` : ''}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
       <span class="aide">${details}</span>
     </button>
-    ${avecMenu ? `<button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>` : ''}
-    ${menu && avecMenu ? `<div class="menu-projet">
+    <button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${echapper(cle)}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
+    ${menu ? `<div class="menu-projet">
       ${estOuvert ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="renommerProjet">renommer</button>' : ''}
-      <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>
+      <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${echapper(cle)}">ranger ${affaire ? `cette affaire (${echapper(affaire.categorie || affaire.numero)})` : ''} dans un dossier</button>
       ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
         <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
         <button type="button" class="bouton-lien seulement-expert" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}

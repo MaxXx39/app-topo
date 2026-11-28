@@ -4,7 +4,7 @@
 // Rangés dans projet.modelesGrues (donc partagés par Drive avec le projet). Voir topo/grue-modele.js pour la forme.
 import { echapper } from '../outils/echapper.js';
 import {
-  tousLesModeles, modeleVide, copierModele, validerModele, lireCharges, texteCharges, lireHauteurs, texteHauteurs,
+  tousLesModeles, modeleVide, copierModele, validerModele, lireCharges, texteCharges, lireHauteurs, texteHauteurs, modeleLivre,
 } from '../topo/grue-modele.js';
 
 const TYPES = [['tour', 'Grue à tour'], ['automontante', 'Grue automontante'], ['autre', 'Autre']];
@@ -83,7 +83,7 @@ export function ouvrirModelesGrues(acces) {
     return p.modelesGrues;
   };
   const courant = () => tousLesModeles().find((m) => m.id === choisi) ?? tousLesModeles()[0];
-  const modifiable = () => !courant().integre && !acces.lectureSeule();
+  const modifiable = () => !acces.lectureSeule(); // 0.355.0 : les modèles livrés se modifient aussi (copie rangée dans le projet, même id)
 
   function ouvrirModele(id) {
     choisi = id;
@@ -103,19 +103,18 @@ export function ouvrirModelesGrues(acces) {
       <div class="entete-fenetre-champs"><h2>Modèles de grues</h2><button type="button" class="bouton-retour" data-cle="fermer" aria-label="Fermer">✕</button></div>
       <div class="corps-modeles-grues">
         <aside class="liste-modeles-grues">
-          <ul>${liste.map((m) => `<li><button type="button" data-modele="${echapper(m.id)}" class="${m.id === choisi ? 'actif' : ''}">${m.integre ? '🔒 ' : ''}${echapper(m.nom)}</button></li>`).join('')}</ul>
+          <ul>${liste.map((m) => `<li><button type="button" data-modele="${echapper(m.id)}" class="${m.id === choisi ? 'actif' : ''}">${echapper(m.nom)}${m.integre ? ' <small>(livré)</small>' : m.base ? ' <small>(livré, modifié)</small>' : ''}</button></li>`).join('')}</ul>
           <div class="boutons-modeles">
             <button type="button" class="bouton-secondaire petit" data-act="nouveau" ${acces.lectureSeule() ? 'disabled' : ''}>＋ Nouveau</button>
             <button type="button" class="bouton-secondaire petit" data-act="dupliquer" ${acces.lectureSeule() ? 'disabled' : ''}>Dupliquer</button>
-            <button type="button" class="bouton-secondaire petit" data-act="supprimer" ${ok ? '' : 'disabled'}>Supprimer</button>
+            ${courant().base ? `<button type="button" class="bouton-secondaire petit" data-act="original" ${ok ? '' : 'disabled'}>↺ Revenir à l'original</button>` : `<button type="button" class="bouton-secondaire petit" data-act="supprimer" ${ok && !courant().integre ? '' : 'disabled'}>Supprimer</button>`}
             <button type="button" class="bouton-secondaire petit" data-act="exporter">Exporter (fichier)</button>
             <button type="button" class="bouton-secondaire petit" data-act="importer" ${acces.lectureSeule() ? 'disabled' : ''}>Importer (fichier)</button>
             <input type="file" accept=".json,application/json" data-fichier hidden>
           </div>
         </aside>
         <section class="formulaire-modele-grue">
-          ${courant().integre ? '<p class="aide-calage">🔒 Modèle livré avec l\'appli : on peut le lire. « Dupliquer » en fait une copie que tu peux modifier.</p>' : ''}
-          ${erreurs.length ? `<ul class="erreurs-modele">${erreurs.map((e) => `<li>⚠ ${echapper(e)}</li>`).join('')}</ul>` : ''}
+          <div data-zone="erreurs">${htmlErreurs()}</div>
           <h3>Général</h3>
           <div class="grille-modele">
             <label>Nom ${champ('data-g="nom"', b.nom, { ok })}</label>
@@ -149,7 +148,7 @@ export function ouvrirModelesGrues(acces) {
               <td><select data-t="${i}:pied" ${ok ? '' : 'disabled'}>${PIEDS.map(([v, n]) => `<option value="${v}" ${t.pied?.type === v ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
               <td>${champ(`data-t="${i}:_c"`, t._c, { type: 'number', pas: '0.01', largeur: '4.5em', ok })}</td>
               <td><textarea rows="2" data-t="${i}:_hauteurs" ${ok ? '' : 'disabled'}>${echapper(t._hauteurs)}</textarea></td>
-              <td><button type="button" class="suppr-calage" data-suppr-tour="${i}" aria-label="Retirer cette tour" ${ok ? '' : 'disabled'}>✕</button></td></tr>`).join('')}</tbody>
+              <td class="actions-tour"><button type="button" class="suppr-calage" data-dupl-tour="${i}" title="Dupliquer cette tour (copie juste en dessous)" aria-label="Dupliquer cette tour" ${ok ? '' : 'disabled'}>⧉</button><button type="button" class="suppr-calage" data-suppr-tour="${i}" aria-label="Retirer cette tour" ${ok ? '' : 'disabled'}>✕</button></td></tr>`).join('')}</tbody>
           </table></div>
           <button type="button" class="lien-calage" data-act="ajout-tour" ${ok ? '' : 'disabled'}>＋ Ajouter une tour</button>
           <h3>Autres caractéristiques (affichées dans la fiche)</h3>
@@ -157,28 +156,40 @@ export function ouvrirModelesGrues(acces) {
         </section>
       </div>
       <div class="boutons-choix">
-        <button type="button" class="bouton" data-act="enregistrer" ${ok ? '' : 'disabled'}><strong>Enregistrer ce modèle</strong></button>
-        <button type="button" class="bouton-secondaire" data-cle="fermer">Fermer</button>
+        <span class="etat-modele" data-zone="etat-modele">${ok ? 'Enregistrement automatique' : 'Lecture seule'}</span>
+        <button type="button" class="bouton" data-cle="fermer"><strong>Fermer</strong></button>
       </div>`;
   }
 
+  const htmlErreurs = () => (erreurs.length ? `<ul class="erreurs-modele">${erreurs.map((e) => `<li>⚠ ${echapper(e)}</li>`).join('')}</ul>` : '');
+
+  /**
+   * Enregistrement automatique (0.355.0) après chaque changement : sans fenêtre redessinée (le champ suivant garde la main).
+   * Un modèle incomplet n'est pas enregistré : les points à corriger s'affichent.
+   */
   function enregistrerModele() {
     const { modele, erreurs: e } = modeleDe(brouillon);
     erreurs = e;
+    const zoneErreurs = fenetre.querySelector('[data-zone="erreurs"]');
+    const zoneEtat = fenetre.querySelector('[data-zone="etat-modele"]');
+    if (zoneErreurs) zoneErreurs.innerHTML = htmlErreurs();
     if (e.length) {
-      acces.message('Le modèle n\'est pas enregistré : voir les points en rouge.', 4000);
-      return dessiner();
+      if (zoneEtat) zoneEtat.textContent = '⚠ Pas enregistré : voir les points en rouge';
+      return;
     }
+    if (modele.integre || modele.base) modele.base = true; // modèle livré modifié : même id, remplace l'original
     delete modele.integre;
     const l = perso();
     const i = l.findIndex((m) => m.id === modele.id);
     if (i >= 0) l[i] = modele; else l.push(modele);
     acces.modifie();
     choisi = modele.id;
-    brouillon = brouillonDe(modele);
-    acces.message(`Modèle « ${modele.nom} » enregistré.`, 2500);
+    if (zoneEtat) zoneEtat.textContent = `✓ Enregistré (${new Date().toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })})`;
+    const bouton = fenetre.querySelector(`[data-modele="${CSS.escape(modele.id)}"]`);
+    if (bouton) bouton.innerHTML = `${echapper(modele.nom)}${modele.base ? ' <small>(livré, modifié)</small>' : ''}`;
+    const suppr = modele.base ? fenetre.querySelector('[data-act="supprimer"]') : null;
+    if (suppr) suppr.outerHTML = '<button type="button" class="bouton-secondaire petit" data-act="original">↺ Revenir à l\'original</button>';
     acces.redessiner();
-    dessiner();
   }
 
   fenetre.addEventListener('change', (ev) => {
@@ -218,7 +229,8 @@ export function ouvrirModelesGrues(acces) {
       const t = brouillon.tours[Number(i)];
       if (k === 'pied') t.pied = { ...t.pied, type: v };
       else t[k] = v;
-    }
+    } else return;
+    enregistrerModele();
   });
 
   fenetre.addEventListener('click', (ev) => {
@@ -232,11 +244,21 @@ export function ouvrirModelesGrues(acces) {
     if (b.dataset.modele) return ouvrirModele(b.dataset.modele);
     if (b.dataset.supprFleche !== undefined && modifiable()) {
       brouillon.fleches.splice(Number(b.dataset.supprFleche), 1);
-      return dessiner();
+      dessiner();
+      return enregistrerModele();
+    }
+    if (b.dataset.duplTour !== undefined && modifiable()) { // 0.358.0 : dupliquer une tour (copie juste en dessous, nouveau nom)
+      const i = Number(b.dataset.duplTour);
+      const t = brouillon.tours[i];
+      const copie = { ...JSON.parse(JSON.stringify(t)), id: `tour${brouillon.tours.length + 1}-${Date.now().toString(36)}`, nom: `${t.nom} (copie)` };
+      brouillon.tours.splice(i + 1, 0, copie);
+      dessiner();
+      return enregistrerModele();
     }
     if (b.dataset.supprTour !== undefined && modifiable()) {
       brouillon.tours.splice(Number(b.dataset.supprTour), 1);
-      return dessiner();
+      dessiner();
+      return enregistrerModele();
     }
     switch (b.dataset.act) {
       case 'ajout-fleche': {
@@ -247,8 +269,15 @@ export function ouvrirModelesGrues(acces) {
       case 'ajout-tour':
         brouillon.tours.push({ id: `tour${brouillon.tours.length + 1}-${Date.now().toString(36)}`, nom: 'Nouvelle tour', famille: 'Tour', mat: 1.6, pied: { type: 'FA' }, element: 3, hauteurs: [], _hauteurs: '', _c: '' });
         return dessiner();
-      case 'enregistrer':
-        return enregistrerModele();
+      case 'original': {
+        const livre = modeleLivre(choisi);
+        if (!livre || !window.confirm(`Revenir au modèle livré « ${livre.nom} » ? Tes modifications de ce modèle seront perdues.`)) return undefined;
+        const l = perso();
+        l.splice(l.findIndex((m) => m.id === choisi), 1);
+        acces.modifie();
+        acces.redessiner();
+        return ouvrirModele(choisi);
+      }
       case 'nouveau': {
         const m = modeleVide();
         perso().push(m);

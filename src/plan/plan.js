@@ -36,7 +36,7 @@ import { COULEURS_LISTES, SECTIONS, htmlEtiquetteNature } from './listes-points.
 import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { lireSousDossiers, pastilleSousDossier } from '../topo/sous-dossiers.js';
-import { pastillesAffaireHtml } from '../topo/affaires.js';
+import { pastillesAffaireCliquables } from '../topo/affaires.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -137,7 +137,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn, lireCoupeIfc, quandChoisirCoupeIfc, dossiersDuProjet } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn, lireCoupeIfc, quandChoisirCoupeIfc, dossiersDuProjet, quandChoisirAffaires, ajoutAffaire } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2217,7 +2217,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
 
   const htmlDossiersCliquables = (id, noms = [], pastillesAffaire = []) => {
     const liste = dossiersDuProjet ? dossiersDuProjet() : lireSousDossiers();
-    return pastillesAffaireHtml(pastillesAffaire) + (noms.length > 0
+    return pastillesAffaireCliquables(id, pastillesAffaire, Boolean(ajoutAffaire?.())) + (noms.length > 0
       ? `<span class="dossiers-cliquables" data-dossiers-de="${id}">${noms.map((nom) => pastilleSousDossier(nom, liste)).join('')}</span>`
       : `<span class="dossiers-cliquables ajout-dossier seulement-intermediaire" data-dossiers-de="${id}">+ dossier</span>`);
   };
@@ -2320,6 +2320,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   // Pastille de dossier touchée (dans une case à cocher : on évite de la cocher / décocher).
   for (const menu of [menuPlans, menuListes, menuSurfaces]) {
     menu.addEventListener('click', (evenement) => {
+      // 0.350.0 : toucher les pastilles d'affaire = changer les affaires de l'élément, directement.
+      const affaire = evenement.target.closest('[data-affaire-de]');
+      if (affaire && quandChoisirAffaires) {
+        evenement.preventDefault();
+        quandChoisirAffaires(affaire.dataset.affaireDe);
+        return;
+      }
       const cible = evenement.target.closest('[data-dossiers-de]');
       if (!cible || !quandChoisirDossiers) return;
       evenement.preventDefault();
@@ -2389,7 +2396,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
-    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
+    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${(plan.pastilles ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     const coupeIfc = plansDxf.some((plan) => plan.ifc) ? lireCoupeIfc?.() : null;
     const signatureComplete = `${signature}#${JSON.stringify(coupeIfc?.choix ?? null)}`;
     if (signatureComplete === signatureMenuPlans) return;

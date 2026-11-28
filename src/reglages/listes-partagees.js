@@ -44,14 +44,16 @@ export function nettoyerListes(listes) {
   const sousDossiers = Array.isArray(listes?.sousDossiers) ? listes.sousDossiers.map((t) => String(t)).filter(Boolean) : undefined;
   // Catégories d'affaires (0.346.0, voir topo/affaires.js) : liste de noms, gardée telle quelle si elle existe.
   const categoriesAffaires = Array.isArray(listes?.categoriesAffaires) ? listes.categoriesAffaires.map((c) => String(c)).filter(Boolean) : undefined;
+  // Gabarits de présentation des Plans de chantier pour tous les projets (0.365.0, voir topo/presentations.js) : { id, nom, feuille, echelle }.
+  const gabarits = Array.isArray(listes?.gabarits) ? listes.gabarits.filter((g) => g && typeof g === 'object' && g.id && g.nom) : undefined;
   // Date de dernière modification de chaque partie (0.136.0) : sert à fusionner partie par partie.
   const dates = {};
   for (const [partie, date] of Object.entries(listes?.dates ?? {})) if (PARTIES.includes(partie) && date) dates[partie] = String(date);
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), ...(sousDossiers ? { sousDossiers } : {}), ...(categoriesAffaires ? { categoriesAffaires } : {}), dates, modifieLe: listes?.modifieLe ?? null };
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), ...(sousDossiers ? { sousDossiers } : {}), ...(categoriesAffaires ? { categoriesAffaires } : {}), ...(gabarits ? { gabarits } : {}), dates, modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Les parties des listes, chacune avec sa propre date de modification (0.136.0). */
-export const PARTIES = ['adresses', 'swipos', 'libelles', 'chantier', 'dossiers', 'typesDxf', 'sousDossiers', 'categoriesAffaires'];
+export const PARTIES = ['adresses', 'swipos', 'libelles', 'chantier', 'dossiers', 'typesDxf', 'sousDossiers', 'categoriesAffaires', 'gabarits'];
 
 const existe = (listes, partie) => (Array.isArray(listes?.[partie]) ? listes[partie].length > 0 : listes?.[partie] !== undefined);
 

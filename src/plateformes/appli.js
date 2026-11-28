@@ -21,7 +21,7 @@ import {
   nouvellePlateforme, prochainNom, sommetsResolus, changerAltitude, penteCote, altitudeParPente, interpolerContour,
   bandeRemblai, coteOuvrageProche,
   ajouterPointMilieu, appliquerDeltaZ, cotePartage, trianglesPlateforme, talusPlateforme, trianglesTalus, reglageDuCote,
-  pointsEtFaces, TALUS_DEFAUT, lireHV, retirerPoint, courberCoteEnArc, baseArc, facettesDArcs, poigneesArcsPf,
+  pointsEtFaces, TALUS_DEFAUT, lireHV, retirerPoint, courberCoteEnArc, redresserArc, baseArc, facettesDArcs, poigneesArcsPf,
   unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin, COULEURS_PLATEFORMES,
   altitudesAuto, empriseOuvrage, hautOuvrage, contreUnOuvrage, traverseesOuvrage,
 } from '../topo/plateforme.js';
@@ -756,8 +756,17 @@ export function ouvrirPlateformes({
     toile.addEventListener('pointerup', pointerUp);
     toile.addEventListener('pointercancel', pointerUp);
     // Double-clic = finir (le 2e clic, au même endroit, a déjà fini : voir clic()).
-    toile.addEventListener('dblclick', () => {
+    toile.addEventListener('dblclick', (ev) => {
       if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil) && etat.saisie?.points?.length) finirPlateforme();
+      // 0.358.0 : double-clic sur la poignée ronde d'un arc = revenir au segment droit
+      if (etat.outil === 'choisir' && vue) {
+        const { x, y } = position(ev);
+        const z = sousLaSouris(x, y);
+        if (z?.type === 'arc' && choisie() && avantChangement() && redresserArc(choisie(), z.debut, z.fin)) {
+          message('Arc retiré : le côté est de nouveau droit.', 2500);
+          enregistrer();
+        }
+      }
     });
     toile.vuePlateformes = () => vue;
     toile.tabIndex = 0; // le plan prend le clavier quand on le touche (Entrée, Échap, Ctrl+Z)

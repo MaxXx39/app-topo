@@ -15,7 +15,7 @@ import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
-import { affairesDe, aPlusieursAffaires, ajouterAffaire, modifierAffaire, retirerAffaire, affaireChoisie, definirAffaire, rangerNouveauxDansAffaire, definirPastilles, pastillesDe, fusionnerProjet, numeroDeLAffaire, cartoucheActif, elementsDesAffaires, retenirAffaire, lireAffaireRetenue, categoriesAffaires, enregistrerCategoriesAffaires, nettoyerCategories, PRINCIPALE } from './topo/affaires.js';
+import { dansAffaire, pastillesVisibles, affairesDe, aPlusieursAffaires, ajouterAffaire, modifierAffaire, retirerAffaire, affaireChoisie, definirAffaire, rangerNouveauxDansAffaire, definirPastilles, pastillesDe, fusionnerProjet, numeroDeLAffaire, cartoucheActif, elementsDesAffaires, retenirAffaire, lireAffaireRetenue, categoriesAffaires, enregistrerCategoriesAffaires, nettoyerCategories, PRINCIPALE } from './topo/affaires.js';
 import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, changerCouleurSousDossierProjet, retirerSousDossierProjet, estDossierDuProjet, COULEURS_CHOIX, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF, precisionPdf } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
@@ -2116,7 +2116,7 @@ function ouvrirPlateformes() {
     },
     plans: () => plansDuProjet(),
     points: () => pointsDuProjet(),
-    surfaces: () => projet.surfaces.filter((s) => s.type !== 'plateforme' && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+    surfaces: () => projet.surfaces.filter((s) => s.type !== 'plateforme' && estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
     trianglesDeSurface: (id) => trianglesDeSurface(id),
     lectureSeule: () => lectureSeule(),
     quandRetour: () => navigation.ouvrirPage(),
@@ -2307,6 +2307,9 @@ function retirerPointControleConfirme(id) {
 }
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), document.querySelector('#contenu-projet'), {
+  choisirAffaires: (id) => choisirAffairesDeLElement(id),
+  choisirDossiers: (id) => choisirDossiersDeLElement(id),
+  ajoutAffaire: () => aPlusieursAffaires(projet) && aAcces('expert'),
   exporterListe: (type, id) => exporterListe(type, id),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
   importerSurface: (fichier) => importerSurface(fichier),
@@ -6166,7 +6169,9 @@ function plansDuProjet() {
   // 0.258.0 : tous les plans sont listés ; le dossier choisi ne fait que cocher / décocher (voir appliquerDossierALAffichage).
   // 0.262.0 : une maquette IFC devient le plan coupé à l'altitude choisie par la tablette.
   const altitudeIfc = (projet.plansDxf ?? []).some(estPlanIfc) ? altitudeIfcDeLaTablette().altitude : null;
+  // 0.351.0 : dans une affaire, les plans d'une autre affaire ne sont ni listés ni dessinés (ni dans les applis plein écran).
   return (projet.plansDxf ?? [])
+    .filter((p) => dansAffaire(projet, p, 'plan'))
     .map((p) => (estPlanIfc(p) ? planIfcCoupe(p, altitudeIfc, p.id === recalage.planId ? null : undefined) : p.id === recalage.planId ? p : planRecale(p)));
 }
 
@@ -8324,6 +8329,8 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherSelectionCalques: (position, tolerance) => toucherSelectionCalques(position, tolerance),
   quandChoisirCalques: (mode) => choisirCalques(mode),
   quandChoisirDossiers: (id) => choisirDossiersDeLElement(id),
+  quandChoisirAffaires: (id) => choisirAffairesDeLElement(id),
+  ajoutAffaire: () => aPlusieursAffaires(projet) && aAcces('expert'),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
@@ -8832,7 +8839,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranTalusSurface.afficher(donneesTalusSurfaces());
   // Choix des côtés d'un talus (0.135.0) : sur tablette / téléphone, le plan passe en haut de Dessin (voir style.css).
   document.body.classList.toggle('en-choix-cotes-talus', choixCotesTalusActif());
-  afficherSiVisible('import', panneauProjet, () => ecranImport.afficher(projet, dernierImport, dernierPlan));
+  afficherSiVisible('import', panneauProjet, () => ecranImport.afficher(projetDeLAffaire(), dernierImport, dernierPlan));
   afficherSiVisible('export', panneauProjet, () => moduleExport.afficher(projet));
   montrerOngletProjet();
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
@@ -8852,7 +8859,8 @@ function recalculer({ recadrer = false } = {}) {
   // Plan : les listes de points cochées (menu « Points » : surfaces, métrés, Autres, fichiers,
   // points ajoutés) ; leurs points, et seulement les contours, lignes et triangles des surfaces cochées.
   // Pendant une modification (surface, mesure), comme avant : les points et surfaces du levé affiché.
-  const toutesLesListes = listesDePoints(projet);
+  // 0.351.0 : dans une affaire, les listes d'une autre affaire ne sont ni dans « Afficher » ni dessinées.
+  const toutesLesListes = listesDePoints(projet).filter((l) => pastillesVisibles(projet, l.pastilles));
   plan.afficherListesPoints(toutesLesListes);
   // Bouton « Seul » : les autres listes sont dessinées comme décochées (le menu ne change pas).
   const gardees = listesDuTravail(toutesLesListes);
@@ -9188,15 +9196,6 @@ async function choisirDossiersDeLElement(id) {
   if (!trouve) return;
   const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
   const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
-  // 0.346.0 : projet à plusieurs affaires : l'Expert peut aussi régler les pastilles (catégories) de l'élément.
-  if (aPlusieursAffaires(projet) && aAcces('expert')) {
-    const quoi = await demanderChoix({ titre: `« ${cible.nom ?? 'cet élément'} »`, boutons: [
-      { cle: 'dossiers', texte: 'Changer les dossiers', principal: true },
-      { cle: 'pastilles', texte: `Changer les pastilles d'affaire (${pastillesDe(projet, trouve.element, trouve.genre).join(', ') || 'aucune : visible partout'})` },
-    ] });
-    if (!quoi) return;
-    if (quoi === 'pastilles') return changerPastillesDeLElement(trouve.element, trouve.genre);
-  }
   const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
   const cochees = await demanderCases({
     titre: `Dossiers de « ${cible.nom ?? 'cet élément'} »`,
@@ -9222,6 +9221,25 @@ async function changerPastillesDeLElement(element, genre) {
     modifie();
     choisirAffaire(affaireChoisie()); // l'élément peut disparaître de la vue (ou apparaître)
   }
+}
+
+/**
+ * 0.351.0 : le projet tel que les pages du projet le montrent (Liste de points, Plans, Surfaces, Gérer) : dans une affaire,
+ * seulement ses éléments (et ceux sans pastille). Les tableaux sont filtrés, les éléments restent les MÊMES objets
+ * (une modification faite dans une page touche bien le projet).
+ */
+function projetDeLAffaire() {
+  if (!affaireChoisie()) return projet;
+  const garder = (cle, genre) => (projet[cle] ?? []).filter((e) => dansAffaire(projet, e, genre));
+  return { ...projet, leves: garder('leves', 'leve'), surfaces: garder('surfaces', 'surface'), autres: garder('autres', 'autre'), plansDxf: garder('plansDxf', 'plan'), dessins: garder('dessins', 'dessin'), canalisations: garder('canalisations', 'reseau') };
+}
+
+/** Pastilles d'affaire d'un élément trouvé par son identifiant (toucher sa pastille d'affaire) : Expert seulement. */
+function choisirAffairesDeLElement(id) {
+  if (!aAcces('expert')) return afficherMessage('Seul l\'Expert change les affaires d\'un élément.', 3000);
+  if (refuserEnLectureSeule()) return undefined;
+  const trouve = elementsDesAffaires(projet).find(({ element }) => element.id === id);
+  return trouve ? changerPastillesDeLElement(trouve.element, trouve.genre) : undefined;
 }
 
 /** Choisit l'affaire de cette tablette pour ce projet (« » = Toutes, Expert seulement) et redessine tout. */
@@ -9348,6 +9366,21 @@ async function ouvrirMenuAffaires() {
       modifie();
       choisirAffaire(affaire.id);
       afficherMessage(`${titreProjet(source)} fusionné : affaire ${affaire.numero} ${affaire.categorie} (${nombre} éléments)`, 5000, { ok: true });
+      // 0.352.0 : la ligne de la nouvelle affaire reste dans le dossier de projets du projet d'origine.
+      const dossierSource = dossierDuProjet(lireDossiers(), source.id);
+      if (dossierSource) ecrireDossiers(rangerProjet(lireDossiers(), `${projet.id}#${affaire.id}`, dossierSource));
+      // 0.352.0 : l'original reste tant qu'on ne dit rien : on demande.
+      const sort = await demanderChoix({
+        titre: `Que faire de « ${titreProjet(source)} » ?`,
+        texte: `Tout son contenu est maintenant dans ce projet (affaire ${affaire.categorie} · ${affaire.numero}).`,
+        boutons: [
+          { cle: 'garder', texte: 'Le garder', principal: true },
+          { cle: 'appareil', texte: 'Le supprimer de cet appareil' },
+          ...(partage?.etat.connecte ? [{ cle: 'partout', texte: 'Le supprimer partout (appareil et Drive)', classe: 'bouton-danger' }] : []),
+        ],
+      });
+      if (sort === 'appareil') await actionsProjet.supprimerProjet(source.id);
+      else if (sort === 'partout') await actionsProjet.supprimerPartout(source.id);
     }
   } catch (erreur) {
     afficherMessage(erreur.message, 6000);
@@ -9375,16 +9408,24 @@ function ouvrirMenuAffairesDeroulant() {
     ...affairesDe(projet).filter((a) => aPlusieursAffaires(projet) || a.principale).map((a) => ligne(a.id, `${a.categorie || '—'} · ${a.numero}`, a.id === choix)),
     '<button type="button" class="ligne-menu-dossiers" data-affaire-gerer><span>⚙ Gérer les affaires…</span></button>',
   ].join('');
-  const entete = document.querySelector('.entete')?.getBoundingClientRect();
-  menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
-  document.body.append(menu);
+  // 0.351.0 : une appli plein écran ouverte (Plans de chantier, Calage…) est une fenêtre au premier plan : la liste s'ouvre
+  // DANS cette fenêtre, sous sa pastille (sinon elle restait cachée derrière et on ne pouvait pas la toucher).
+  const page = [...document.querySelectorAll('dialog[open]')].at(-1) ?? null;
+  const pastillePage = page?.querySelector('[data-affaire-chantier], .pastille-affaire-page');
+  const repere = (pastillePage ?? document.querySelector('.entete'))?.getBoundingClientRect();
+  menu.style.top = `${Math.round(repere?.bottom ?? 56) + 4}px`;
+  if (pastillePage) {
+    menu.style.right = 'auto';
+    menu.style.left = `${Math.max(8, Math.round(Math.min(repere.left, window.innerWidth - 240)))}px`;
+  }
+  (page ?? document.body).append(menu);
   const fermer = () => {
     menu.remove();
     document.removeEventListener('pointerdown', dehors, true);
     document.removeEventListener('keydown', touche, true);
   };
   const dehors = (evenement) => {
-    if (!menu.contains(evenement.target) && !evenement.target.closest('#pastille-affaire')) fermer();
+    if (!menu.contains(evenement.target) && !evenement.target.closest('#pastille-affaire, [data-affaire-chantier], .pastille-affaire-page')) fermer();
   };
   const touche = (evenement) => {
     if (evenement.key === 'Escape') fermer();
@@ -9399,6 +9440,7 @@ function ouvrirMenuAffairesDeroulant() {
   document.addEventListener('pointerdown', dehors, true);
   document.addEventListener('keydown', touche, true);
 }
+document.addEventListener('topo-choisir-affaires', (evenement) => choisirAffairesDeLElement(evenement.detail?.id));
 document.querySelector('#pastille-affaire')?.addEventListener('click', (evenement) => {
   evenement.stopPropagation();
   ouvrirMenuAffairesDeroulant();
