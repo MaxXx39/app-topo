@@ -23,7 +23,7 @@ import { accrocher, sourcesDesPlans, piedPerpendiculaire } from '../topo/accroch
 import { deplacer, versTerrain, versEcran } from '../plan/vue.js';
 import { MAX_DETAILS, FONDS_DETAIL, COULEURS_BORD, ECHELLES_DETAIL, nouveauDetail, redimensionnerBoite, poigneesDeBoite, poigneeSousLePoint } from '../topo/details-feuille.js';
 import {
-  GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet as ajouterObjetBrut, retirerObjet, objetsVisibles, objetSousLePoint,
+  GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet as ajouterObjetBrut, retirerObjet, objetsVisibles, objetSousLePoint, objetsSousLePoint,
   deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne, baseEtiquette, etiquetteSousLePoint, decalEtiquette,
   LARGEUR_FLECHE, OPACITE_ZONE, ECHELLE_PAPIER, epaisseurLigneMm, contourZoneMm, dimensionsFleche, coteDuPoint,
   decalerPolyligne, ligneProcheAvecOrigine,
@@ -172,7 +172,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    popupFeuille: null, triElements: 'ordre', dansGroupe: null, voletGroupes: false, panneauReplie: false, menuPhases: false, presse: null, collage: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    popupFeuille: null, triElements: 'ordre', dansGroupe: null, voletGroupes: false, survol: null, panneauReplie: false, menuPhases: false, presse: null, collage: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     coupe: { ouvert: false, ligne: null, cachees: new Set() }, // 0.311.0 : vue de côté (coupe) ; 0.312.0 : surfaces cachées, ligne de coupe tracée
     coupeProchaine: false, // le prochain segment de construction dessiné est une ligne de coupe
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
@@ -296,6 +296,69 @@ export function ouvrirPlansChantier({
     majTout();
   }
 
+  // ---------------------------------------------------------------- Survol (0.357.0, Expert)
+  // Souris immobile 0,6 s sur un objet (sans outil) : petite bulle transparente + contour bleu léger. Tab passe à l'objet
+  // dessous (en boucle), un clic choisit l'objet montré. Au doigt rien ne change (pas de survol sans toucher).
+  const DELAI_SURVOL = 600; // ms
+  let minuteurSurvol = null;
+  const peutSurvoler = () => aAcces('expert') && etat.outil === 'choisir' && !etat.saisie && !etat.collage && !etat.orthoRepere && !etat.orienter && !etat.attenteRepere && !etat.selCalques;
+  const toleranceSurvol = () => 10 / (vue?.vue?.().echelle ?? 1);
+  function preparerSurvol(p) {
+    clearTimeout(minuteurSurvol);
+    if (etat.survol && p) {
+      const v = vue?.vue?.();
+      const a = v && versEcran(etat.survol.p[0], etat.survol.p[1], v);
+      const b = v && versEcran(p[0], p[1], v);
+      if (a && b && Math.hypot(a.x - b.x, a.y - b.y) <= 6) return; // petite tremblote : la bulle reste
+      cacherSurvol();
+    }
+    if (!p || !peutSurvoler()) return;
+    minuteurSurvol = setTimeout(() => montrerSurvol(p), DELAI_SURVOL);
+  }
+  function montrerSurvol(p) {
+    if (!p || !peutSurvoler() || !plan()) return;
+    const liste = objetsSousLePoint(objetsVisibles(plan()), p, toleranceSurvol(), toucheSymbole);
+    if (!liste.length) return cacherSurvol();
+    etat.survol = { liste, i: 0, p };
+    afficherBulleSurvol();
+    vue?.redessinerDessus();
+  }
+  /** « Phase 1 - Terrassement » ou « Phases 1 - … → 3 - … » (bulle de survol). */
+  function textePhases(pl, o) {
+    const d = pl.phases.find((ph) => ph.id === o.phase);
+    const f = o.fin ? pl.phases.find((ph) => ph.id === o.fin) : null;
+    if (!d) return '';
+    return f && f.id !== d.id ? `Phases ${libellePhase(pl, d)} → ${libellePhase(pl, f)}` : `Phase ${libellePhase(pl, d)}`;
+  }
+  function cacherSurvol() {
+    clearTimeout(minuteurSurvol);
+    if (!etat.survol) return;
+    etat.survol = null;
+    page.querySelector('.bulle-survol')?.remove();
+    vue?.redessinerDessus();
+  }
+  function afficherBulleSurvol() {
+    const zone = page.querySelector('.vue-chantier');
+    const v = vue?.vue?.();
+    if (!zone || !v || !etat.survol) return;
+    const { liste, i, p } = etat.survol;
+    const o = liste[i];
+    const q = versEcran(p[0], p[1], v);
+    const pl = plan();
+    const g = o.groupe ? groupeDe(pl, o.groupe) : null;
+    let bulle = zone.querySelector('.bulle-survol');
+    if (!bulle) {
+      bulle = document.createElement('div');
+      bulle.className = 'bulle-survol';
+      zone.append(bulle);
+    }
+    bulle.innerHTML = `<b>${echapper(resumeObjet(o))}</b>${o.type === 'construction' ? '' : `<small>${echapper(textePhases(pl, o))}</small>`}${g ? `<small>⊞ ${echapper(g.nom)}</small>` : ''}${liste.length > 1 ? `<small>${i + 1} / ${liste.length} · Tab = dessous</small>` : ''}`;
+    const toile = page.querySelector('[data-toile]').getBoundingClientRect();
+    const boite = zone.getBoundingClientRect();
+    bulle.style.left = `${Math.min(toile.left - boite.left + q.x + 14, boite.width - 240)}px`;
+    bulle.style.top = `${toile.top - boite.top + q.y + 16}px`;
+  }
+
   // ---------------------------------------------------------------- Groupes (0.356.0, Expert)
   /** Groupe dont les objets choisis sont exactement les membres (ou null). */
   function groupeChoisi() {
@@ -402,6 +465,15 @@ export function ouvrirPlansChantier({
       return;
     }
     if (etat.ecran !== 'dessin') return;
+    if (ev.key === 'Tab' && !ev.ctrlKey && !ev.altKey && !ev.target.matches('input, select, textarea') && (etat.survol || (etat.curseur && peutSurvoler()))) {
+      // 0.357.0 : Tab = objet suivant sous la souris (du dessus vers le dessous, en boucle) ; Maj+Tab = précédent
+      ev.preventDefault();
+      if (!etat.survol) return montrerSurvol(etat.curseur);
+      const n = etat.survol.liste.length;
+      etat.survol.i = (etat.survol.i + (ev.shiftKey ? -1 : 1) + n) % n;
+      afficherBulleSurvol();
+      return vue?.redessinerDessus();
+    }
     if ((ev.ctrlKey || ev.metaKey) && !ev.target.matches('input, select, textarea')) { // 0.338.0 : copier / coller
       if (ev.key.toLowerCase() === 'g' && aAcces('expert')) { // 0.356.0 : Ctrl+G = grouper, Ctrl+Maj+G = dégrouper
         ev.preventDefault();
@@ -645,6 +717,7 @@ export function ouvrirPlansChantier({
   }
 
   function monterVue() {
+    page.querySelector('[data-toile]').addEventListener('pointerleave', () => cacherSurvol()); // 0.357.0 : la bulle part avec la souris
     vue = creerVueChantier(page.querySelector('[data-toile]'), {
       plans: plansFond,
       points: () => (pointsMontres()),
@@ -652,6 +725,7 @@ export function ouvrirPlansChantier({
       choisi: () => etat.choisi,
       multi: () => [...etat.multi],
       groupe: vueGroupe,
+      survol: () => (etat.survol ? etat.survol.liste[etat.survol.i] : null),
       saisie: saisieVue,
       selection: () => etat.selCalques?.elements.map((e) => e.forme) ?? [],
       bibliotheque: bib,
@@ -674,6 +748,7 @@ export function ouvrirPlansChantier({
       },
       bouge: (p) => {
         etat.curseur = p;
+        preparerSurvol(p);
         majEtat();
       },
       glisserObjet: {
@@ -1132,7 +1207,8 @@ export function ouvrirPlansChantier({
     if (etat.orienter) return toucherOrientation(p, tolerance);
     if (etat.outil === 'decaler') return toucherDecalage(p, tolerance);
     if (etat.outil === 'choisir') {
-      const sous = objetSous(p, tolerance);
+      const sous = etat.survol?.liste[etat.survol.i] ?? objetSous(p, tolerance); // 0.357.0 : l'objet montré par la bulle (Tab)
+      cacherSurvol();
       // 0.356.0 : dans un groupe, un clic en dehors en fait sortir
       if (etat.dansGroupe && sous?.groupe !== etat.dansGroupe) etat.dansGroupe = null;
       const toutLeGroupe = sous?.groupe && !etat.dansGroupe ? membresDe(plan(), sous.groupe) : null;

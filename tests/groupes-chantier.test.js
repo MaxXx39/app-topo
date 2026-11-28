@@ -64,3 +64,14 @@ describe('groupes d\'éléments (0.356.0)', () => {
     expect(groupesDe(plan)).toHaveLength(4);
   });
 });
+
+describe('objets sous le point (0.357.0, Tab)', () => {
+  it('tous les objets sous la souris, du dessus vers le dessous', async () => {
+    const { objetsSousLePoint } = await import('../src/topo/plan-chantier.js');
+    const z1 = { id: 'a', type: 'zone', points: [[0, 0], [10, 0], [10, 10], [0, 10]] };
+    const z2 = { id: 'b', type: 'zone', points: [[5, 5], [15, 5], [15, 15], [5, 15]] };
+    const z3 = { id: 'c', type: 'zone', points: [[50, 50], [60, 50], [60, 60]] };
+    expect(objetsSousLePoint([z1, z2, z3], [7, 7], 0.1).map((o) => o.id)).toEqual(['b', 'a']);
+    expect(objetsSousLePoint([z1, z2, z3], [2, 2], 0.1).map((o) => o.id)).toEqual(['a']);
+  });
+});

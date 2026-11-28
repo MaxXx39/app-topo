@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.356.0 — Plans de chantier : groupes d'éléments (Expert, maquette validée le 28.11)
+Lire seulement la section utile : `grep -n '^## 0.357.0 — Lot « Général » du 28.11 : dossiers plus petits, applis PC compactes, infobulle et Tab
+- **Dossiers du projet** (page Applications, TER., CANA…) : puces plus petites (28 px, texte 0.8 rem, sans gras), plus serrées ; flèches ‹ › quand la ligne ne tient pas (`.cadre-dossiers`, `data-defiler-dossiers`).
+- **Applis de PC compactes** (Plans de chantier, Calage, Plateformes, Comparer, Matériel ; pas sur l'APK) : `habillerPage` pose `page-pc` (sauf si `window.AppliAndroid`) ; quand une telle page est ouverte, `html:has(dialog.page-pc[open])` : taille de base 13 px, boutons, champs, fenêtres (popups), marges, ruban plus petits ; boutons du bas des fenêtres à cases alignés à droite.
+- **Infobulle au survol** (Plans de chantier, Expert, souris) : 0,6 s immobile sans outil → petite bulle transparente (nom, phases, groupe, « 1 / 2 · Tab = dessous ») et contour bleu léger ; **Tab / Maj+Tab** = objet suivant / précédent sous la souris (`objetsSousLePoint`), **clic** = choisir l'objet montré (le groupe entier si l'objet est groupé). Rien au doigt.
+- Pas encore : infobulle / Tab dans les autres applis (Calage, Plateformes, plan de Terrain) : à faire si l'essai plaît.
+
+## 0.356.0 — Plans de chantier : groupes d'éléments (Expert, maquette validée le 28.11)
 - **Données** (`topo/groupes-chantier.js`) : `plan.groupes` [{ id, nom, phase, fin }], `objet.groupe`. Un objet = un seul groupe (pas de groupe dans un groupe) ; **tout le groupe a la même phase de début / fin** (celles du groupe, remises à chaque enregistrement par `harmoniserGroupes` ; groupe de moins de 2 éléments retiré).
 - **Grouper** : choisir plusieurs éléments (Ctrl + clic) puis Ctrl+G ou « ⊞ Grouper » ; phase = celle du premier. **Dégrouper** : Ctrl+Maj+G ou bouton du panneau.
 - **Clic** sur un élément groupé = tout le groupe (cadre orange en tirets, nom sous le cadre ; glisser / Suppr / Ctrl+C sur tout). **Double-clic** = entrer dans le groupe (un élément seul, le reste du plan estompé à 25 %, bandeau « Dans le groupe … » + Sortir) ; Échap ou clic dehors = sortir.

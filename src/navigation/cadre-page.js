@@ -50,6 +50,9 @@ export function habillerPage(page, { couleur, titre, contenuBande = null }) {
     const zone = page.querySelector(':scope > .bande-page .zone-bande-page');
     if (zone && contenuBande) zone.innerHTML = contenuBande();
   };
+  // 0.357.0 : applis de PC (site, Topo Bureau, Topo Tablette) : tout plus compact, comme un logiciel de bureau (style.css « page-pc »).
+  // Sur la tablette Android (APK), on garde les grandes tailles pour le doigt.
+  if (!window.AppliAndroid) page.classList.add('page-pc');
   page.style.setProperty('--couleur-appli', couleur);
   page.style.setProperty('--texte-appli', '#ffffff');
   const observateur = new MutationObserver(() => {

@@ -15451,3 +15451,50 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .liste-groupes button.actif { background: color-mix(in srgb, #ea580c 16%, var(--surface)); color: #c2410c; font-weight: 700; }
 .liste-groupes ul { padding-left: 16px; font-size: 0.78rem; }
 .elements-chantier .marque-groupe { color: #ea580c; margin-right: 3px; font-size: 0.8em; }
+
+/* 0.357.0 : dossiers du projet (TER., CANA…) plus petits, sans gras, plus serrés ; flèches ‹ › quand ils ne tiennent pas */
+.cadre-dossiers { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.cadre-dossiers .puces-dossiers { flex: 1 1 auto; min-width: 0; gap: 4px; padding: 2px 2px 6px; }
+.cadre-dossiers .puces-dossiers .puce-dossier { min-height: 28px; padding: 2px 8px; gap: 4px; font-weight: 500; font-size: 0.8rem; border-width: 1px; }
+.cadre-dossiers .puce-dossier i { width: 10px; height: 10px; border-width: 1px; }
+body.appli-windows .cadre-dossiers .puces-dossiers .puce-dossier { min-height: 24px; padding: 1px 7px; font-size: 0.78rem; }
+.fleche-dossiers { display: none; flex: none; width: 26px; height: 28px; margin-bottom: 4px; padding: 0; border: 1px solid var(--bordure, #cbd5e1); border-radius: 6px; background: var(--surface, #fff); color: var(--encre, #1b2b36); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.cadre-dossiers.reste-gauche .fleche-dossiers.gauche, .cadre-dossiers.reste-droite .fleche-dossiers.droite { display: block; }
+
+/* ================================================================================================================
+   0.357.0 : applis de PC compactes (Plans de chantier, Calage, Plateformes, Comparer, Matériel ; pas sur l'APK).
+   Demande du 28.11 : textes, boutons, marges et fenêtres beaucoup plus petits, comme AutoCAD. Tout ce qui est en rem
+   suit la taille de base (13 px au lieu de 15 px) ; les tailles en px sont réduites ici. Les fenêtres (popups) ouvertes
+   par-dessus l'appli suivent aussi (elles sont dans body, d'où le html:has(...)).
+   ================================================================================================================ */
+html:has(dialog.page-pc[open]), html:has(dialog.page-pc[open]) body { font-size: 13px; line-height: 1.3; }
+html:has(dialog.page-pc[open]) :is(.bouton, button.bouton, .bouton-secondaire) { min-height: 26px; padding: 3px 10px; border-radius: 6px; font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .bouton-secondaire.petit { min-height: 22px; padding: 1px 6px; font-size: 0.8rem; }
+html:has(dialog.page-pc[open]) :is(input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='range']), select, textarea) { min-height: 24px; padding: 2px 6px; font-size: 0.9rem; border-radius: 5px; }
+html:has(dialog.page-pc[open]) input[type='color'] { width: 28px; height: 22px; padding: 0 1px; }
+html:has(dialog.page-pc[open]) input[type='checkbox'] { width: 14px; height: 14px; }
+html:has(dialog.page-pc[open]) .fenetre-choix { padding: 10px 12px; border-radius: 8px; }
+html:has(dialog.page-pc[open]) .fenetre-choix h2 { font-size: 1rem; margin: 0 0 6px; }
+html:has(dialog.page-pc[open]) .fenetre-choix h3 { font-size: 0.85rem; margin: 8px 0 4px; }
+html:has(dialog.page-pc[open]) .entete-fenetre-champs { margin-bottom: 4px; }
+html:has(dialog.page-pc[open]) .bouton-retour { width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .boutons-choix { gap: 5px; }
+html:has(dialog.page-pc[open]) .boutons-choix button { padding: 4px 10px; }
+html:has(dialog.page-pc[open]) .boutons-choix .bouton strong { font-size: 0.9rem; }
+html:has(dialog.page-pc[open]) .fenetre-champs .boutons-choix { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+html:has(dialog.page-pc[open]) .fenetre-champs .boutons-choix button { width: auto; }
+html:has(dialog.page-pc[open]) .aide-calage { font-size: 0.8rem; margin: 2px 0; }
+dialog.page-pc .carte-calage { padding: 7px 9px; gap: 5px; border-radius: 6px; }
+dialog.page-pc .carte-calage h3 { font-size: 0.75rem; margin: 2px 0; }
+dialog.page-pc .champ-calage { gap: 1px; font-size: 0.85rem; }
+dialog.page-pc:not(._) .outil-ruban { height: 38px; min-width: 34px; padding: 1px 4px; border-radius: 5px; }
+dialog.page-pc:not(._) .outil-ruban svg { width: 18px; height: 18px; }
+dialog.page-pc:not(._) .outil-ruban span { font-size: 0.62rem; }
+dialog.page-pc .groupe-ruban { padding: 1px 5px; gap: 2px; }
+dialog.page-pc .groupe-ruban .mini-titre, dialog.page-pc .mini-titre { font-size: 0.55rem; }
+dialog.page-pc .travail-chantier { gap: 6px; }
+/* 0.357.0 : infobulle au survol d'un objet (petite, transparente, ne bloque pas la souris) */
+.bulle-survol { position: absolute; z-index: 9; max-width: 230px; display: flex; flex-direction: column; gap: 1px; padding: 3px 7px; border-radius: 5px; background: rgba(15, 23, 42, 0.72); color: #f8fafc; font-size: 11px; line-height: 1.25; pointer-events: none; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); }
+.bulle-survol b { font-weight: 600; }
+.bulle-survol small { color: #cbd5e1; font-size: 10px; }
+.bulle-survol .phases-element { margin: 0; padding: 0; color: #94a3b8; }

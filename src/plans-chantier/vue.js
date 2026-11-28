@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, survol = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -189,6 +189,8 @@ export function creerVueChantier(conteneur, options) {
       }
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
+      const sv = survol(); // 0.357.0 : objet sous la souris (infobulle) : contour bleu léger
+      if (sv) dessinerSurvol(ctx, sv);
       for (const id of multi()) { // plusieurs éléments choisis (Ctrl + clic)
         const autre = visibles.find((o) => o.id === id);
         if (autre) dessinerChoix(ctx, autre);
@@ -273,6 +275,26 @@ export function creerVueChantier(conteneur, options) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  /** Contour bleu clair, sans poignées, de l'objet survolé (0.357.0). */
+  function dessinerSurvol(ctx, o) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(37, 99, 235, 0.55)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([]);
+    const s = estPose(o) ? symboleDeLObjet(bibliotheque(), o) : null;
+    const pts = s ? coinsSymbole(o, s) : pointsDe(o);
+    if (pts.length > 1) {
+      chemin(ctx, pts, Boolean(s) || o.type === 'zone');
+      ctx.stroke();
+    } else if (pts.length) {
+      const q = ecran(pts[0]);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 12, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function dessinerChoix(ctx, o) {

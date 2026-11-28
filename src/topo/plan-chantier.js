@@ -375,6 +375,16 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   return null;
 }
 
+/**
+ * Tous les objets sous le point (0.357.0), du dessus vers le dessous (même test que objetSousLePoint) : pour passer de l'un
+ * à l'autre avec Tab quand plusieurs objets sont l'un sur l'autre.
+ */
+export function objetsSousLePoint(objets, p, tolerance, surSymbole = null) {
+  const res = [];
+  for (let k = objets.length - 1; k >= 0; k--) if (objetSousLePoint([objets[k]], p, tolerance, surSymbole)) res.push(objets[k]);
+  return res;
+}
+
 /** Déplace un objet de (dEst, dNord) m (sans le copier). */
 export function deplacerObjet(o, dEst, dNord) {
   if (o.type === 'texte' || estPose(o)) o.point = [o.point[0] + dEst, o.point[1] + dNord]; // le point de repère reste en place
