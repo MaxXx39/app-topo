@@ -9,6 +9,7 @@
 // une page par phase), PDF et DXF.
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
+import { libellePhase, nomSansNumero } from '../topo/phases-chantier.js';
 import { cartoucheActif, dansAffaire, pastillesAffaireCliquables, aPlusieursAffaires, affaireChoisie } from '../topo/affaires.js';
 import { aAcces } from '../reglages/reglages.js';
 import { habillerPage } from '../navigation/cadre-page.js';
@@ -364,7 +365,7 @@ export function ouvrirPlansChantier({
     }
     if (ev.key === 'F8') {
       ev.preventDefault();
-      etat.ortho = !etat.ortho;
+      cyclerOrtho();
       majOutils();
       return majConsigne();
     }
@@ -519,7 +520,7 @@ export function ouvrirPlansChantier({
     // ça libère le ruban du haut. Les gestionnaires restent ceux de la page (clics et changements sur toute la page).
     const echellePapier = plan()?.echelle ?? ECHELLE_PAPIER;
     bandeDessin = `
-      ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c], etat.accroches.has(c) ? 'actif' : '')).join(''))}
+      ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c], etat.accroches.has(c) ? 'actif' : '')).join(''), 'groupe-accroches')}
       ${groupe('Ortho', `${bt('data-action="ortho"', '<path d="M5 5V19H19"/><path d="M5 14H10V19"/>', 'Ortho (F8) : le dessin est aimanté aux directions N / S / E / O ou à celles du repère', etat.ortho ? 'actif' : '')}
           ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
           ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}
@@ -815,6 +816,22 @@ export function ouvrirPlansChantier({
     return pointOrtho(position);
   }
 
+  /** Mode de l'Ortho (0.354.0) : 'aucun', 'nseo' (repère à 0°) ou 'repere' (angle d'une ligne choisie). Un seul à la fois. */
+  function modeOrtho() { return !etat.ortho ? 'aucun' : etat.orthoRepereChoisi ? 'repere' : 'nseo'; }
+  function reglerOrtho(mode) {
+    etat.ortho = mode !== 'aucun';
+    etat.orthoRepereChoisi = mode === 'repere';
+    etat.orthoRepere = false;
+    etat.orthoAngle = mode === 'repere' ? (etat.orthoAngleMemo ?? 0) : 0;
+  }
+  /** F8 / bouton Ortho : rien → N S E O → repère (si un repère a été choisi) → rien. */
+  function cyclerOrtho() {
+    const m = modeOrtho();
+    if (m === 'aucun') reglerOrtho('nseo');
+    else if (m === 'nseo' && etat.orthoAngleMemo) reglerOrtho('repere');
+    else reglerOrtho('aucun');
+  }
+
   /** Ortho (0.294.1) : pendant un dessin, le point suivant est aimanté à la direction du repère (ou à ses perpendiculaires). */
   function pointOrtho(position) {
     const dernier = etat.saisie?.points?.at(-1);
@@ -1003,8 +1020,8 @@ export function ouvrirPlansChantier({
       if (!seg) return message('Aucune ligne ici : l\'angle de repère n\'a pas changé.', 3000);
       // L'angle de la ligne cliquée, tel quel (0 à 180°, sens trigonométrique depuis l'Est) ; 0 = N / S / E / O.
       const angle = ((angleVers(seg[0], seg[1]) % 180) + 180) % 180;
-      etat.orthoAngle = Math.round(angle * 100) / 100;
-      etat.ortho = true;
+      etat.orthoAngleMemo = Math.round(angle * 100) / 100;
+      reglerOrtho('repere');
       message(`Repère de l'Ortho : ${etat.orthoAngle}° (angle de la ligne cliquée)`, 3500);
       return majTout();
     }
@@ -1857,7 +1874,7 @@ export function ouvrirPlansChantier({
       <h3>Feuille ${bulle('feuilleChantier')}</h3>
       <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
-        ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
+        ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(libellePhase(p, ph))}</label>`).join('')}` : ''}
       <h3>Éléments de la feuille</h3>
       ${[['cartouche', 'Cartouche', 'data-feuille-case="cartoucheActif"', r.cartoucheActif], ['situation', 'Vue de situation', 'data-situation="actif"', r.situation.actif], ['nord', 'Flèche du nord', 'data-feuille-case="nord"', r.nord], ['echelle', 'Échelle', 'data-feuille-case="barre"', r.barre], ['legende', 'Légende', 'data-feuille-case="legende"', r.legende]].map(([popup, texte, attr, coche]) => `<div class="ligne-element-feuille"><label class="case-chantier"><input type="checkbox" ${attr} ${coche ? 'checked' : ''}> ${texte}</label>${coche ? `<button type="button" class="bouton-secondaire petit ${etat.popupFeuille === popup ? 'actif' : ''}" data-action="popup-feuille" data-popup="${popup}" title="Régler : ${texte}">⚙</button>` : ''}</div>`).join('')}
       <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
@@ -2188,7 +2205,9 @@ export function ouvrirPlansChantier({
     const p = plan();
     if (!p) return '';
     return `<span class="phases-entete groupe-tete tete-phase"><span class="mini-titre">Phase</span><label class="champ-bande" title="Phase dans laquelle on dessine"><span>Phase</span>
-      <select data-phase-select>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === p.phaseActive ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
+      <button type="button" class="outil-ruban petit-nav" data-action="phase-prec" title="Phase précédente" aria-label="Phase précédente">◀</button>
+      <select data-phase-select>${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === p.phaseActive && !p.voirToutes ? 'selected' : ''}>${echapper(libellePhase(p, ph))}</option>`).join('')}<option value="__toutes__" ${p.voirToutes ? 'selected' : ''}>Toutes (on voit tout)</option></select>
+      <button type="button" class="outil-ruban petit-nav" data-action="phase-suiv" title="Phase suivante" aria-label="Phase suivante">▶</button></label>
       <button type="button" class="outil-ruban" data-action="menu-phases" aria-expanded="${Boolean(etat.menuPhases)}" title="Gestion des phases : montrer, couleur, nom, ajouter, supprimer">${ico('<circle cx="12" cy="12" r="3"/><path d="M12 3V6M12 18V21M3 12H6M18 12H21M5.6 5.6L7.8 7.8M16.2 16.2L18.4 18.4M5.6 18.4L7.8 16.2M16.2 7.8L18.4 5.6"/>')}<span>Phases</span></button>
       <label class="champ-bande" title="Couleur des éléments : celle de chaque objet, ou une couleur par phase"><span>Couleurs</span><select data-champ="couleurs"><option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option><option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une par phase</option></select></label></span>`;
   }
@@ -2228,7 +2247,7 @@ export function ouvrirPlansChantier({
         calques: (x.calques ?? []).map((c, i) => { const r = reglageCalque(x.id, i); return { i, nom: c.nom, visible: (r.visible ?? c.visible) !== false, couleur: r.couleur ?? c.couleur ?? '#000000' }; }),
       })),
       deplie: etat.planDeplie,
-      phase: p.phases.length > 1 ? { nom: p.phases.find((ph) => ph.id === p.phaseActive)?.nom ?? '', propre: Boolean(p.fond.plansParPhase?.[p.phaseActive]) } : null,
+      phase: p.phases.length > 1 ? { nom: libellePhase(p, p.phases.find((ph) => ph.id === p.phaseActive)), propre: Boolean(p.fond.plansParPhase?.[p.phaseActive]) } : null,
     });
   }
 
@@ -2420,8 +2439,8 @@ export function ouvrirPlansChantier({
     page.querySelectorAll('[data-outil]').forEach((b) => b.classList.toggle('actif', b.dataset.outil === etat.outil));
     page.querySelectorAll('[data-accroche]').forEach((b) => b.classList.toggle('actif', etat.accroches.has(b.dataset.accroche)));
     page.querySelector('[data-action="ortho"]')?.classList.toggle('actif', etat.ortho);
-    page.querySelector('[data-action="ortho-repere"]')?.classList.toggle('actif', Boolean(etat.orthoRepere)); // 0.337.0 : on voit ce qui est actif
-    page.querySelector('[data-action="ortho-zero"]')?.classList.toggle('actif', etat.ortho && !etat.orthoAngle);
+    page.querySelector('[data-action="ortho-repere"]')?.classList.toggle('actif', Boolean(etat.orthoRepere) || modeOrtho() === 'repere'); // 0.354.0 : reste coché une fois le repère choisi
+    page.querySelector('[data-action="ortho-zero"]')?.classList.toggle('actif', modeOrtho() === 'nseo' && !etat.orthoRepere);
     const champOrtho = page.querySelector('[data-reglage="orthoAngle"]');
     if (champOrtho && document.activeElement !== champOrtho) champOrtho.value = etat.orthoAngle;
     page.querySelector('[data-action="construction-visible"]')?.classList.toggle('actif', plan()?.construction?.visible !== false);
@@ -2582,7 +2601,7 @@ export function ouvrirPlansChantier({
     if (['zone', 'ligne', 'piste', 'fleche', 'texte', 'cotation', 'rectangle', 'rond'].includes(etat.outil)) {
       const phaseActive = p.phases.find((ph) => ph.id === p.phaseActive);
       reglages += `<label class="champ-calage"><span>Couleur de ce qu'on dessine</span><span class="ligne-couleur-outil"><input type="color" value="${etat.couleurOutil || '#64748b'}" data-reglage="couleurOutil">${etat.couleurOutil ? '<button type="button" class="bouton-secondaire petit" data-action="couleur-outil-origine" title="Couleur d\'origine du type">↺</button>' : '<small>(celle du type)</small>'}</span></label>
-        <label class="champ-calage"><span>Phase</span><select data-reglage="phaseOutil"><option value="">Phase active (${echapper(phaseActive?.nom ?? '')})</option>${p.phases.map((ph) => `<option value="${ph.id}" ${etat.phaseOutil === ph.id ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>`;
+        <label class="champ-calage"><span>Phase</span><select data-reglage="phaseOutil"><option value="">Phase active (${echapper(phaseActive ? libellePhase(p, phaseActive) : '')})</option>${p.phases.map((ph) => `<option value="${ph.id}" ${etat.phaseOutil === ph.id ? 'selected' : ''}>${echapper(libellePhase(p, ph))}</option>`).join('')}</select></label>`;
     }
     let choisi = '';
     let propreHtml = '';
@@ -2591,7 +2610,7 @@ export function ouvrirPlansChantier({
       const lot = p.objets.filter((x) => etat.multi.has(x.id));
       choisi = `<h3>${lot.length} éléments choisis</h3>
         <p class="aide-calage">Glisser l'un d'eux = les déplacer tous ; Suppr = tous les effacer ; Ctrl+C / Ctrl+V = les copier ; Ctrl + clic = en ajouter ou en retirer ; Échap = ne plus les choisir.</p>
-        <label class="champ-calage"><span>Phase de tous</span><select data-multi="phase"><option value="">— (ne pas changer)</option>${p.phases.map((ph) => `<option value="${ph.id}">${echapper(ph.nom)}</option>`).join('')}</select></label>
+        <label class="champ-calage"><span>Phase de tous</span><select data-multi="phase"><option value="">— (ne pas changer)</option>${p.phases.map((ph) => `<option value="${ph.id}">${echapper(libellePhase(p, ph))}</option>`).join('')}</select></label>
         <label class="champ-calage"><span>Couleur de tous</span><span class="ligne-couleur-outil"><input type="color" value="#64748b" data-multi="couleur"><button type="button" class="bouton-secondaire petit" data-action="multi-couleur-origine" title="Couleur d'origine de chacun">↺</button></span></label>
         ${lot.some((x) => x.type === 'zone') ? `<label class="champ-calage"><span>Type des zones</span><select data-multi="categorie"><option value="">— (ne pas changer)</option>${CATEGORIES_ZONE.map((c) => `<option value="${c.cle}">${echapper(c.nom)}</option>`).join('')}</select></label>` : ''}
         ${lot.some((x) => x.type === 'ligne') ? `<label class="champ-calage"><span>Type des lignes</span><select data-multi="style"><option value="">— (ne pas changer)</option>${STYLES_LIGNE.map((c) => `<option value="${c.cle}">${echapper(c.nom)}</option>`).join('')}</select></label>` : ''}`;
@@ -2685,8 +2704,8 @@ export function ouvrirPlansChantier({
     const petit = (titre, attr, cle, valeur, min, max, pas, unite = '') => `<label class="champ-bandeau"><span>${titre}${unite ? ` (${unite})` : ''}</span><input type="number" min="${min}" max="${max}" step="${pas}" value="${valeur}" data-${attr}="${cle}"></label>`;
     const bouton = (attr, texte, titre) => `<button type="button" class="bouton-secondaire petit" ${attr} title="${titre}">${texte}</button>`;
     const rangDebut = p.phases.findIndex((ph) => ph.id === o.phase);
-    const phases = `<label class="champ-bandeau" title="Première phase où l'élément est présent"><span>Phase de début</span><select data-prop="phase">${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.phase ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('')}</select></label>
-      <label class="champ-bandeau" title="Dernière phase où l'élément est présent en normal (de la phase de début à celle-ci) ; après, il suit le réglage « Éléments terminés » de Gestion des phases. Sans fin : il reste dans sa phase de début."><span>Phase de fin</span><select data-prop="fin"><option value="">— (pas de fin)</option>${p.phases.map((ph, i) => (i < rangDebut ? '' : `<option value="${ph.id}" ${ph.id === o.fin ? 'selected' : ''}>${echapper(ph.nom)}</option>`)).join('')}</select></label>`;
+    const phases = `<label class="champ-bandeau" title="Première phase où l'élément est présent"><span>Phase de début</span><select data-prop="phase">${p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.phase ? 'selected' : ''}>${echapper(libellePhase(p, ph))}</option>`).join('')}</select></label>
+      <label class="champ-bandeau" title="Dernière phase où l'élément est présent en normal (de la phase de début à celle-ci) ; après, il suit le réglage « Éléments terminés » de Gestion des phases. Sans fin : il reste dans sa phase de début."><span>Phase de fin</span><select data-prop="fin"><option value="">— (pas de fin)</option>${p.phases.map((ph, i) => (i < rangDebut ? '' : `<option value="${ph.id}" ${ph.id === o.fin ? 'selected' : ''}>${echapper(libellePhase(p, ph))}</option>`)).join('')}</select></label>`;
     const couleur = pose || o.type === 'construction' ? '' : p.couleurs === 'phases' ? '<span class="aide-calage">Couleur : celle de la phase</span>'
       : `<label class="champ-bandeau"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>${o.couleur ? bouton('data-action="couleur-origine"', '↺', 'Couleur d\'origine') : ''}`;
     const poseHtml = pose ? `${petit('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
@@ -3190,19 +3209,21 @@ export function ouvrirPlansChantier({
       return vue?.redessinerDessus();
     }
     if (b.dataset.action === 'ortho') {
-      etat.ortho = !etat.ortho;
+      cyclerOrtho();
       majOutils();
       return majConsigne();
     }
     if (b.dataset.action === 'ortho-zero') {
-      etat.orthoAngle = 0;
-      etat.ortho = true;
+      reglerOrtho(modeOrtho() === 'nseo' ? 'aucun' : 'nseo'); // 0.354.0 : un seul choix à la fois (rien / N S E O / repère), recliquer l'éteint
       majOutils();
-      return message('Ortho : repère à 0° (Nord / Sud / Est / Ouest).', 2500);
+      return message(modeOrtho() === 'nseo' ? 'Ortho : repère à 0° (Nord / Sud / Est / Ouest).' : 'Ortho coupé.', 2500);
     }
     if (b.dataset.action === 'ortho-repere') {
-      etat.orthoRepere = !etat.orthoRepere;
-      if (etat.orthoRepere) etat.ortho = true; // 0.338.0 : Ortho reste allumé pendant le choix du repère
+      if (modeOrtho() === 'repere' && !etat.orthoRepere) reglerOrtho('aucun'); // déjà actif : recliquer l'éteint
+      else {
+        etat.orthoRepere = !etat.orthoRepere; // 0.354.0 : en attente de la ligne à cliquer ; le repère choisi reste coché ensuite
+        etat.ortho = true;
+      }
       majOutils();
       if (etat.orthoRepere) message('Cliquez une ligne du plan ou du dessin : son angle devient le repère de l\'Ortho.', 4000);
       return;
@@ -3245,6 +3266,19 @@ export function ouvrirPlansChantier({
       b.setAttribute('aria-expanded', String(!etat.panneauReplie));
       return vue?.redessiner();
     }
+    if (b.dataset.action === 'phase-prec' || b.dataset.action === 'phase-suiv') {
+      const i = p.phases.findIndex((x) => x.id === p.phaseActive);
+      const j = i + (b.dataset.action === 'phase-prec' ? -1 : 1);
+      if (j < 0 || j >= p.phases.length) return message(j < 0 ? 'C\'est la première phase.' : 'C\'est la dernière phase.', 2000);
+      p.voirToutes = false;
+      p.phaseActive = p.phases[j].id;
+      if (etat.choisi && !objetsVisibles(p).some((o) => o.id === etat.choisi)) etat.choisi = null;
+      enregistrer();
+      majTout();
+      if (etat.ecran === 'feuille') majFeuille();
+      majPhasesEntete();
+      return vue?.redessiner();
+    }
     if (b.dataset.action === 'phase-ajouter') {
       if (!avantChangement()) return;
       ajouterPhase(p);
@@ -3262,7 +3296,7 @@ export function ouvrirPlansChantier({
     }
     if (b.dataset.phaseRenommer) {
       const ph = p.phases.find((x) => x.id === b.dataset.phaseRenommer);
-      const nom = await demanderTexte({ titre: 'Nom de la phase', valeur: ph.nom });
+      const nom = await demanderTexte({ titre: 'Nom de la phase', valeur: nomSansNumero(ph.nom) });
       if (!nom || !avantChangement()) return;
       ph.nom = nom;
       enregistrer();
@@ -3383,6 +3417,7 @@ export function ouvrirPlansChantier({
         if (v === null) return majPanneau();
         etat[cle] = v;
       } else etat[cle] = c.value;
+      if (cle === 'orthoAngle') { etat.orthoAngleMemo = etat.orthoAngle; reglerOrtho('repere'); majOutils(); } // un angle tapé = repère choisi
       if (cle === 'mesureMode') etat.saisie = null; // une autre mesure : on repart de zéro
       if (etat.saisie && !etat.saisie.source) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style, largeur: etat.largeur });
       majConsigne();
@@ -3425,7 +3460,8 @@ export function ouvrirPlansChantier({
       return majFeuille();
     }
     if (c.dataset.phaseSelect !== undefined) {
-      p.phaseActive = c.value;
+      if (c.value === '__toutes__') p.voirToutes = true; // vue seulement : on dessine toujours dans la phase active
+      else { p.voirToutes = false; p.phaseActive = c.value; }
       if (etat.choisi && !objetsVisibles(p).some((o) => o.id === etat.choisi)) etat.choisi = null;
       enregistrer();
       majPhasesEntete();

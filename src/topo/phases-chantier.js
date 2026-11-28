@@ -27,9 +27,24 @@ export function dupliquerPhase(plan, id) {
   return copie;
 }
 
+/**
+ * Nom d'une phase sans son numéro (0.354.0) : « 2 - Bâtiment » → « Bâtiment » ; l'ancien nom par défaut « Phase 3 » → « Phase ».
+ * Le numéro n'est jamais écrit à la main : il vient de la place de la phase dans la liste.
+ */
+export function nomSansNumero(nom) {
+  const t = String(nom ?? '').trim().replace(/^\d+\s*[-–.)]\s*/, '');
+  return /^Phase\s*\d+$/i.test(t) ? 'Phase' : t;
+}
+
+/** Nom affiché d'une phase : « 1 - Terrassement » (numéro = rang dans la liste). */
+export function libellePhase(plan, phase) {
+  const i = plan.phases.findIndex((p) => p.id === phase?.id);
+  return i < 0 ? nomSansNumero(phase?.nom) : `${i + 1} - ${nomSansNumero(phase.nom)}`;
+}
+
 /** Renomme la phase id (texte vide refusé : renvoie faux). */
 export function renommerPhase(plan, id, nom) {
-  const texte = String(nom ?? '').trim().slice(0, 60);
+  const texte = nomSansNumero(String(nom ?? '').slice(0, 60));
   const ph = plan.phases.find((p) => p.id === id);
   if (!ph || !texte) return false;
   ph.nom = texte;

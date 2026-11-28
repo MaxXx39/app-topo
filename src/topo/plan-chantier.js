@@ -117,7 +117,7 @@ export function nouveauPlanChantier(nom, genre = 'installation', maintenant = ne
   const phase = { id: nouvelId('ph'), nom: 'Phase 1', couleur: COULEURS_PHASES[0], visible: true };
   return {
     id: nouvelId('pc'), nom: nom || 'Plan de chantier', genre, creeLe: maintenant, modifieLe: maintenant,
-    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true, ortho: true }, echelle: ECHELLE_PAPIER, // 0.289.0 : photo pâlie au départ
+    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: false, ortho: true }, echelle: ECHELLE_PAPIER, // 0.289.0 : photo pâlie au départ
   };
 }
 
@@ -230,6 +230,7 @@ export function objetsVus(plan, courante = plan.phaseActive) {
 
 /** Objets dont la phase est visible (dans la phase active). */
 export function objetsVisibles(plan) {
+  if (plan.voirToutes) return plan.objets.filter((o) => o.type !== 'construction' || plan.construction?.visible !== false); // 0.354.0 : « Toutes » les phases à l'écran
   return objetsVus(plan, plan.phaseActive);
 }
 

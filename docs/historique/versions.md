@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.353.0 — Plans de chantier : phase de début → phase de fin, et phases précédentes (demandes du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.354.0 — Plans de chantier : lot 1 des demandes du 28.11 (phases, Ortho, accroches, points)
+- **Numéro des phases automatique** (`libellePhase`, `nomSansNumero` dans `topo/phases-chantier.js`) : on écrit « Terrassement », l'appli affiche « 1 - Terrassement » d'après l'ordre ; un numéro tapé à la main est retiré ; l'ancien « Phase 3 » devient « Phase ».
+- **Choix de phase** : flèches ◀ ▶ à côté de la liste, option « Toutes (on voit tout) » (`plan.voirToutes`, vue seulement : on dessine toujours dans la phase active).
+- **Fenêtre Phases** : une phase = une ligne (flex qui passe à la ligne si l'écran est étroit), fenêtre plus large.
+- **Ortho** : un seul choix à la fois (rien / N S E O / repère). F8 et le bouton Ortho tournent : rien → N S E O → repère (si un repère a été choisi) → rien ; N S E O et Repère recliqués s'éteignent ; le repère reste coché après le choix de la ligne, l'angle taper = repère choisi.
+- **Accroches** plus petites (28 px, icônes seules). **Points levés cachés** au départ d'un nouveau plan.
+- Pas encore fait (lots suivants) : texte dans Affichage, grue modifiable + réglage Grue, mot « Éléments » sur le volet replié, Éléments avec phase début / fin + tri, groupes (maquette à valider), volume de zone stock (tronc de pyramide, formule à valider), Présentation (phase par page, phase au cartouche), appli PC plus compacte, infobulle au survol, Tab sur objets superposés.
+
+## 0.353.0 — Plans de chantier : phase de début → phase de fin, et phases précédentes (demandes du 28.11)
 - **Début → fin** : un élément avec une phase de fin est **présent en normal de sa phase de début à sa phase de fin** (sur l'écran, les pages de la feuille PDF), sans régler chaque phase dans Gestion des phases ; après la fin, il suit « Éléments terminés » (caché au départ). Sans fin : comme avant (sa phase seule + ce que dit Gestion des phases). Fin avant le début : ignorée (la liste ne propose que les phases ≥ début ; avancer le début au-delà de la fin enlève la fin avec un message). Une case de Gestion des phases réglée à la main fait toujours la loi.
 - **Panneau de l'objet** : « Phase de début » / « Phase de fin » (« — (pas de fin) »).
 - **Phases précédentes** (Gestion des phases, `plan.precedentes` { actif, mode, opacite, couleur }, décoché au départ) : toutes les phases d'AVANT la phase en cours en **estompé** (couleurs d'origine), **couleur unique** ou **couleur unique estompée**. Réglage de départ : une case du tableau réglée à la main (`manuel`) le garde ; un élément « en place » (début → fin) reste normal. Fonctions : `precedentesDe`, `regleDeVue` (couche), `objetsVus` ; `dessin.js` (`rendu.estompe`).

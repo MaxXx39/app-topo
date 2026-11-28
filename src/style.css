@@ -15411,3 +15411,18 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .affaires-cliquables { display: inline-flex; align-items: center; cursor: pointer; }
 .affaires-cliquables.ajout-affaire { padding: 0 6px; border: 1px dashed #94a3b8; border-radius: 999px; font-size: 0.6rem; color: #475569; margin-right: 4px; }
 .dossiers-cliquables { cursor: pointer; }
+
+/* Plans de chantier 0.354.0 : accroches plus petites (comme AutoCAD), flèches de phase, liste des phases sur une ligne */
+.groupe-accroches { gap: 2px; }
+.groupe-accroches .outil-ruban { min-width: 28px; height: 28px; padding: 2px 4px; border-radius: 5px; }
+.groupe-accroches .outil-ruban span { display: none; }
+.groupe-accroches .outil-ruban svg { width: 18px; height: 18px; }
+.petit-nav { min-width: 26px; height: 28px; padding: 0 4px; font-size: 0.75rem; }
+.fenetre-phases-chantier { width: min(720px, 96vw); }
+.liste-phases-chantier.compact { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.liste-phases-chantier.compact li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 6px; font-size: 0.8rem; }
+.liste-phases-chantier.compact li.active { background: color-mix(in srgb, #2563eb 10%, var(--surface)); }
+.liste-phases-chantier.compact .num-phase { min-width: 2ch; font-weight: 600; color: var(--discret, #64748b); }
+.liste-phases-chantier.compact input[type="color"] { width: 24px; height: 24px; padding: 0; }
+.liste-phases-chantier.compact input[type="text"] { flex: 1 1 140px; min-width: 120px; padding: 3px 6px; font-size: 0.85rem; }
+.liste-phases-chantier.compact .bouton-secondaire.petit { padding: 2px 6px; min-height: 0; font-size: 0.75rem; }
