@@ -54,7 +54,16 @@ export function definirModelesPerso(liste) {
   version += 1;
 }
 export const versionModeles = () => version;
-export const tousLesModeles = () => [...MODELES_DE_BASE, ...personnalises];
+// 0.355.0 : un modèle livré peut être modifié ; la version modifiée est rangée dans le projet avec le même id et `base: true`,
+// elle remplace le modèle livré (on peut revenir à l'original en la supprimant).
+export const tousLesModeles = () => [
+  ...MODELES_DE_BASE.map((m) => personnalises.find((p) => p.id === m.id) ?? m),
+  ...personnalises.filter((p) => !MODELES_DE_BASE.some((m) => m.id === p.id)),
+];
+/** Vrai pour un modèle créé par l'utilisateur (ni livré, ni livré modifié) : dessin générique selon son type. */
+export const estModeleGenerique = (m) => !m?.integre && !m?.base;
+/** Modèle livré d'origine pour un id (null si ce n'est pas un modèle livré). */
+export const modeleLivre = (id) => MODELES_DE_BASE.find((m) => m.id === id) ?? null;
 /** Modèle d'un id ; à défaut (modèle supprimé, ancien objet) le premier livré. */
 export const modeleDe = (id) => tousLesModeles().find((m) => m.id === id) ?? MODELE_LIEBHERR;
 
@@ -134,6 +143,7 @@ export function modeleVide(nom = 'Nouveau modèle') {
 export function copierModele(m, nom) {
   const c = JSON.parse(JSON.stringify(m));
   delete c.integre;
+  delete c.base;
   c.id = `grue-${Date.now().toString(36)}`;
   c.nom = nom ?? `${m.nom} (copie)`;
   return c;

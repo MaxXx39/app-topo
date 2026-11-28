@@ -243,8 +243,10 @@ describe('feuille', () => {
     const p3 = ajouterPhase(plan);
     plan.feuille = { pages: 'phases' };
     const pages = pagesDeLaFeuille(plan);
-    expect(pages.map((x) => x.titre)).toEqual([p2.nom, p3.nom]);
+    expect(pages.map((x) => x.titre)).toEqual(['2 - Phase', '3 - Phase']); // 0.355.0 : titre = numéro automatique + nom
     expect(pages[0].phases).toEqual([p1.id, p2.id]);
+    plan.feuille = { pages: 'une', phase: p3.id }; // 0.355.0 : une seule phase choisie dans la présentation
+    expect(pagesDeLaFeuille(plan).map((x) => [x.titre, x.phase])).toEqual([['3 - Phase', p3.id]]);
     ajouterObjet(plan, { type: 'zone', phase: p1.id, points: [[0, 0], [1, 0], [1, 1]], categorie: 'emprise' });
     ajouterObjet(plan, { type: 'zone', phase: p3.id, points: [[0, 0], [1, 0], [1, 1]], categorie: 'stockage' });
     expect(objetsDeLaPage(plan, pages[0])).toHaveLength(1);

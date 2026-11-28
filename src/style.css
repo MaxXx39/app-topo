@@ -15426,3 +15426,17 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .liste-phases-chantier.compact input[type="color"] { width: 24px; height: 24px; padding: 0; }
 .liste-phases-chantier.compact input[type="text"] { flex: 1 1 140px; min-width: 120px; padding: 3px 6px; font-size: 0.85rem; }
 .liste-phases-chantier.compact .bouton-secondaire.petit { padding: 2px 6px; min-height: 0; font-size: 0.75rem; }
+/* 0.355.0 : panneau Éléments replié : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place */
+.travail-chantier.avec-biblio.panneau-replie { grid-template-columns: 250px minmax(0, 1fr) !important; }
+@media (max-width: 1100px) { .travail-chantier.avec-biblio.panneau-replie { grid-template-columns: 210px minmax(0, 1fr) !important; } }
+.panneau-replie .bouton-replier-panneau { height: auto; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bouton-replier-panneau .mot-repli { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; }
+.tri-elements { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #475569; margin: 0 0 4px; }
+.tri-elements select { font-size: 0.75rem; padding: 2px 4px; }
+.elements-chantier .phases-element { margin-left: auto; padding-left: 6px; font-size: 0.68rem; color: #94a3b8; white-space: nowrap; }
+.fenetre-modeles-grues .etat-modele { margin-right: auto; font-size: 0.8rem; color: #475569; }
+.bande-page .zone-bande-page .groupe-ruban.groupe-accroches .outil-ruban { min-width: 28px; width: 30px; height: 28px; min-height: 0; padding: 2px; }
+.page-chantier .bande-page .groupe-accroches .outil-ruban svg { width: 18px; height: 18px; }
+.bande-page .zone-bande-page .groupe-ruban.groupe-accroches .outil-ruban span { display: none; }
+.outils-entete .phases-entete select[data-phase-select] { max-width: 170px; }
+.liste-phases-chantier.compact .case { display: inline-flex; flex-direction: row; align-items: center; gap: 3px; font-size: 0.78rem; }

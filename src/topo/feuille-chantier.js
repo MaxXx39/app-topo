@@ -2,6 +2,7 @@
 // Feuille A4 / A3 / A1 paysage ou portrait, plan à l'échelle du plan de chantier (plan.echelle), cartouche avec logo,
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
+import { libellePhase } from './phases-chantier.js';
 import { modeleDe } from './grue-modele.js';
 import { detailsDe } from './details-feuille.js';
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
@@ -30,7 +31,7 @@ export function reglagesFeuille(plan) {
   const f = plan.feuille ?? {};
   return {
     ...reglagesElements(f),
-    format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
+    format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une', phase: f.phase ?? '',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
     plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
@@ -221,12 +222,15 @@ export function accrocherBoite(boite, autres, cadre, tolerance) {
 }
 
 /** Pages à faire : une par phase (avec les phases « sur toutes les pages »), ou une seule (phases visibles). */
-export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
+export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages, phase = reglagesFeuille(plan).phase) {
+  const communes = plan.phases.filter((p) => p.commune).map((p) => p.id);
   if (pages !== 'phases' || plan.phases.length < 2) {
+    // 0.355.0 : la présentation peut montrer une seule phase (choisie dans la présentation, pas dans le bandeau)
+    const ph = phase ? plan.phases.find((p) => p.id === phase) : null;
+    if (ph) return [{ titre: libellePhase(plan, ph), phase: ph.id, phases: [...new Set([...communes, ph.id])] }];
     return [{ titre: '', phases: plan.phases.filter((p) => p.visible !== false).map((p) => p.id) }];
   }
-  const communes = plan.phases.filter((p) => p.commune).map((p) => p.id);
-  return plan.phases.filter((p) => !p.commune).map((p) => ({ titre: p.nom, phase: p.id, phases: [...communes, p.id] }));
+  return plan.phases.filter((p) => !p.commune).map((p) => ({ titre: libellePhase(plan, p), phase: p.id, phases: [...communes, p.id] }));
 }
 
 /** Objets d'une page (phases de la page). */

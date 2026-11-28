@@ -100,7 +100,7 @@ export const MATERIAUX_TAS = [
 ];
 export const materiauTas = (cle) => MATERIAUX_TAS.find((m) => m.cle === cle) ?? null;
 export const TAS_HAUTEUR = 3; // m, au départ
-export const TAS_TALUS = 1.5; // m horizontaux pour 1 m de hauteur, au départ (à valider)
+export const TAS_TALUS = 1; // m horizontaux pour 1 m de hauteur, au départ (0.355.0 : talus 1/1, demande du 28.11)
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
 export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
@@ -808,6 +808,46 @@ export function anneauxDuTas(points, hauteur = TAS_HAUTEUR, talus = TAS_TALUS, n
   return { anneaux, largeur, sens };
 }
 
+/**
+ * Volume d'un tas de stock (0.355.0), en m³. Base = la zone dessinée (E, N en m), hauteur h (m), talus t (m horizontaux
+ * pour 1 m de hauteur). À la hauteur z, la section est la base décalée de z × t vers l'intérieur. Son aire varie en z²,
+ * donc la formule du prismatoïde (trois niveaux) est exacte : V = h / 6 × (A bas + 4 × A milieu + A haut).
+ * Si le tas devient pointu avant h (zone trop étroite), on additionne des tranches jusqu'à ce que la section disparaisse,
+ * et `hauteurReelle` donne la hauteur atteinte. Renvoie { volume, aireBas, aireHaut, hauteurReelle, pointu }.
+ */
+export function volumeDuTas(points, hauteur, talus = TAS_TALUS) {
+  const ferme = [...points, points[0]];
+  const aireBas = Math.abs(aireSignee(points));
+  const sens = aireSignee(points) >= 0 ? 1 : -1;
+  const aireA = (z) => {
+    if (z <= 0) return aireBas;
+    const r = decalerPolyligne(ferme, sens * z * talus);
+    if (r.length < 4) return 0;
+    const pts = r.slice(0, -1);
+    const a = aireSignee(pts);
+    return a * sens <= 0 || Math.abs(a) > aireBas ? 0 : Math.abs(a);
+  };
+  if (!(hauteur > 0) || aireBas <= 0) return { volume: 0, aireBas, aireHaut: aireBas, hauteurReelle: 0, pointu: false };
+  if (!(talus > 0)) return { volume: aireBas * hauteur, aireBas, aireHaut: aireBas, hauteurReelle: hauteur, pointu: false };
+  const aireHaut = aireA(hauteur);
+  if (aireHaut > 0) {
+    const volume = (hauteur / 6) * (aireBas + 4 * aireA(hauteur / 2) + aireHaut);
+    return { volume, aireBas, aireHaut, hauteurReelle: hauteur, pointu: false };
+  }
+  // Tas pointu : tranches fines (milieu de chaque tranche) jusqu'à la disparition de la section
+  const n = 400;
+  const dz = hauteur / n;
+  let volume = 0;
+  let hauteurReelle = 0;
+  for (let i = 0; i < n; i++) {
+    const a = aireA((i + 0.5) * dz);
+    if (a <= 0) break;
+    volume += a * dz;
+    hauteurReelle = (i + 1) * dz;
+  }
+  return { volume, aireBas, aireHaut: 0, hauteurReelle, pointu: true };
+}
+
 // ------------------------------------------------------------------ Cotations (0.293.0)
 
 const dirDe = (a, b) => {
@@ -1270,7 +1310,7 @@ export function baseEtiquette(o) {
 
 /** Vrai si l'objet affiche un texte qu'on peut déplacer (zone avec surface / tas / texte, bloc avec texte). */
 export function etiquettePresente(o) {
-  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && o.afficherHauteur));
+  if (o.type === 'zone') return Boolean(o.etiquette || o.afficherSurface || (o.tasH > 0 && (o.afficherHauteur || o.afficherVolume)));
   return Boolean(estPose(o) && o.etiquette);
 }
 

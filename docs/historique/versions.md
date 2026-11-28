@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.354.0 — Plans de chantier : lot 1 des demandes du 28.11 (phases, Ortho, accroches, points)
+Lire seulement la section utile : `grep -n '^## 0.355.0 — Plans de chantier : lot 2 des demandes du 28.11 (volume des tas, grues, Éléments, présentation)
+- **Volume d'un tas** (Expert, `volumeDuTas` dans `topo/plan-chantier.js`) : talus 1/1 par défaut (`TAS_TALUS` = 1, champ « Talus » modifiable), V = h / 6 × (A bas + 4 A milieu + A haut) (prismatoïde : exact pour une base décalée vers l'intérieur ; l'utilisateur avait validé le « tronc de pyramide », qui donne 1 % de moins sur un rectangle 20 × 10 m h 3 m : 361.8 au lieu de 366 m³ — **à confirmer**). Tas pointu (zone trop étroite) : tranches jusqu'à la hauteur atteinte. Case « Écrire le volume » et ligne de résultat dans le panneau.
+- **Texte (mm)** remonté dans Affichage (bandeau du haut).
+- **Panneau de droite replié** : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place (le volet Symboles prenait toute la page).
+- **Liste Éléments** : phase début → fin en petit gris (« 1 → 3 »), tri « Dernier dessiné en haut / Par type / Par phase ».
+- **Grues** : bouton **Grue** (icône grue) dans le groupe Symboles du ruban (le bouton « Modèles de grues… » du panneau est retiré) ; **enregistrement automatique** à chaque champ (sans redessiner la fenêtre) ; **modèles livrés modifiables** (copie du projet au même id, `base: true`, « ↺ Revenir à l'original ») ; grue créée par l'utilisateur (`estModeleGenerique`) : grue à tour avec cabine (2.4 × 2 m si rien n'est donné), automontante sans contre-flèche.
+- **Présentation** : « Phase montrée » = Toutes (une page) / Une page par phase / une seule phase ; la phase s'écrit dans le cartouche (« Phase : 2 - Bâtiment ») ; plus de choix de phase dans le bandeau en Présentation.
+
+## 0.354.0 — Plans de chantier : lot 1 des demandes du 28.11 (phases, Ortho, accroches, points)
 - **Numéro des phases automatique** (`libellePhase`, `nomSansNumero` dans `topo/phases-chantier.js`) : on écrit « Terrassement », l'appli affiche « 1 - Terrassement » d'après l'ordre ; un numéro tapé à la main est retiré ; l'ancien « Phase 3 » devient « Phase ».
 - **Choix de phase** : flèches ◀ ▶ à côté de la liste, option « Toutes (on voit tout) » (`plan.voirToutes`, vue seulement : on dessine toujours dans la phase active).
 - **Fenêtre Phases** : une phase = une ligne (flex qui passe à la ligne si l'écran est étroit), fenêtre plus large.

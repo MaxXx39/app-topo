@@ -7,7 +7,7 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, volumeDuTas, TAS_HAUTEUR, TAS_TALUS,
   hachureZone, hachureDeLaZone, tiretsContour, ancreEtiquette,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
@@ -284,6 +284,7 @@ export function dessinerObjet(d, o) {
     if (o.etiquette) parties.push(o.etiquette); // 0.293.0 : texte libre de la zone ou du tas
     if (o.afficherSurface) parties.push(texteSurface(o.points));
     if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
+    if (o.tasH > 0 && o.afficherVolume) parties.push(`V ${Math.round(volumeDuTas(o.points, o.tasH, o.tasTalus ?? TAS_TALUS).volume).toLocaleString('fr-CH')} m³`);
     if (parties.length) {
       const c = ecran(ancreEtiquette(o)); // 0.320.5 : texte déplaçable par sa poignée
       plaque(ctx, parties.join(' · '), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));

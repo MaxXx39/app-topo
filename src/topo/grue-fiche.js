@@ -7,7 +7,7 @@ import { piece, trait, rectArrondi, cercle, tourner, texte, tournerPrims, NOIR }
 import { versSymbole } from './symboles-retouches.js';
 import { coteDuChassis } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
-import { modeleDe, versionModeles } from './grue-modele.js';
+import { modeleDe, versionModeles, estModeleGenerique } from './grue-modele.js';
 
 export const CLE_FICHE = 'fiche';
 export const RAYON_MIN = 2.6; // m : rayon minimal du crochet proposé
@@ -267,16 +267,22 @@ function mat(B) {
 /** Contre-flèche, contrepoids, plate-forme, cabine et flèche : tout ce qui tourne avec la flèche. */
 function partieHaute(g) {
   const { modele: M, fleche: f, r, mode } = g;
-  const D = M.dim;
+  const generique = estModeleGenerique(M);
+  // 0.355.0 : grue créée par l'utilisateur : une grue à tour a une cabine (2.4 × 2 m si rien n'est donné),
+  // une automontante n'a pas de contre-flèche (flèche arrière).
+  const D = generique && M.type === 'tour' && !M.dim.cabine ? { ...M.dim, cabine: { l: 2.4, b: 2 } } : M.dim;
+  const sansArriere = generique && M.type === 'automontante';
   const res = [];
   const arr = D.contreFlecheArriere;
   const w = D.contreFlecheLargeur;
-  res.push(...piece(JAUNE, 'peinture', rectArrondi(-arr, -w / 2, -0.4, w / 2, 0.06, 1)));
-  res.push(...treillis(-arr, -0.4, w, Math.max(0.9, w * 0.57)), trait([[-arr, 0], [-0.4, 0]], false, '#8a9198'));
+  if (!sansArriere && arr > 0.4) {
+    res.push(...piece(JAUNE, 'peinture', rectArrondi(-arr, -w / 2, -0.4, w / 2, 0.06, 1)));
+    res.push(...treillis(-arr, -0.4, w, Math.max(0.9, w * 0.57)), trait([[-arr, 0], [-0.4, 0]], false, '#8a9198'));
+  }
   // 0.320.4 : les blocs de contrepoids colorés à l'arrière ne sont plus dessinés (demande du 25.11) ;
   // le poids reste écrit dans la fiche de la grue (contrepoidsDe).
   if (D.treuil) res.push(...piece(METAL, 'metal', rectArrondi(D.treuil.x0, -0.9, D.treuil.x1, 0.9, 0.06, 2)), ...piece(METAL_FONCE, 'metal', rectArrondi(D.treuil.x0 + 0.4, -0.6, D.treuil.x1 - 1, 0.6, 0.05, 2)));
-  if (M.court && arr >= 8) res.push(texte(M.court, -5.6, 0, 0.7, { k: '#1e293b' }));
+  if (M.court && arr >= 8 && !sansArriere) res.push(texte(M.court, -5.6, 0, 0.7, { k: '#1e293b' }));
   // Plate-forme tournante, couronne d'orientation, pointe de mât
   if (D.plateforme) res.push(...piece(METAL, 'metal', rectArrondi(-2.9, -D.plateforme.b / 2, -2.9 + D.plateforme.l, D.plateforme.b / 2, 0.08, 2)));
   res.push(trait(cercle(0, 0, g.tour.mat * 0.62, 28), true, ARDOISE), ...piece(JAUNE, 'peinture', cercle(0, 0, Math.min(0.5, g.tour.mat * 0.35), 18)));
