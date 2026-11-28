@@ -9366,6 +9366,21 @@ async function ouvrirMenuAffaires() {
       modifie();
       choisirAffaire(affaire.id);
       afficherMessage(`${titreProjet(source)} fusionné : affaire ${affaire.numero} ${affaire.categorie} (${nombre} éléments)`, 5000, { ok: true });
+      // 0.352.0 : la ligne de la nouvelle affaire reste dans le dossier de projets du projet d'origine.
+      const dossierSource = dossierDuProjet(lireDossiers(), source.id);
+      if (dossierSource) ecrireDossiers(rangerProjet(lireDossiers(), `${projet.id}#${affaire.id}`, dossierSource));
+      // 0.352.0 : l'original reste tant qu'on ne dit rien : on demande.
+      const sort = await demanderChoix({
+        titre: `Que faire de « ${titreProjet(source)} » ?`,
+        texte: `Tout son contenu est maintenant dans ce projet (affaire ${affaire.categorie} · ${affaire.numero}).`,
+        boutons: [
+          { cle: 'garder', texte: 'Le garder', principal: true },
+          { cle: 'appareil', texte: 'Le supprimer de cet appareil' },
+          ...(partage?.etat.connecte ? [{ cle: 'partout', texte: 'Le supprimer partout (appareil et Drive)', classe: 'bouton-danger' }] : []),
+        ],
+      });
+      if (sort === 'appareil') await actionsProjet.supprimerProjet(source.id);
+      else if (sort === 'partout') await actionsProjet.supprimerPartout(source.id);
     }
   } catch (erreur) {
     afficherMessage(erreur.message, 6000);

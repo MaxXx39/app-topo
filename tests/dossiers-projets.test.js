@@ -49,3 +49,17 @@ describe('dossiers de projets', () => {
     expect(dossierDuProjet(rangerProjet(d, 'p3', 'inconnu'), 'p3')).toBe(SANS_DOSSIER);
   });
 });
+
+describe('dossiers : une ligne par affaire (0.352.0)', () => {
+  it('une ligne d\'affaire a son propre dossier, sinon celui du projet', async () => {
+    const { dossierDuProjet, regrouperParDossier, rangerProjet, supprimerDossier } = await import('../src/projet/dossiers.js');
+    let d = { liste: [{ id: 'gc', nom: 'Perrin - GC' }, { id: 'bat', nom: 'Perrin - Bât' }], projets: { A: 'gc' } };
+    expect(dossierDuProjet(d, 'A#affB')).toBe('gc'); // pas encore rangée : le dossier du projet
+    d = rangerProjet(d, 'A#affB', 'bat');
+    expect(dossierDuProjet(d, 'A#affB')).toBe('bat');
+    const groupes = regrouperParDossier([{ id: 'A', cleDossier: 'A#principale' }, { id: 'A', cleDossier: 'A#affB' }], d);
+    expect(groupes.find((g) => g.id === 'gc').projets).toHaveLength(1);
+    expect(groupes.find((g) => g.id === 'bat').projets).toHaveLength(1);
+    expect(supprimerDossier(d, 'bat', ['A']).erreur).toMatch(/encore 1 projet/);
+  });
+});

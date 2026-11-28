@@ -1,6 +1,11 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.351.0 — Revue complète des affaires (projets liés), simulée de A à Z (Expert, Intermédiaire, Base)
+Lire seulement la section utile : `grep -n '^## 0.352.0 — Affaires : un dossier de projets par affaire ; après une fusion, que faire de l'original ? (demandes du 28.11)
+- **Dossiers de projets** : chaque ligne d'affaire d'« Ouvrir » a son ⋮ et se range dans son propre dossier (clé `idProjet#idAffaire` dans `dossiers.projets` ; sans rangement propre : le dossier du projet). Ex. « 8114 - Arzier Bix GC » dans « Perrin - GC », « 662 524 - Arzier Bix BÂT » dans « Perrin - Bât ». Un dossier qui contient encore une ligne d'affaire ne peut pas être supprimé.
+- **Fusion** : l'original restait sans rien dire. Maintenant une fenêtre demande « Que faire de « … » ? » : le garder (par défaut), le supprimer de cet appareil, ou partout (appareil + Drive, si Drive est connecté ; confirmation ensuite). La nouvelle ligne d'affaire reprend le dossier de projets de l'original.
+- Vérifié en Playwright (2 dossiers, rangement de chaque ligne, fusion puis suppression de l'original).
+
+## 0.351.0 — Revue complète des affaires (projets liés), simulée de A à Z (Expert, Intermédiaire, Base)
 Simulations Playwright sur un vrai projet (2 affaires GC 8114 / BÂT 10203, 3 plans, 2 levés) + un 2e projet à fusionner. Corrigé :
 - **« Ouvrir »** : chaque ligne d'affaire prenait le numéro de l'affaire ouverte (« 10203 - Paris » sur les deux lignes) : chaque ligne a maintenant SON numéro (« 8114 - Paris GC », « 10203 - Paris BÂT ») et la ligne ouverte est marquée « ouvert ». Le titre du projet dans les listes / la carte : « 8114 / 10203 - Paris » (`resumerProjet`, champ `lieu`). En « Toutes » (Expert), l'en-tête montre aussi tous les numéros.
 - **Éléments d'une autre affaire** : avant, seulement décochés (on pouvait les recocher, même en Base) ; maintenant **ni listés ni dessinés** dans une affaire : menus Plan / Points / Surface, pages du projet (Liste de points, Plans, Gérer : `projetDeLAffaire`), plans de fond des applis plein écran (`plansDuProjet`), liste de Calage, liste de Plans de chantier, surfaces de Plateformes. En « Toutes » : tout.
