@@ -33,7 +33,7 @@ export function reglagesFeuille(plan) {
     ...reglagesElements(f),
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une', phase: f.phase ?? '',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    cartouchePerso: cartouchePersoDe(f.cartouchePerso), texteCartouche: texteCartoucheDe(f.texteCartouche), logos: listeLogos(f), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
+    cartouchePerso: cartouchePersoDe(f.cartouchePerso), texteCartouche: texteCartoucheDe(f.texteCartouche), titrePage: titrePageDe(f.titrePage), logos: listeLogos(f), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
 }
 
@@ -91,6 +91,45 @@ export function listeLogos(f) {
   if (Array.isArray(f?.logos)) return f.logos.filter((x) => typeof x === 'string' && x).slice(0, 4);
   const l = f?.logo ?? 'perrin';
   return l === 'aucun' ? [] : [l];
+}
+
+// ---- Titre de la présentation (0.363.0) : bandeau posé au-dessus du cadre du plan.
+export const ELEMENTS_TITRE = [['nom', 'Nom du plan'], ['chantier', 'Chantier'], ['phase', 'Phase'], ['echelle', 'Échelle'], ['format', 'Format'], ['indice', 'Indice'], ['date', 'Date'], ['auteur', 'Dessiné par']];
+export const STYLES_TITRE = [['simple', 'Simple'], ['bandeau', 'Bandeau plein'], ['encadre', 'Encadré'], ['souligne', 'Souligné']];
+export const ALIGNEMENTS_TITRE = [['g', 'À gauche'], ['c', 'Centré'], ['d', 'À droite']];
+
+/** Réglages du titre, complétés : { actif, style, taille (pt, 8 à 40), couleur (texte), couleurFond (fond ou trait), alignement, elements, texteLibre }. */
+export function titrePageDe(f) {
+  const t = f && typeof f === 'object' ? f : {};
+  const taille = Number(t.taille);
+  const couleur = (c, defaut) => (/^#[0-9a-f]{6}$/i.test(c ?? '') ? c : defaut);
+  return {
+    actif: Boolean(t.actif),
+    style: STYLES_TITRE.some(([c]) => c === t.style) ? t.style : 'bandeau',
+    taille: Number.isFinite(taille) && taille > 0 ? Math.min(40, Math.max(8, taille)) : 16,
+    couleur: couleur(t.couleur, '#1b2b36'),
+    couleurFond: couleur(t.couleurFond, '#f5c518'),
+    alignement: ALIGNEMENTS_TITRE.some(([c]) => c === t.alignement) ? t.alignement : 'c',
+    elements: Array.isArray(t.elements) ? ELEMENTS_TITRE.map(([c]) => c).filter((c) => t.elements.includes(c)) : ['nom', 'phase'],
+    texteLibre: String(t.texteLibre ?? '').slice(0, 120),
+  };
+}
+
+/** Texte du titre : le texte libre puis les éléments cochés (dans l'ordre de la liste), séparés par « · ». champs : ceux du cartouche. */
+export function texteTitrePage(tp, champs) {
+  const morceaux = { nom: champs.titre, chantier: champs.affaire, phase: champs.phase, echelle: `Échelle 1:${champs.echelle}`, format: `Format ${champs.format}`, indice: `Indice ${champs.indice}`, date: `Date ${champs.date}`, auteur: champs.auteur ? `Dessiné par ${champs.auteur}` : '' };
+  return [tp.texteLibre.trim(), ...tp.elements.map((c) => String(morceaux[c] ?? '').trim())].filter(Boolean).join(' · ');
+}
+
+/** Hauteur (mm) du bandeau du titre ; 0 si le titre n'est pas actif. k : taille des éléments (A3 = 1). */
+export function hauteurTitrePage(tp, k) {
+  return tp?.actif ? tp.taille * k * 0.3528 * 1.4 + 5 * k : 0;
+}
+
+/** Taille (points sur le papier) qui fait tenir le texte dans la largeur (mm) : la taille choisie, réduite si besoin. */
+export function taillePourTitre(tp, texte, largeur, k) {
+  const tient = (largeur - 6 * k) / (Math.max(1, texte.length) * 0.3528 * 0.58);
+  return Math.min(tp.taille * k, tient);
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
@@ -160,7 +199,9 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const page = tailleFeuille(format, orientation);
   const k = Math.max(page.largeur, page.hauteur) / 420;
   const marge = Math.max(7, 10 * Math.sqrt(k));
-  const cadre = { x: marge, y: marge, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge };
+  const ht = hauteurTitrePage(opts.titrePage, k); // 0.363.0 : le titre prend une bande en haut ; le cadre du plan commence dessous
+  const cadre = { x: marge, y: marge + ht, l: page.largeur - 2 * marge, h: page.hauteur - 2 * marge - ht };
+  const titrePage = ht ? { x: marge, y: marge, l: cadre.l, h: ht } : null;
   const lc = Math.min(cadre.l * 0.45, 135 * k);
   const hc = cartoucheActif ? 36 * k : 0; // sans cartouche : la légende prend sa place
   const enBas = coin.startsWith('b');
@@ -239,7 +280,7 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const nord = boites.nord ? { x: boites.nord.x + 0.85 * tNord, y: boites.nord.y + 1.25 * tNord, t: tNord } : { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: tNord };
   const barre = boites.barre ? { x: boites.barre.x + 2 * k, y: boites.barre.y + 6 * k * (barreTaille / 100), max: maxBarre } : { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: maxBarre };
   return {
-    page, k, cadre, cartouche, texteCartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
+    page, k, cadre, titrePage, cartouche, texteCartouche, legende, nord, barre, planning, situation: boites.situation ?? null,
     // Boîtes (mm) de ce qu'on peut glisser sur la feuille, pour le toucher et les accroches.
     boites: { nord: boites.nord ?? null, barre: boites.barre ?? null, situation: boites.situation ?? null, ...Object.fromEntries(nomsDetails.map((n) => [n, boites[n]])) }, fixes: occupes,
   };
@@ -367,7 +408,7 @@ export function barreDeLaFeuille(echelle, maxMm, longueurM = 0) {
 }
 
 /** Options de mise en page tirées des réglages de la feuille (une seule source pour l'écran et le PDF). */
-export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, texteCartouche: r.texteCartouche, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
+export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.positions, situation: r.situation, details: r.details, cartoucheActif: r.cartoucheActif, texteCartouche: r.texteCartouche, titrePage: r.titrePage, nordTaille: r.nordTaille, barreTaille: r.barreTaille, legendeTaille: r.legendeTaille, legendeColonnes: r.legendeColonnes });
 
 /**
  * Textes du cartouche (mm de papier, y vers le bas ; taille en points) : affaire, titre du plan, phase, échelle, format,

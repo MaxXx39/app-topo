@@ -449,7 +449,9 @@ export function dessinerObjet(d, o) {
     ctx.rotate((-g.texte.angle * Math.PI) / 180);
     // 'dessus' : posé au-dessus de la ligne (pas dessus) ; 'sur' : sur la ligne avec cadre ; 'coupee' : la ligne est cachée sous le texte.
     const dessus = style === 'dessus' || style === 'dessus-cadre';
-    const decalage = dessus && !courte && o.genre !== 'angle' ? -(h * 0.78 + 0.5 * mm) : 0;
+    // 0.363.0 : valeur collée à la ligne (presque sans vide), dessus ou dessous (`o.cotePos`) ; avec cadre, un peu plus loin pour ne pas la recouvrir
+    const ecart = style === 'dessus-cadre' ? h * 0.78 + 0.5 * mm : h * 0.5 + 0.25 * mm;
+    const decalage = dessus && !courte && o.genre !== 'angle' ? (o.cotePos === 'dessous' ? 1 : -1) * ecart : 0;
     plaque(ctx, g.texte.t, 0, decalage, h, 600, '#1b2b36', style === 'dessus' ? true : style === 'dessus-cadre' ? false : style === 'coupee' ? false : Boolean(o.nu), o.arrondi ?? 'peu', style === 'coupee');
     ctx.restore();
   } else if (o.type === 'texte') {

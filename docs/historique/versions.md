@@ -1,6 +1,12 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.362.0 — Cartouche : plusieurs logos, texte au-dessus, couleurs, aperçu en gros (demandes du 28.11)
+Lire seulement la section utile : `grep -n '^## 0.363.0 — Cote collée à la ligne, titre de présentation, dernières couleurs (demandes du 28.11)
+- **Cotation** : la valeur est collée à la ligne (écart de 0,5 hauteur de texte), au choix **Dessus / Dessous** (`o.cotePos`, bandeau) ; le style de la valeur (cadre, ligne coupée…), les bouts, leur taille et les coins sont rangés dans « ⚙ Style de cote » (décidé le 28.11). Les cotes déjà dessinées gardent leur style ; les nouvelles partent en « Au-dessus, sans cadre ».
+- **Titre de présentation** : `feuille.titrePage` { actif, style (simple / bandeau / encadré / souligné), taille, couleur, couleurFond, alignement g / c / d, elements (nom, chantier, phase, échelle, format, indice, date, auteur), texteLibre } ; le titre prend une bande au-dessus du cadre du plan (`miseEnPageFeuille` renvoie `titrePage`, le cadre commence dessous) ; texte réduit s'il ne tient pas. Les 4 styles proposés ont tous été retenus (28.11). Case « Titre » dans les éléments de la feuille.
+- **Dernières couleurs** (`plans-chantier/couleurs-recentes.js`) : 8 couleurs gardées sur l'appareil (`topo-couleurs-recentes`), petite rangée sous chaque `input[type=color]` de l'appli (observateur), un clic remet la couleur ; les pastilles de couleur (0.360.0) comptent aussi.
+- À essayer : PDF exporté avec le titre ; doigt sur tablette (rangée de couleurs petite : 16 px).
+
+## 0.362.0 — Cartouche : plusieurs logos, texte au-dessus, couleurs, aperçu en gros (demandes du 28.11)
 - **Logos** : `feuille.logos` (liste, 4 au plus ; livrés `perrin` / `natalini` / `ronchi` ou image importée réduite à 600 px) ; l'ancien `feuille.logo` est lu tant que `logos` n'existe pas (`listeLogos`). Chaque logo est centré dans sa part de la zone de gauche du cartouche, mêmes marges et proportions qu'avant (`dessinerCartouche` dans `plans-chantier/feuille.js`).
 - **Texte au-dessus du cartouche** : `feuille.texteCartouche` { texte (plusieurs lignes), taille, couleur, fond, opaciteFond }, posé contre le cartouche du côté du plan ; la légende se décale derrière (`miseEnPageFeuille` renvoie `texteCartouche`).
 - **Couleur de chaque information** du cartouche (`cartouchePerso.champs[clé].couleur`).

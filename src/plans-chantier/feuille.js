@@ -11,7 +11,7 @@ import { repereDuDetail } from '../topo/details-feuille.js';
 import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, optionsMiseEnPage, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
-  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche, hauteurTexteCartouche,
+  reglagesFeuille, FORMATS_FEUILLE, nomChantierCartouche, hauteurTexteCartouche, texteTitrePage, taillePourTitre,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
@@ -274,6 +274,9 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     });
   }
 
+  // --- Titre de la présentation (0.363.0) : bande au-dessus du cadre du plan.
+  if (mise.titrePage) dessinerTitrePage(ctx, s, mise.titrePage, mise.k, prep.r.titrePage, prep.champs, texte);
+
   // --- Cartouche : logo à gauche, textes à droite (0.337.0 : facultatif).
   const K = mise.cartouche;
   if (!prep.r.cartoucheActif) { ctx.restore(); return prep; }
@@ -418,6 +421,30 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
 }
 
 /** Cadre blanc à liseré (légende, cartouche). */
+/** Titre de la présentation : style simple / bandeau plein / encadré / souligné, texte aligné à gauche, centré ou à droite. */
+export function dessinerTitrePage(ctx, s, B, k, tp, champs, texte) {
+  const t = texteTitrePage(tp, champs);
+  ctx.save();
+  if (tp.style === 'bandeau') {
+    ctx.fillStyle = tp.couleurFond;
+    ctx.fillRect(B.x * s, B.y * s, B.l * s, B.h * s);
+  } else if (tp.style === 'encadre') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(B.x * s, B.y * s, B.l * s, B.h * s);
+    ctx.strokeStyle = tp.couleur;
+    ctx.lineWidth = Math.max(1, 0.35 * s);
+    ctx.strokeRect(B.x * s, B.y * s, B.l * s, B.h * s);
+  } else if (tp.style === 'souligne') {
+    ctx.fillStyle = tp.couleurFond;
+    ctx.fillRect(B.x * s, (B.y + B.h - 0.9 * k) * s, B.l * s, 0.9 * k * s);
+  }
+  ctx.restore();
+  if (!t) return;
+  const taille = taillePourTitre(tp, t, B.l, k);
+  const x = tp.alignement === 'g' ? B.x + 3 * k : tp.alignement === 'd' ? B.x + B.l - 3 * k : B.x + B.l / 2;
+  texte(t, x, B.y + (B.h - (tp.style === 'souligne' ? 0.9 * k : 0)) / 2, taille, { gras: true, couleur: tp.couleur, align: tp.alignement === 'g' ? 'left' : tp.alignement === 'd' ? 'right' : 'center' });
+}
+
 /** Cartouche : cadre, logos à gauche (même zone, chacun centré dans sa part), textes à droite. texte : fonction d'écriture. */
 export function dessinerCartouche(ctx, s, K, k, r, champs, logos, texte) {
   const mm = (v) => v * s;

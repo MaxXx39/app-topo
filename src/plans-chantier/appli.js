@@ -17,6 +17,7 @@ import { habillerPage } from '../navigation/cadre-page.js';
 import { presentationsDe, presentationActive, creerPresentation, appliquerPresentation, quitterPresentation, dupliquerPresentation, renommerPresentation, supprimerPresentation, synchroniserPresentation, gabaritsDe, enregistrerGabarit, utiliserGabarit, supprimerGabarit } from '../topo/presentations.js';
 import { echapper } from '../outils/echapper.js';
 import { pastillesCouleur } from './pastilles-couleur.js';
+import { surveillerCouleurs } from './couleurs-recentes.js';
 import { prolongerPolyligne, ajusterPolyligne } from '../topo/modifier-plan.js';
 import { titreProjet } from '../projet/projet.js';
 import { bulle } from '../aide/bulles.js';
@@ -55,7 +56,7 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe, pointsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, volumeDuTas, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, segmentProcheAvecOrigine, segmentConstruction, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION, CHAMPS_CARTOUCHE, COULEUR_TEXTE_CARTOUCHE, COULEURS_DEFAUT_CARTOUCHE, texteCartoucheDe, TAILLE_CARTOUCHE_MIN, TAILLE_CARTOUCHE_MAX, cartouchePersoDe, listeLogos } from '../topo/feuille-chantier.js';
+import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION, CHAMPS_CARTOUCHE, COULEUR_TEXTE_CARTOUCHE, COULEURS_DEFAUT_CARTOUCHE, texteCartoucheDe, TAILLE_CARTOUCHE_MIN, TAILLE_CARTOUCHE_MAX, cartouchePersoDe, listeLogos, ELEMENTS_TITRE, STYLES_TITRE, ALIGNEMENTS_TITRE, titrePageDe } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo, chargerLogos, dessinerApercuCartouche } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -106,6 +107,7 @@ function listeChoix(libelle, attr, cle, options, valeur) {
   return `<label class="champ-calage"><span>${libelle}</span><select data-${attr}="${cle}">${options.map(([v, t]) => `<option value="${v}" ${valeur === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
 }
 const STYLES_COTE = [['dessus', 'Au-dessus, sans cadre'], ['dessus-cadre', 'Au-dessus, avec cadre'], ['sur', 'Sur la ligne'], ['coupee', 'Ligne coupée sous le texte']];
+const COTE_POS = [['dessus', 'Dessus de la ligne'], ['dessous', 'Dessous de la ligne']]; // 0.363.0 : valeur collée à la ligne, d'un côté ou de l'autre
 const FLECHES_COTE = [['fleche', 'Flèche'], ['point', 'Point'], ['tiret', 'Tiret oblique']];
 const ARRONDIS = [['peu', 'Peu arrondi'], ['carre', 'Carré'], ['normal', 'Très arrondi']];
 
@@ -160,10 +162,11 @@ export function ouvrirPlansChantier({
   habillerPage(page, { couleur: '#b45309', titre: 'Plans de chantier', contenuBande: () => bandeDessin });
   document.body.append(page);
   page.showModal();
+  surveillerCouleurs(page); // 0.363.0 : dernières couleurs sous chaque sélecteur de couleur
 
   const etat = {
     ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, multi: new Set(), couleurOutil: '', phaseOutil: '', dernierOutil: '', accroches: new Set(['point', 'sommet']),
-    categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null, cadreTexte: 'arrondi', styleCote: 'sur', flecheCote: 'fleche', tailleFlecheCote: 2.6, coteTexte: 'fin', arrondi: 'peu',
+    categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null, cadreTexte: 'arrondi', styleCote: 'dessus', cotePos: 'dessus', flecheCote: 'fleche', tailleFlecheCote: 2.6, coteTexte: 'fin', arrondi: 'peu',
     // Réglages de l'outil (valeurs données aux éléments dessinés ensuite) : null = celle du genre.
     opacite: OPACITE_ZONE, contourMm: null, afficherSurface: false, epaisseurMm: null, echelleMotif: 1,
     // 0.299.0 : trait du contour d'une zone et hachure (en plus du remplissage) donnés aux zones dessinées ensuite.
@@ -1414,7 +1417,7 @@ export function ouvrirPlansChantier({
       const [A, B, C] = pts;
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
       const decalage = (((C[0] - A[0]) * -(B[1] - A[1])) + ((C[1] - A[1]) * (B[0] - A[0]))) / L; // distance signée de C à la droite A → B
-      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000, ...(etat.cotationNu ? { nu: true } : {}), ...(etat.arrondi !== 'peu' ? { arrondi: etat.arrondi } : {}), styleCote: etat.styleCote, fleche: etat.flecheCote, tailleFlecheMm: etat.tailleFlecheCote, coteTexte: etat.coteTexte };
+      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000, ...(etat.cotationNu ? { nu: true } : {}), ...(etat.arrondi !== 'peu' ? { arrondi: etat.arrondi } : {}), styleCote: etat.styleCote, ...(etat.cotePos === 'dessous' ? { cotePos: 'dessous' } : {}), fleche: etat.flecheCote, tailleFlecheMm: etat.tailleFlecheCote, coteTexte: etat.coteTexte };
     }
     const o = ajouterObjet(plan(), champs);
     etat.saisie = null;
@@ -2097,6 +2100,19 @@ export function ouvrirPlansChantier({
     if (cle === 'legende') {
       return `${champNb('Taille du texte', 'legendeTaille', r.legendeTaille, 60, 200, 10, '%')}${choix('Colonnes', 'legendeColonnes', COLONNES_LEGENDE, r.legendeColonnes)}`;
     }
+    if (cle === 'titre') {
+      const t = r.titrePage;
+      const dessinAlign = (a) => `<button type="button" class="bouton-secondaire petit ${t.alignement === a ? 'actif' : ''}" data-titre-align="${a}" title="${ALIGNEMENTS_TITRE.find(([c]) => c === a)[1]}">${{ g: '⇤ Gauche', c: '↔ Centré', d: 'Droite ⇥' }[a]}</button>`;
+      return `
+      <div class="styles-titre" role="group" aria-label="Style du titre">${STYLES_TITRE.map(([c, nom]) => `<button type="button" class="style-titre ${t.style === c ? 'actif' : ''}" data-titre-style="${c}" title="${nom}"><i class="mini-titre-${c}"></i><span>${nom}</span></button>`).join('')}</div>
+      <div class="ligne-tc">${['g', 'c', 'd'].map(dessinAlign).join('')}</div>
+      <div class="ligne-tc"><label>Taille <input type="number" min="8" max="40" step="1" value="${t.taille}" data-titre="taille"> pt</label>
+        <label>Texte <input type="color" value="${t.couleur}" data-titre="couleur"></label>
+        ${t.style === 'simple' || t.style === 'encadre' ? '' : `<label>${t.style === 'souligne' ? 'Trait' : 'Fond'} <input type="color" value="${t.couleurFond}" data-titre="couleurFond"></label>`}</div>
+      <b>Éléments du titre</b>
+      <div class="elements-titre">${ELEMENTS_TITRE.map(([c, nom]) => `<label class="case-chantier"><input type="checkbox" data-titre-element="${c}" ${t.elements.includes(c) ? 'checked' : ''}> ${nom}</label>`).join('')}</div>
+      <label class="champ-calage"><span>Texte libre (écrit en premier)</span><input type="text" maxlength="120" value="${echapper(t.texteLibre)}" data-titre="texteLibre"></label>`;
+    }
     if (cle === 'cartouche') {
       return `
       <canvas class="apercu-cartouche" data-apercu-cartouche aria-label="Aperçu du cartouche"></canvas>
@@ -2188,7 +2204,7 @@ export function ouvrirPlansChantier({
     majPanneauFeuille();
   }
 
-  const TITRES_POPUP = { cartouche: 'Cartouche', situation: 'Vue de situation', nord: 'Flèche du nord', echelle: 'Échelle', legende: 'Légende', detail: 'Cadres de détail' };
+  const TITRES_POPUP = { titre: 'Titre de la présentation', cartouche: 'Cartouche', situation: 'Vue de situation', nord: 'Flèche du nord', echelle: 'Échelle', legende: 'Légende', detail: 'Cadres de détail' };
   /** Montre, met à jour ou ferme la petite fenêtre (non bloquante : on garde la feuille sous les yeux). */
   function majPopupFeuille() {
     const d = page.querySelector('[data-zone="popup-feuille"]');
@@ -2196,7 +2212,7 @@ export function ouvrirPlansChantier({
     const cle = etat.ecran === 'feuille' ? etat.popupFeuille : null;
     const p = plan();
     const rr = p && reglagesFeuille(p);
-    if (!cle || !p || (cle === 'situation' && !rr.situation.actif) || (cle === 'cartouche' && !rr.cartoucheActif) || (cle === 'nord' && !rr.nord) || (cle === 'echelle' && !rr.barre) || (cle === 'legende' && !rr.legende)) {
+    if (!cle || !p || (cle === 'situation' && !rr.situation.actif) || (cle === 'cartouche' && !rr.cartoucheActif) || (cle === 'titre' && !rr.titrePage.actif) || (cle === 'nord' && !rr.nord) || (cle === 'echelle' && !rr.barre) || (cle === 'legende' && !rr.legende)) {
       etat.popupFeuille = null;
       if (d.open) d.close();
       return;
@@ -2224,7 +2240,7 @@ export function ouvrirPlansChantier({
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(libellePhase(p, ph))}</label>`).join('')}` : ''}
       <h3>Éléments de la feuille</h3>
-      ${[['cartouche', 'Cartouche', 'data-feuille-case="cartoucheActif"', r.cartoucheActif], ['situation', 'Vue de situation', 'data-situation="actif"', r.situation.actif], ['nord', 'Flèche du nord', 'data-feuille-case="nord"', r.nord], ['echelle', 'Échelle', 'data-feuille-case="barre"', r.barre], ['legende', 'Légende', 'data-feuille-case="legende"', r.legende]].map(([popup, texte, attr, coche]) => `<div class="ligne-element-feuille"><label class="case-chantier"><input type="checkbox" ${attr} ${coche ? 'checked' : ''}> ${texte}</label>${coche ? `<button type="button" class="bouton-secondaire petit ${etat.popupFeuille === popup ? 'actif' : ''}" data-action="popup-feuille" data-popup="${popup}" title="Régler : ${texte}">⚙</button>` : ''}</div>`).join('')}
+      ${[['titre', 'Titre', 'data-titre="actif"', r.titrePage.actif], ['cartouche', 'Cartouche', 'data-feuille-case="cartoucheActif"', r.cartoucheActif], ['situation', 'Vue de situation', 'data-situation="actif"', r.situation.actif], ['nord', 'Flèche du nord', 'data-feuille-case="nord"', r.nord], ['echelle', 'Échelle', 'data-feuille-case="barre"', r.barre], ['legende', 'Légende', 'data-feuille-case="legende"', r.legende]].map(([popup, texte, attr, coche]) => `<div class="ligne-element-feuille"><label class="case-chantier"><input type="checkbox" ${attr} ${coche ? 'checked' : ''}> ${texte}</label>${coche ? `<button type="button" class="bouton-secondaire petit ${etat.popupFeuille === popup ? 'actif' : ''}" data-action="popup-feuille" data-popup="${popup}" title="Régler : ${texte}">⚙</button>` : ''}</div>`).join('')}
       <label class="case-chantier"><input type="checkbox" data-feuille-case="coupe" ${r.coupe ? 'checked' : ''}> Page « Vue de côté » (coupe) à la fin du PDF</label>
       <h3>Cadres de détail</h3>
       <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="popup-feuille" data-popup="detail">Détails… (${r.details.length})</button></div>
@@ -2375,6 +2391,14 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majFeuille();
     }
+    if (b.dataset.titreStyle || b.dataset.titreAlign) {
+      if (!avantChangement()) return;
+      const actuel = titrePageDe(plan().feuille?.titrePage);
+      plan().feuille = { ...(plan().feuille ?? {}), titrePage: { ...actuel, ...(b.dataset.titreStyle ? { style: b.dataset.titreStyle } : { alignement: b.dataset.titreAlign }) } };
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
+    }
     if (b.dataset.logoRetirer !== undefined) return changerLogos((l) => { l.splice(Number(b.dataset.logoRetirer), 1); });
     if (b.dataset.action === 'feuille-pdf') {
       b.disabled = true;
@@ -2505,6 +2529,24 @@ export function ouvrirPlansChantier({
       enregistrer();
       majFeuille();
       return vue?.redessiner();
+    }
+    if (c.dataset.titre || c.dataset.titreElement) {
+      if (!avantChangement()) return majPanneauFeuille();
+      const actuel = titrePageDe(plan().feuille?.titrePage);
+      let suivant;
+      if (c.dataset.titreElement) {
+        const el = new Set(actuel.elements);
+        if (c.checked) el.add(c.dataset.titreElement); else el.delete(c.dataset.titreElement);
+        suivant = { ...actuel, elements: [...el] };
+      } else {
+        const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? Number(String(c.value).replace(',', '.')) : c.value;
+        suivant = { ...actuel, [c.dataset.titre]: v };
+        if (c.dataset.titre === 'actif' && v) etat.popupFeuille = 'titre'; // cocher ouvre la petite fenêtre de réglage
+      }
+      plan().feuille = { ...(plan().feuille ?? {}), titrePage: suivant };
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
     }
     if (c.dataset.logoAjout !== undefined) {
       if (!c.value) return;
@@ -2972,7 +3014,7 @@ export function ouvrirPlansChantier({
           ${[['droite', 'Droite (2 points)'], ['angle', 'Droite par un point et un angle'], ['segment', 'Segment / polyligne (autant de points que voulu, Entrée pour finir)']].map(([v, t]) => `<option value="${v}" ${etat.constructionMode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <p class="aide-calage">Cyan en tirets, jamais imprimées ni exportées ; elles servent d'accroche (Sur ligne, Croisement, Perpendiculaire) et pour aligner. « Décaler » avec la case « En ligne de construction » donne une parallèle.</p>`,
       mesure: `<label class="champ-calage"><span>Mesurer</span><select data-reglage="mesureMode">${MODES_MESURE.map(([v, t]) => `<option value="${v}" ${etat.mesureMode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`,
-      cotation: `${listeChoix('Valeur', 'reglage', 'styleCote', STYLES_COTE, etat.styleCote)}${listeChoix('Bouts', 'reglage', 'flecheCote', FLECHES_COTE, etat.flecheCote)}${champNombre('Taille des bouts', 'reglage', 'tailleFlecheCote', etat.tailleFlecheCote, 0.8, 8, 0.2, 'mm')}${listeChoix('Si la cote est courte, valeur au', 'reglage', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], etat.coteTexte)}${listeChoix('Coins du cadre', 'reglage', 'arrondi', ARRONDIS, etat.arrondi)}${champCase('Valeur sans cadre ni fond', 'reglage-case', 'cotationNu', etat.cotationNu)}<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
+      cotation: `${listeChoix('Valeur', 'reglage', 'cotePos', COTE_POS, etat.cotePos)}<details class="style-cote"><summary>⚙ Style de cote</summary>${listeChoix('Style de la valeur', 'reglage', 'styleCote', STYLES_COTE, etat.styleCote)}${listeChoix('Bouts', 'reglage', 'flecheCote', FLECHES_COTE, etat.flecheCote)}${champNombre('Taille des bouts', 'reglage', 'tailleFlecheCote', etat.tailleFlecheCote, 0.8, 8, 0.2, 'mm')}${listeChoix('Si la cote est courte, valeur au', 'reglage', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], etat.coteTexte)}${listeChoix('Coins du cadre', 'reglage', 'arrondi', ARRONDIS, etat.arrondi)}${champCase('Valeur sans cadre ni fond', 'reglage-case', 'cotationNu', etat.cotationNu)}</details><label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
         ${selectGenresOutil('ligne', etat.style)}`,
@@ -3036,7 +3078,7 @@ export function ouvrirPlansChantier({
           ${champNombre('Hauteur du texte', 'prop', 'texteLigneMm', o.texteLigneMm ?? 2.5, 1, 10, 0.5, 'mm')}
           `,
         piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
-        cotation: (o.genre === 'angle' ? '' : listeChoix('Valeur', 'prop', 'styleCote', STYLES_COTE, o.styleCote ?? 'dessus') + listeChoix('Bouts', 'prop', 'fleche', FLECHES_COTE, o.fleche ?? 'fleche') + champNombre('Taille des bouts', 'prop', 'tailleFlecheMm', o.tailleFlecheMm ?? 2.6, 0.8, 8, 0.2, 'mm') + listeChoix('Cote courte : valeur au', 'prop', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], o.coteTexte ?? 'fin')) + listeChoix('Coins du cadre', 'prop', 'arrondi', ARRONDIS, o.arrondi ?? 'peu') + champCase('Valeur sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu)) + (o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm')),
+        cotation: (o.genre === 'angle' ? '' : listeChoix('Valeur', 'prop', 'cotePos', COTE_POS, o.cotePos ?? 'dessus') + '<details class="style-cote"><summary>⚙ Style de cote</summary>' + listeChoix('Style de la valeur', 'prop', 'styleCote', STYLES_COTE, o.styleCote ?? 'dessus') + listeChoix('Bouts', 'prop', 'fleche', FLECHES_COTE, o.fleche ?? 'fleche') + champNombre('Taille des bouts', 'prop', 'tailleFlecheMm', o.tailleFlecheMm ?? 2.6, 0.8, 8, 0.2, 'mm') + listeChoix('Cote courte : valeur au', 'prop', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], o.coteTexte ?? 'fin')) + listeChoix('Coins du cadre', 'prop', 'arrondi', ARRONDIS, o.arrondi ?? 'peu') + champCase('Valeur sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu)) + (o.genre === 'angle' ? '' : '</details>') + (o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm')),
         texte: `<label class="champ-calage"><span>Texte (Entrée = nouvelle ligne)</span><textarea data-prop="texte" maxlength="400" rows="2">${echapper(o.texte)}</textarea></label>
           <div class="styles-lignes"><span>Par ligne :</span>${lignesDuTexte(o.texte).map((l, i) => `<span class="style-ligne">${i + 1}
             <button type="button" data-style-ligne="${i}" data-s="g" class="${o.styles?.[i]?.g ? 'actif' : ''}" title="Gras" style="font-weight:800">G</button><button type="button" data-style-ligne="${i}" data-s="s" class="${o.styles?.[i]?.s ? 'actif' : ''}" title="Souligné" style="text-decoration:underline">S</button>

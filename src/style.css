@@ -15565,3 +15565,18 @@ html:has(dialog.page-pc[open]) .panneau-chantier .champ-calage { margin-bottom: 
 .cartouche-perso textarea { width: 100%; resize: vertical; font: inherit; }
 dialog.popup-feuille.popup-large { width: 400px; }
 html:has(dialog.page-pc[open]) dialog.popup-feuille.popup-large { width: 400px; }
+
+/* 0.363.0 : dernières couleurs, style de cote, titre de la présentation */
+.recentes-couleurs { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-left: 6px; vertical-align: middle; }
+.recente-couleur { width: 16px; height: 16px; min-width: 16px; min-height: 16px; padding: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.35); cursor: pointer; }
+.recente-couleur:hover { outline: 2px solid var(--sombre, #1b2b36); outline-offset: 1px; }
+.style-cote > summary { cursor: pointer; font-size: 0.8rem; margin: 2px 0; }
+.styles-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+.style-titre { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 0.72rem; }
+.style-titre.actif { border-color: #b45309; box-shadow: 0 0 0 2px #b4530944; }
+.style-titre i { display: block; height: 14px; border-radius: 2px; }
+.mini-titre-simple { background: linear-gradient(#1b2b36, #1b2b36) center / 60% 3px no-repeat; }
+.mini-titre-bandeau { background: #f5c518; }
+.mini-titre-encadre { background: #fff; border: 1.5px solid #1b2b36; }
+.mini-titre-souligne { background: linear-gradient(#f5c518, #f5c518) bottom / 100% 3px no-repeat; }
+.elements-titre { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 2px 0 6px; }

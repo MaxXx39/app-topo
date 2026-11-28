@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cartouchePersoDe, textesCartouche as textesCartoucheT, texteCartoucheDe, hauteurTexteCartouche, listeLogos, miseEnPageFeuille } from '../src/topo/feuille-chantier.js';
+import { cartouchePersoDe, textesCartouche as textesCartoucheT, texteCartoucheDe, hauteurTexteCartouche, listeLogos, miseEnPageFeuille, titrePageDe, texteTitrePage, hauteurTitrePage, taillePourTitre } from '../src/topo/feuille-chantier.js';
 describe('Cartouche sur mesure (0.361.0)', () => {
   const champs = { affaire: 'A', projet: '', titre: 'T', phase: '', echelle: 200, format: 'A3', date: '1.1.2026', indice: 'A', auteur: 'Moi' };
   it('sans réglage : cartouche standard', () => { expect(cartouchePersoDe(null)).toBeNull(); });
@@ -54,5 +54,34 @@ describe('Logos, texte du dessus et couleurs (0.362.0)', () => {
     const t = textesCartoucheT(cart, 1, { affaire: 'A', projet: '', titre: 'T', phase: '', echelle: 200, format: 'A3', date: 'd', indice: 'A', auteur: '' }, perso);
     expect(t.find((x) => x.texte === 'T').couleur).toBe('#ff0000');
     expect(t.find((x) => x.texte === 'A').couleur).toBe('#1b2b36');
+  });
+});
+
+describe('Titre de la présentation (0.363.0)', () => {
+  const champs = { affaire: '10 203 - Rue X', titre: 'Plan 1', phase: 'Phase : 2', echelle: 200, format: 'A3 paysage', date: '1.1.2026', indice: 'B', auteur: 'Moi' };
+  it('réglages par défaut et bornes', () => {
+    const t = titrePageDe({});
+    expect(t.actif).toBe(false);
+    expect(t.elements).toEqual(['nom', 'phase']);
+    expect(titrePageDe({ taille: 999, style: 'x', couleur: 'rouge', alignement: 'z' })).toMatchObject({ taille: 40, style: 'bandeau', couleur: '#1b2b36', alignement: 'c' });
+  });
+  it('texte : libre d\'abord, puis les éléments cochés dans l\'ordre de la liste', () => {
+    const t = titrePageDe({ texteLibre: 'Installation', elements: ['echelle', 'nom', 'auteur'] });
+    expect(texteTitrePage(t, champs)).toBe('Installation · Plan 1 · Échelle 1:200 · Dessiné par Moi');
+    expect(texteTitrePage(titrePageDe({ elements: [] }), champs)).toBe('');
+  });
+  it('le titre prend une bande en haut : le cadre du plan commence dessous', () => {
+    const sans = miseEnPageFeuille('a3', 'paysage', 0, {});
+    const tp = titrePageDe({ actif: true, taille: 20 });
+    const avec = miseEnPageFeuille('a3', 'paysage', 0, { titrePage: tp });
+    expect(sans.titrePage).toBeNull();
+    expect(avec.titrePage.y + avec.titrePage.h).toBeCloseTo(avec.cadre.y, 6);
+    expect(avec.cadre.y - sans.cadre.y).toBeCloseTo(hauteurTitrePage(tp, avec.k), 6);
+    expect(avec.cadre.y + avec.cadre.h).toBeCloseTo(sans.cadre.y + sans.cadre.h, 6);
+  });
+  it('un texte trop long est réduit pour tenir', () => {
+    const tp = titrePageDe({ taille: 30 });
+    expect(taillePourTitre(tp, 'court', 400, 1)).toBe(30);
+    expect(taillePourTitre(tp, 'x'.repeat(200), 100, 1)).toBeLessThan(30);
   });
 });
