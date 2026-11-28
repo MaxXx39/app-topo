@@ -1,6 +1,7 @@
 // Plans de chantier (0.338.0, demande du 26.11) : gestion des phases dans une fenêtre (monter / descendre, dupliquer).
 // Les phases sont dans plan.phases (ordre = ordre affiché). Ces fonctions changent le plan sur place.
 import { nouvelId } from './plan-chantier.js';
+import { regrouperCopies } from './groupes-chantier.js';
 
 /** Déplace la phase id d'un cran : sens = -1 (monter) ou 1 (descendre). Renvoie vrai si elle a bougé. */
 export function deplacerPhase(plan, id, sens) {
@@ -23,6 +24,7 @@ export function dupliquerPhase(plan, id) {
   plan.phases.splice(i + 1, 0, copie);
   const elements = plan.objets.filter((o) => o.phase === id).map((o) => ({ ...JSON.parse(JSON.stringify(o)), id: nouvelId('o'), phase: copie.id }));
   plan.objets.push(...elements);
+  regrouperCopies(plan, elements); // 0.356.0 : les groupes copiés deviennent de nouveaux groupes
   plan.phaseActive = copie.id;
   return copie;
 }

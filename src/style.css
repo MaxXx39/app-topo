@@ -15440,3 +15440,14 @@ body.mode-telephone .pastille-entete.pastille-affaire { font-size: 0.8rem; paddi
 .bande-page .zone-bande-page .groupe-ruban.groupe-accroches .outil-ruban span { display: none; }
 .outils-entete .phases-entete select[data-phase-select] { max-width: 170px; }
 .liste-phases-chantier.compact .case { display: inline-flex; flex-direction: row; align-items: center; gap: 3px; font-size: 0.78rem; }
+/* 0.356.0 : groupes d'éléments */
+.bandeau-dans-groupe { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, #ea580c 14%, var(--surface)); color: #c2410c; font-weight: 700; font-size: 0.8rem; }
+.bandeau-dans-groupe button { margin-left: auto; }
+.liste-groupes, .liste-groupes ul { list-style: none; margin: 0; padding: 0; }
+.liste-groupes > li { border-bottom: 1px solid var(--bordure); padding: 2px 0; }
+.liste-groupes summary { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.82rem; }
+.liste-groupes summary small { margin-left: auto; color: #94a3b8; font-size: 0.7rem; white-space: nowrap; }
+.liste-groupes button { border: 0; background: transparent; color: var(--encre); text-align: left; padding: 2px 4px; border-radius: 4px; cursor: pointer; font: inherit; }
+.liste-groupes button.actif { background: color-mix(in srgb, #ea580c 16%, var(--surface)); color: #c2410c; font-weight: 700; }
+.liste-groupes ul { padding-left: 16px; font-size: 0.78rem; }
+.elements-chantier .marque-groupe { color: #ea580c; margin-right: 3px; font-size: 0.8em; }

@@ -1,6 +1,13 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.355.0 — Plans de chantier : lot 2 des demandes du 28.11 (volume des tas, grues, Éléments, présentation)
+Lire seulement la section utile : `grep -n '^## 0.356.0 — Plans de chantier : groupes d'éléments (Expert, maquette validée le 28.11)
+- **Données** (`topo/groupes-chantier.js`) : `plan.groupes` [{ id, nom, phase, fin }], `objet.groupe`. Un objet = un seul groupe (pas de groupe dans un groupe) ; **tout le groupe a la même phase de début / fin** (celles du groupe, remises à chaque enregistrement par `harmoniserGroupes` ; groupe de moins de 2 éléments retiré).
+- **Grouper** : choisir plusieurs éléments (Ctrl + clic) puis Ctrl+G ou « ⊞ Grouper » ; phase = celle du premier. **Dégrouper** : Ctrl+Maj+G ou bouton du panneau.
+- **Clic** sur un élément groupé = tout le groupe (cadre orange en tirets, nom sous le cadre ; glisser / Suppr / Ctrl+C sur tout). **Double-clic** = entrer dans le groupe (un élément seul, le reste du plan estompé à 25 %, bandeau « Dans le groupe … » + Sortir) ; Échap ou clic dehors = sortir.
+- **Panneau du groupe** : nom, phase de début / fin pour tout le groupe, Entrer, Dégrouper. **Volet Groupes** (bouton « Groupes » à côté de Symboles et Grue) : liste, nombre d'éléments, phases, éléments de chaque groupe. Liste Éléments : ⊞ devant un élément groupé.
+- **Copies** (Ctrl+V, dupliquer une phase) : nouveau groupe « … (copie) », jamais l'original (`regrouperCopies`).
+
+## 0.355.0 — Plans de chantier : lot 2 des demandes du 28.11 (volume des tas, grues, Éléments, présentation)
 - **Volume d'un tas** (Expert, `volumeDuTas` dans `topo/plan-chantier.js`) : talus 1/1 par défaut (`TAS_TALUS` = 1, champ « Talus » modifiable), V = h / 6 × (A bas + 4 A milieu + A haut) (prismatoïde : exact pour une base décalée vers l'intérieur ; l'utilisateur avait validé le « tronc de pyramide », qui donne 1 % de moins sur un rectangle 20 × 10 m h 3 m : 361.8 au lieu de 366 m³ — **à confirmer**). Tas pointu (zone trop étroite) : tranches jusqu'à la hauteur atteinte. Case « Écrire le volume » et ligne de résultat dans le panneau.
 - **Texte (mm)** remonté dans Affichage (bandeau du haut).
 - **Panneau de droite replié** : le mot « Éléments » à côté de la flèche ; avec Symboles ouvert, le plan garde sa place (le volet Symboles prenait toute la page).

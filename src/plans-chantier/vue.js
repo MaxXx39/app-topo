@@ -28,7 +28,7 @@ const ORANGE = '#ea580c';
  */
 export function creerVueChantier(conteneur, options) {
   const {
-    plans, points, planChantier, choisi, multi = () => [], saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    plans, points, planChantier, choisi, multi = () => [], groupe = () => null, saisie, selection = () => [], accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
     bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
   } = options;
   conteneur.classList.add('toile-chantier');
@@ -156,9 +156,37 @@ export function creerVueChantier(conteneur, options) {
     ctx.lineCap = 'round';
     const pc = planChantier();
     if (pc) {
-      const visibles = objetsVisibles(pc);
+      // 0.356.0 : groupes. groupe() = { id, dedans } : dedans (double-clic dans le groupe), tout le reste est estompé.
+      const g = groupe();
+      const visibles = objetsVisibles(pc).map((o) => (g?.dedans && o.groupe !== g.id && !o.rendu ? { ...o, rendu: { mode: 'estompe', opacite: 0.25 } } : o));
       const d = contexteDessin(ctx, pc);
       dessinerObjets(d, visibles);
+      if (g) {
+        // cadre orange en tirets autour du groupe, avec son nom
+        const b = bornesObjets(visibles.filter((o) => o.groupe === g.id));
+        if (b) {
+          const a1 = ecran([b.estMin, b.nordMax]);
+          const a2 = ecran([b.estMax, b.nordMin]);
+          const m = 14;
+          ctx.save();
+          ctx.strokeStyle = ORANGE;
+          ctx.lineWidth = g.dedans ? 2.5 : 1.5;
+          ctx.setLineDash([8, 5]);
+          ctx.strokeRect(a1.x - m, a1.y - m, a2.x - a1.x + 2 * m, a2.y - a1.y + 2 * m);
+          ctx.setLineDash([]);
+          if (g.nom) {
+            ctx.font = 'bold 11px system-ui, sans-serif';
+            const t = g.dedans ? `${g.nom} (dans le groupe)` : g.nom;
+            const w = ctx.measureText(t).width + 10;
+            ctx.fillStyle = ORANGE;
+            const yb = a2.y + m + 1; // sous le cadre (au-dessus, il passerait sous les boutons Fond / Plan / Points)
+            ctx.fillRect(a1.x - m, yb, w, 16);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(t, a1.x - m + 5, yb + 12);
+          }
+          ctx.restore();
+        }
+      }
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
       for (const id of multi()) { // plusieurs éléments choisis (Ctrl + clic)

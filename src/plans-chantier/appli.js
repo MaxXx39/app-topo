@@ -10,6 +10,7 @@
 // Calculs : topo/plan-chantier.js, topo/symboles.js, topo/feuille-chantier.js, topo/plan-chantier-dxf.js ; vue : vue.js ;
 // dessin : dessin.js ; feuille : feuille.js. Rangé dans le projet : projet.plansChantier, projet.symboles (Drive).
 import { libellePhase, nomSansNumero } from '../topo/phases-chantier.js';
+import { groupesDe, groupeDe, membresDe, grouper, degrouper, reglerPhaseGroupe, harmoniserGroupes, regrouperCopies } from '../topo/groupes-chantier.js';
 import { cartoucheActif, dansAffaire, pastillesAffaireCliquables, aPlusieursAffaires, affaireChoisie } from '../topo/affaires.js';
 import { aAcces } from '../reglages/reglages.js';
 import { habillerPage } from '../navigation/cadre-page.js';
@@ -171,7 +172,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    popupFeuille: null, triElements: 'ordre', panneauReplie: false, menuPhases: false, presse: null, collage: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    popupFeuille: null, triElements: 'ordre', dansGroupe: null, voletGroupes: false, panneauReplie: false, menuPhases: false, presse: null, collage: false, menuPastille: null, planDeplie: null, mesureMode: 'longueur', constructionMode: 'segment', constructionTrait: 'tirets', constructionCouleur: '', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     coupe: { ouvert: false, ligne: null, cachees: new Set() }, // 0.311.0 : vue de côté (coupe) ; 0.312.0 : surfaces cachées, ligne de coupe tracée
     coupeProchaine: false, // le prochain segment de construction dessiné est une ligne de coupe
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
@@ -276,6 +277,8 @@ export function ouvrirPlansChantier({
   }
   function enregistrer() {
     plan().modifieLe = new Date().toISOString();
+    harmoniserGroupes(plan()); // 0.356.0 : groupes vides retirés, même phase pour tout le groupe
+    if (etat.dansGroupe && !groupeDe(plan(), etat.dansGroupe)) etat.dansGroupe = null;
     synchroniserPresentation(plan()); // 0.330.0 : la présentation choisie reprend les réglages de la feuille (toute seule)
     modifie();
   }
@@ -293,10 +296,66 @@ export function ouvrirPlansChantier({
     majTout();
   }
 
+  // ---------------------------------------------------------------- Groupes (0.356.0, Expert)
+  /** Groupe dont les objets choisis sont exactement les membres (ou null). */
+  function groupeChoisi() {
+    const p = plan();
+    if (!p || etat.multi.size < 2) return null;
+    const premier = p.objets.find((x) => etat.multi.has(x.id));
+    const m = membresDe(p, premier?.groupe);
+    return m.length === etat.multi.size && m.every((x) => etat.multi.has(x.id)) ? groupeDe(p, premier.groupe) : null;
+  }
+  /** Choisit tout un groupe (ses objets passent dans la sélection multiple : déplacer, copier, effacer d'un coup). */
+  function choisirGroupe(id) {
+    etat.multi.clear();
+    for (const x of membresDe(plan(), id)) etat.multi.add(x.id);
+    etat.choisi = null;
+    etat.orienter = null;
+  }
+  /** Ce que la vue dessine : cadre du groupe choisi, ou « dans le groupe » (le reste estompé). */
+  function vueGroupe() {
+    const g = groupeDe(plan(), etat.dansGroupe) ?? groupeChoisi();
+    return g ? { id: g.id, nom: g.nom, dedans: g.id === etat.dansGroupe } : null;
+  }
+  function faireGrouper() {
+    if (!aAcces('expert')) return;
+    if (etat.multi.size < 2) return message('Choisissez au moins 2 éléments (Ctrl + clic), puis Grouper.', 3500);
+    if (!avantChangement()) return;
+    const g = grouper(plan(), [...etat.multi]);
+    if (!g) return message('Il faut au moins 2 éléments (les lignes de construction ne se groupent pas).', 3500);
+    etat.dansGroupe = null;
+    choisirGroupe(g.id);
+    enregistrer();
+    majTout();
+    message(`« ${g.nom} » créé : même phase pour tous ; double-clic = entrer dans le groupe.`, 4000, { ok: true });
+  }
+  function faireDegrouper(id) {
+    if (!id || !avantChangement()) return;
+    const nom = groupeDe(plan(), id)?.nom;
+    degrouper(plan(), id);
+    if (etat.dansGroupe === id) etat.dansGroupe = null;
+    enregistrer();
+    majTout();
+    message(`« ${nom} » défait : les éléments restent choisis.`, 3000);
+  }
+  /** Entre dans un groupe (double-clic) : on choisit un objet seul, le reste du plan est estompé. */
+  function entrerDansGroupe(id, objetId = null) {
+    etat.dansGroupe = id;
+    etat.multi.clear();
+    etat.choisi = objetId;
+    majTout();
+  }
+
   function echap() {
     if (etat.collage) { // 0.338.0 : Ctrl+V en attente : Échap annule le collage
       etat.collage = false;
       return message('Collage annulé.', 2000);
+    }
+    if (etat.dansGroupe) { // 0.356.0 : on sort du groupe, il reste choisi
+      const id = etat.dansGroupe;
+      etat.dansGroupe = null;
+      choisirGroupe(id);
+      return majTout();
     }
     if (etat.multi.size) { // plusieurs éléments choisis : Échap ne les garde plus
       etat.multi.clear();
@@ -344,6 +403,11 @@ export function ouvrirPlansChantier({
     }
     if (etat.ecran !== 'dessin') return;
     if ((ev.ctrlKey || ev.metaKey) && !ev.target.matches('input, select, textarea')) { // 0.338.0 : copier / coller
+      if (ev.key.toLowerCase() === 'g' && aAcces('expert')) { // 0.356.0 : Ctrl+G = grouper, Ctrl+Maj+G = dégrouper
+        ev.preventDefault();
+        if (ev.shiftKey) return faireDegrouper(groupeChoisi()?.id ?? etat.dansGroupe);
+        return faireGrouper();
+      }
       if (ev.key.toLowerCase() === 'c' && etat.multi.size >= 2) {
         etat.presse = plan().objets.filter((x) => etat.multi.has(x.id) && x.type !== 'cotation').map((x) => JSON.parse(JSON.stringify(x)));
         message(`${etat.presse.length} éléments copiés : Ctrl+V puis cliquez où coller (Échap = annuler).`, 3000, { ok: true });
@@ -499,7 +563,7 @@ export function ouvrirPlansChantier({
     // Mots courts sous les icônes (le nom complet est dans l'infobulle) : un juste milieu entre icônes seules et textes longs.
     const COURTS = {
       'Sélectionner': 'Choisir', 'Effacer': 'Effacer', 'Annuler (Ctrl+Z)': 'Annuler', 'Zone': 'Zone', 'Ligne': 'Ligne', 'Flèche': 'Flèche', 'Texte': 'Texte',
-      'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Mesure': 'Mesure', 'Bibliothèque de symboles': 'Symboles', 'Grue : réglage des modèles de grues': 'Grue',
+      'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Mesure': 'Mesure', 'Bibliothèque de symboles': 'Symboles', 'Grue : réglage des modèles de grues': 'Grue', 'Groupes d\'éléments (liste, Ctrl+G = grouper)': 'Groupes',
       'Accroche : point levé': 'Point', 'Accroche : sommet': 'Sommet', 'Accroche : milieu': 'Milieu', 'Accroche : sur la ligne': 'Ligne', 'Accroche : croisement': 'Croisem.', 'Accroche : perpendiculaire': 'Perpend.',
       'Plans du projet dessous (par phase)': 'Plans', 'Calques des plans affichés (masquer, couleur)': 'Calques', 'Points levés': 'Points', 'Fond : carte nationale': 'Carte', 'Fond : photo aérienne': 'Ortho', 'Fond : cadastre': 'Cadastre', 'Fond : surfaces du projet': 'Surfaces',
       'Repère à 0° : Nord / Sud / Est / Ouest': 'N S E O', 'Montrer / cacher les lignes de construction (jamais imprimées)': 'Constr.', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne': 'Coupe', 'Tracer une ligne de coupe (2 points, avec les accroches)': 'Tracer', 'Zoom avant': '+', 'Zoom arrière': '−', 'Tout voir': 'Tout',
@@ -529,7 +593,7 @@ export function ouvrirPlansChantier({
       <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
         ${groupe('Tracer', OUTILS.filter(([c]) => ['zone', 'rectangle', 'rond', 'ligne', 'fleche', 'decaler'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-trace')}
         ${groupe('Annoter', OUTILS.filter(([c]) => ['texte', 'cotation', 'mesure'].includes(c)).map(([c, i, t]) => outil(c, i, t)).join(''), 'type-annoter')}
-        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles') + bt('data-action="modeles-grues"', '<path d="M5 21V5M5 5H20M5 5L3 9M9 5V9M16 5V11"/><rect x="14.5" y="11" width="3" height="2"/><circle cx="17.5" cy="17.5" r="2.2"/><path d="M17.5 13.8V15M17.5 20V21.2M13.8 17.5H15M20 17.5H21.2"/>', 'Grue : réglage des modèles de grues'), 'type-symboles')}
+        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles') + bt('data-action="modeles-grues"', '<path d="M5 21V5M5 5H20M5 5L3 9M9 5V9M16 5V11"/><rect x="14.5" y="11" width="3" height="2"/><circle cx="17.5" cy="17.5" r="2.2"/><path d="M17.5 13.8V15M17.5 20V21.2M13.8 17.5H15M20 17.5H21.2"/>', 'Grue : réglage des modèles de grues') + (aAcces('expert') ? bt(`data-action="volet-groupes" aria-pressed="${etat.voletGroupes}"`, '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M2 2H22V22H2Z" stroke-dasharray="3 2"/>', 'Groupes d\'éléments (liste, Ctrl+G = grouper)') : ''), 'type-symboles')}
         ${groupe('Construction', `${outil('construction', OUTILS.find(([c]) => c === 'construction')[1], 'Construction')}${bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)')}`, 'type-construction')}
         ${groupe('Coupe', `${bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) : grues, bâtiments, terrains et plateformes le long d\'une ligne')}
           ${bt('data-action="coupe-tracer"', '<path d="M3 18L21 6" stroke-dasharray="4 2 1 2"/><path d="M3 13V21M21 1V9"/>', 'Tracer une ligne de coupe (2 points, avec les accroches)')}`, 'type-construction')}
@@ -587,6 +651,7 @@ export function ouvrirPlansChantier({
       planChantier: plan,
       choisi: () => etat.choisi,
       multi: () => [...etat.multi],
+      groupe: vueGroupe,
       saisie: saisieVue,
       selection: () => etat.selCalques?.elements.map((e) => e.forme) ?? [],
       bibliotheque: bib,
@@ -599,6 +664,10 @@ export function ouvrirPlansChantier({
       clic: toucher,
       double: (p) => {
         if (etat.outil === 'choisir' && etat.choisi && p && supprimerSommet(p, 10 / (vue?.vue?.().echelle ?? 1))) return; // double-clic sur un carré = supprimer ce point
+        if (etat.outil === 'choisir' && !etat.saisie && p && !etat.dansGroupe) { // 0.356.0 : double-clic sur un groupe = entrer dedans
+          const sous = objetSous(p, 10 / (vue?.vue?.().echelle ?? 1));
+          if (sous?.groupe) return entrerDansGroupe(sous.groupe, sous.id);
+        }
         if (etat.saisie?.outil === 'decaler') return;
         if (etat.saisie && etat.saisie.outil !== 'zone') finirSaisie();
         else if (etat.saisie?.outil === 'zone' && etat.saisie.points.length >= 3) finirSaisie();
@@ -1022,6 +1091,7 @@ export function ouvrirPlansChantier({
       copie.phase = plan().phaseActive;
       return ajouterObjet(plan(), copie);
     });
+    regrouperCopies(plan(), crees); // 0.356.0 : une copie de groupe devient un nouveau groupe
     etat.collage = false;
     etat.multi.clear();
     if (crees.length > 1) crees.forEach((x) => etat.multi.add(x.id));
@@ -1063,14 +1133,24 @@ export function ouvrirPlansChantier({
     if (etat.outil === 'decaler') return toucherDecalage(p, tolerance);
     if (etat.outil === 'choisir') {
       const sous = objetSous(p, tolerance);
+      // 0.356.0 : dans un groupe, un clic en dehors en fait sortir
+      if (etat.dansGroupe && sous?.groupe !== etat.dansGroupe) etat.dansGroupe = null;
+      const toutLeGroupe = sous?.groupe && !etat.dansGroupe ? membresDe(plan(), sous.groupe) : null;
       // 0.343.0 : Ctrl (ou ⌘) + clic = ajouter / retirer l'élément de la sélection (plusieurs éléments à la fois).
       if ((ev?.ctrlKey || ev?.metaKey) && sous) {
         if (!etat.multi.size && etat.choisi) etat.multi.add(etat.choisi);
-        if (etat.multi.has(sous.id)) etat.multi.delete(sous.id); else etat.multi.add(sous.id);
+        if (toutLeGroupe) { // un objet groupé : tout son groupe entre ou sort de la sélection
+          const dedans = etat.multi.has(sous.id);
+          for (const x of toutLeGroupe) if (dedans) etat.multi.delete(x.id); else etat.multi.add(x.id);
+        } else if (etat.multi.has(sous.id)) etat.multi.delete(sous.id); else etat.multi.add(sous.id);
         etat.orienter = null;
         if (etat.multi.size <= 1) { etat.choisi = [...etat.multi][0] ?? null; etat.multi.clear(); } else etat.choisi = null;
         majTout();
         return;
+      }
+      if (toutLeGroupe) { // 0.356.0 : un clic sur un objet groupé prend tout le groupe
+        choisirGroupe(sous.groupe);
+        return majTout();
       }
       etat.multi.clear();
       etat.choisi = sous?.id ?? null;
@@ -2639,9 +2719,21 @@ export function ouvrirPlansChantier({
     let choisi = '';
     let propreHtml = '';
     // 0.343.0 : plusieurs éléments choisis (Ctrl + clic) : on règle phase, couleur et type de tous en une fois.
-    if (etat.multi.size >= 2) {
+    const gChoisi = groupeChoisi();
+    const optionsPhases = (valeur, depuis = 0) => p.phases.map((ph, i) => (i < depuis ? '' : `<option value="${ph.id}" ${ph.id === valeur ? 'selected' : ''}>${echapper(libellePhase(p, ph))}</option>`)).join('');
+    if (gChoisi) {
+      // 0.356.0 : groupe choisi : nom, phase de début / fin communes, dégrouper
+      const rangDebut = p.phases.findIndex((ph) => ph.id === gChoisi.phase);
+      choisi = `<h3>Groupe : ${echapper(gChoisi.nom)}</h3>
+        <p class="aide-calage">${etat.multi.size} éléments. Double-clic = entrer dans le groupe (un élément seul) ; glisser = tout déplacer ; Suppr = tout effacer.</p>
+        <label class="champ-calage"><span>Nom du groupe</span><input type="text" maxlength="60" value="${echapper(gChoisi.nom)}" data-groupe-champ="nom"></label>
+        <label class="champ-calage"><span>Phase de début (tout le groupe)</span><select data-groupe-champ="phase">${optionsPhases(gChoisi.phase)}</select></label>
+        <label class="champ-calage"><span>Phase de fin (tout le groupe)</span><select data-groupe-champ="fin"><option value="">— (pas de fin)</option>${optionsPhases(gChoisi.fin, Math.max(0, rangDebut))}</select></label>
+        <div class="actions-chantier"><button type="button" class="bouton-secondaire" data-action="entrer-groupe">Entrer dans le groupe</button><button type="button" class="bouton-secondaire" data-action="degrouper" title="Ctrl+Maj+G">⊟ Dégrouper</button></div>`;
+    } else if (etat.multi.size >= 2) {
       const lot = p.objets.filter((x) => etat.multi.has(x.id));
       choisi = `<h3>${lot.length} éléments choisis</h3>
+        ${aAcces('expert') ? '<button type="button" class="bouton-secondaire" data-action="grouper" title="Ctrl+G : même phase de début et de fin pour tous">⊞ Grouper (Ctrl+G)</button>' : ''}
         <p class="aide-calage">Glisser l'un d'eux = les déplacer tous ; Suppr = tous les effacer ; Ctrl+C / Ctrl+V = les copier ; Ctrl + clic = en ajouter ou en retirer ; Échap = ne plus les choisir.</p>
         <label class="champ-calage"><span>Phase de tous</span><select data-multi="phase"><option value="">— (ne pas changer)</option>${p.phases.map((ph) => `<option value="${ph.id}">${echapper(libellePhase(p, ph))}</option>`).join('')}</select></label>
         <label class="champ-calage"><span>Couleur de tous</span><span class="ligne-couleur-outil"><input type="color" value="#64748b" data-multi="couleur"><button type="button" class="bouton-secondaire petit" data-action="multi-couleur-origine" title="Couleur d'origine de chacun">↺</button></span></label>
@@ -2701,14 +2793,17 @@ export function ouvrirPlansChantier({
       propreHtml = propre ?? ''; // 0.293.0 : tout ce qui concerne l'élément choisi est dans le bandeau du haut
     }
     majPhasesEntete();
+    if (etat.voletGroupes) majVoletGroupes();
+    const dans = groupeDe(p, etat.dansGroupe);
     zone.innerHTML = `
+      ${dans ? `<p class="bandeau-dans-groupe">Dans le groupe « ${echapper(dans.nom)} » <button type="button" class="bouton-secondaire petit" data-action="sortir-groupe" title="Échap">Sortir</button></p>` : ''}
       <h3>Plan</h3>
       ${choisi}
       ${ficheGrueHtml(o)}
       <details class="repli-elements" open><summary>Éléments (${p.objets.length})</summary>
       <label class="tri-elements">Trier <select data-tri-elements>${[['ordre', 'Dernier dessiné en haut'], ['type', 'Par type'], ['phase', 'Par phase']].map(([v, t]) => `<option value="${v}" ${etat.triElements === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <ul class="elements-chantier">${elementsTries(p).map((x) => `<li class="ligne-element"><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
-        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}${phasesCourtes(p, x)}</button><button type="button" class="cadenas-liste ${x.verrou ? 'actif' : ''}" data-verrou-id="${x.id}" title="${x.verrou ? 'Verrouillé : toucher pour déverrouiller' : 'Toucher pour verrouiller'}" aria-label="Verrou">${icoCadenas(x.verrou)}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul></details>`;
+        <i style="background:${couleurObjet(p, x)}"></i>${x.groupe ? `<span class="marque-groupe" title="Groupe : ${echapper(groupeDe(p, x.groupe)?.nom ?? '')}">⊞</span>` : ''}${echapper(resumeObjet(x))}${phasesCourtes(p, x)}</button><button type="button" class="cadenas-liste ${x.verrou ? 'actif' : ''}" data-verrou-id="${x.id}" title="${x.verrou ? 'Verrouillé : toucher pour déverrouiller' : 'Toucher pour verrouiller'}" aria-label="Verrou">${icoCadenas(x.verrou)}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul></details>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
     majBandeau(o, p, propreHtml, reglages);
@@ -2874,9 +2969,31 @@ export function ouvrirPlansChantier({
 
   // ---------------------------------------------------------------- Bibliothèque (panneau de gauche)
 
+  /** Volet de gauche « Groupes » (0.356.0) : liste des groupes ; toucher = le choisir, ▸ = voir ses éléments. */
+  function majVoletGroupes() {
+    const zone = page.querySelector('[data-zone="biblio"]');
+    const p = plan();
+    if (!zone || !p) return;
+    zone.hidden = false;
+    page.querySelector('.travail-chantier')?.classList.add('avec-biblio');
+    const g0 = groupeChoisi()?.id ?? etat.dansGroupe;
+    const liste = groupesDe(p);
+    zone.innerHTML = `<h3>Groupes (${liste.length})</h3>
+      ${liste.length ? `<ul class="liste-groupes">${liste.map((g) => {
+        const m = membresDe(p, g.id);
+        const rd = p.phases.findIndex((ph) => ph.id === g.phase) + 1;
+        const rf = g.fin ? p.phases.findIndex((ph) => ph.id === g.fin) + 1 : 0;
+        return `<li><details ${g.id === g0 ? 'open' : ''}><summary><button type="button" class="${g.id === g0 ? 'actif' : ''}" data-groupe-choisir="${g.id}">${echapper(g.nom)}</button><small>${m.length} él. · ${rf > rd ? `${rd} → ${rf}` : rd}</small></summary>
+          <ul>${m.map((x) => `<li><button type="button" class="${x.id === etat.choisi ? 'actif' : ''}" data-groupe-membre="${x.id}">${echapper(resumeObjet(x))}</button></li>`).join('')}</ul></details></li>`;
+      }).join('')}</ul>` : '<p class="aide-calage">Aucun groupe.</p>'}
+      <p class="aide-calage">Grouper : choisir plusieurs éléments (Ctrl + clic), puis Ctrl+G.</p>`;
+  }
+
   function majBiblio() {
     const zone = page.querySelector('[data-zone="biblio"]');
     if (!zone) return;
+    if (etat.voletGroupes) return majVoletGroupes();
+    if (zone.querySelector('.liste-groupes') || zone.textContent.startsWith('Groupes')) zone.innerHTML = ''; // on revient aux symboles
     zone.hidden = !etat.biblio.ouvert;
     page.querySelector('.travail-chantier')?.classList.toggle('avec-biblio', etat.biblio.ouvert);
     if (!etat.biblio.ouvert) return;
@@ -3086,8 +3203,29 @@ export function ouvrirPlansChantier({
       });
     }
     if (!p || etat.ecran !== 'dessin') return;
+    if (b.dataset.action === 'volet-groupes') {
+      etat.voletGroupes = !etat.voletGroupes;
+      if (etat.voletGroupes) etat.biblio.ouvert = false;
+      else page.querySelector('[data-zone="biblio"]').innerHTML = '';
+      majBiblio();
+      return majOutils();
+    }
+    if (b.dataset.groupeChoisir) {
+      etat.dansGroupe = null;
+      choisirGroupe(b.dataset.groupeChoisir);
+      return majTout();
+    }
+    if (b.dataset.groupeMembre) {
+      const x = plan().objets.find((y) => y.id === b.dataset.groupeMembre);
+      return x?.groupe ? entrerDansGroupe(x.groupe, x.id) : undefined;
+    }
+    if (b.dataset.action === 'grouper') return faireGrouper();
+    if (b.dataset.action === 'degrouper') return faireDegrouper(groupeChoisi()?.id);
+    if (b.dataset.action === 'entrer-groupe') { const g = groupeChoisi(); return g ? entrerDansGroupe(g.id) : undefined; }
+    if (b.dataset.action === 'sortir-groupe') return echap();
     if (b.dataset.action === 'biblio') {
       etat.biblio.ouvert = !etat.biblio.ouvert;
+      if (etat.biblio.ouvert && etat.voletGroupes) { etat.voletGroupes = false; page.querySelector('[data-zone="biblio"]').innerHTML = ''; }
       majBiblio();
       majOutils();
       return;
@@ -3176,6 +3314,10 @@ export function ouvrirPlansChantier({
     if (b.dataset.choisir) {
       etat.outil = 'choisir';
       etat.saisie = null;
+      etat.multi.clear();
+      const x = p.objets.find((y) => y.id === b.dataset.choisir);
+      if (x?.groupe) return entrerDansGroupe(x.groupe, x.id); // 0.356.0 : un élément groupé choisi dans la liste = dans son groupe
+      etat.dansGroupe = null;
       etat.choisi = b.dataset.choisir;
       return majTout();
     }
@@ -3389,11 +3531,19 @@ export function ouvrirPlansChantier({
     const p = plan();
     if (!p) return;
     if (etat.ecran === 'feuille' && !['rendu3d', 'tailleTexteMm'].includes(c.dataset.champ)) return changeFeuille(c, p);
+    if (c.dataset.groupeChamp) {
+      const g = groupeChoisi();
+      if (!g || !avantChangement()) return majPanneau();
+      if (c.dataset.groupeChamp === 'nom') g.nom = c.value.trim().slice(0, 60) || g.nom;
+      else reglerPhaseGroupe(p, g.id, { [c.dataset.groupeChamp]: c.value });
+      enregistrer();
+      return majTout();
+    }
     if (c.dataset.multi) {
       if (c.value === '' || !avantChangement()) return;
       for (const x of p.objets) {
         if (!etat.multi.has(x.id)) continue;
-        if (c.dataset.multi === 'phase') x.phase = c.value;
+        if (c.dataset.multi === 'phase') { if (x.groupe) reglerPhaseGroupe(p, x.groupe, { phase: c.value }); else x.phase = c.value; }
         else if (c.dataset.multi === 'couleur' && x.type !== 'symbole' && !estPose(x)) x.couleur = c.value;
         else if (c.dataset.multi === 'categorie' && x.type === 'zone') x.categorie = c.value;
         else if (c.dataset.multi === 'style' && x.type === 'ligne') x.style = c.value;
@@ -3688,6 +3838,7 @@ export function ouvrirPlansChantier({
       }
       if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
       if (cle === 'fin' && !valeur) delete o.fin;
+      if (o.groupe && (cle === 'phase' || cle === 'fin')) reglerPhaseGroupe(p, o.groupe, { [cle]: valeur ?? '' }); // 0.356.0 : tout le groupe suit
       // 0.353.0 : la fin ne peut pas être avant le début ; si on avance le début au-delà de la fin, la fin est enlevée
       if (cle === 'phase' && o.fin && p.phases.findIndex((ph) => ph.id === o.fin) < p.phases.findIndex((ph) => ph.id === o.phase)) {
         delete o.fin;
