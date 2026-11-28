@@ -260,7 +260,7 @@ export function retoucherBibliotheque(symboles) {
     ['Camion pompe à béton (plié)', 'Véhicules', pompeABeton(false), false], ['Camion pompe à béton (déplié)', 'Véhicules', pompeABeton(true), false],
     // Engins
     ['Finisseur Super 800', 'Engins', finisseur800()], ['Raboteuse W100', 'Engins', nv.raboteuse100()], ['Raboteuse W50', 'Engins', nv.raboteuse50()],
-    ['Benne à béton (grue)', 'Grues', nv.bennePourGrue()], ['Ouvrier (vue de dessus)', 'Sécurité', nv.ouvrier()], ['Ouvrier à la raquette (vue de dessus)', 'Sécurité', nv.ouvrierRaquette()],
+    ['Benne à béton (grue)', 'Engins', nv.bennePourGrue()], ['Ouvrier (vue de dessus)', 'Sécurité', nv.ouvrier()], ['Ouvrier à la raquette (vue de dessus)', 'Sécurité', nv.ouvrierRaquette()],
     ['Ouvrier (silhouette)', 'Sécurité', nv.ouvrierSilhouette()], ['Signaleur à la raquette (silhouette)', 'Sécurité', nv.signaleurRaquette()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
     ['Élévateur à ciseaux', 'Engins', elevateurCiseaux()], ['Compresseur', 'Engins', compresseur()], ['Bétonnière', 'Engins', betonniere()],
     // Installations

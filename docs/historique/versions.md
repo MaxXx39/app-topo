@@ -1,6 +1,14 @@
 # Historique détaillé des versions (sorti de CLAUDE.md le 26.11)
 
-Lire seulement la section utile : `grep -n '^## 0.360.0 — Demandes du 28.11 : pastilles de couleur, Modifier (Prolonger / Ajuster), aligner, grue
+Lire seulement la section utile : `grep -n '^## 0.361.0 — Demandes du 28.11 (suite) : choix par surbrillance, benne, fenêtres compactes, cartouche sur mesure
+- **Choisir la ligne à décaler / prolonger / ajuster** : curseur flèche (plus de croix) et élément visé en contour bleu (Décaler : segment orange) avant le clic.
+- **Benne à béton (grue)** rangée dans « Engins » (plus dans « Grues »).
+- **Fenêtres plus petites** (style AutoCAD / Mensura) dans les applis de PC : fenêtres Cartouche & co, menu des phases, fenêtres de choix, boutons OK / Annuler.
+- **Cartouche sur mesure** : `feuille.cartouchePerso` { ordre, champs: { clé: { visible, taille } } } (`cartouchePersoDe`, `textesCartouchePerso` dans `topo/feuille-chantier.js`) ; sans réglage = cartouche standard inchangé ; dans le sur mesure, une information par ligne, tailles réduites ensemble si ça ne tient pas. Test : `tests/feuille-chantier.test.js`.
+- Bug trouvé à l'essai et corrigé avant envoi : `r` non défini dans `feuille.js` (utiliser `prep.r`).
+- À essayer : le doigt sur tablette ; PDF exporté avec cartouche sur mesure.
+
+## 0.360.0 — Demandes du 28.11 : pastilles de couleur, Modifier (Prolonger / Ajuster), aligner, grue
 - **Pastilles de couleur** à la place des noms (bord des cadres de détail, couleur des constructions) : `plans-chantier/pastilles-couleur.js` (liste cachée + `change`).
 - **Croix ✕** pour fermer la bibliothèque de symboles.
 - **Groupe « Modifier »** du ruban Dessin : Décaler (sorti de Tracer), **Prolonger** et **Ajuster** (Intermédiaire, décidé le 28.11). On choisit l'outil, on clique la ou les lignes (ligne, flèche, piste, construction segment), Espace / Entrée, puis on clique jusqu'où : une ligne du plan (droite infinie) ou un point libre ; Ajuster enlève le bout du côté du clic (décidé le 28.11). Calculs : `topo/modifier-plan.js` + `tests/modifier-plan.test.js`.

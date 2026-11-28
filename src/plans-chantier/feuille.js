@@ -287,7 +287,7 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     const h = logo.height * r;
     ctx.drawImage(logo, mm(K.x + (K.l * 0.4 - w) / 2), mm(K.y + (K.h - h) / 2), mm(w), mm(h));
   }
-  for (const t of textesCartouche(K, mise.k, prep.champs)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
+  for (const t of textesCartouche(K, mise.k, prep.champs, prep.r.cartouchePerso)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
   ctx.restore();
   return prep;
 }

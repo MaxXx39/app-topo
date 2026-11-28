@@ -55,7 +55,7 @@ import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, estRectangle, poigneeDecalageCote, decalageCoteDepuis, poigneesDe, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe, pointsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, volumeDuTas, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, segmentProcheAvecOrigine, segmentConstruction, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { accrocherBoite, positionDeBoite, rotationDeFeuille, rotationPourAligner, COINS_CARTOUCHE, plansDeLaFeuille, reglagesFeuille, nomChantierCartouche, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, STYLES_NORD, STYLES_BARRE, COLONNES_LEGENDE, miseEnPageFeuille, COINS_SITUATION, CHAMPS_CARTOUCHE, TAILLE_CARTOUCHE_MIN, TAILLE_CARTOUCHE_MAX, cartouchePersoDe } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -745,7 +745,7 @@ export function ouvrirPlansChantier({
       choisi: () => etat.choisi,
       multi: () => [...etat.multi],
       groupe: vueGroupe,
-      survol: () => (etat.survol ? etat.survol.liste[etat.survol.i] : null),
+      survol: () => etat.survolModif ?? (etat.survol ? etat.survol.liste[etat.survol.i] : null),
       surbrillance: () => (surbrillanceActive() ? etat.ligneSurvolee ?? null : null),
       saisie: saisieVue,
       selection: () => etat.selCalques?.elements.map((e) => e.forme) ?? [],
@@ -1038,14 +1038,24 @@ export function ouvrirPlansChantier({
   }
 
   /** 0.360.0 : pendant « Aligner » (bloc), la ligne qui sera prise est tracée en orange avant le clic. */
-  const surbrillanceActive = () => etat.orienter?.mode === 'ligne' || (OUTILS_MODIFIER.includes(etat.outil) && etat.modifEtape === 'cible');
+  // 0.361.0 : choix d'une ligne à modifier (Prolonger, Ajuster, Décaler) : curseur flèche + l'élément visé est mis en surbrillance avant le clic
+  const choixLigneEnCours = () => (OUTILS_MODIFIER.includes(etat.outil) && etat.modifEtape !== 'cible') || (etat.outil === 'decaler' && !etat.saisie?.source);
+  const surbrillanceActive = () => etat.orienter?.mode === 'ligne' || (OUTILS_MODIFIER.includes(etat.outil) && etat.modifEtape === 'cible') || (etat.outil === 'decaler' && !etat.saisie?.source);
   function majLigneSurvolee(p) {
+    if (OUTILS_MODIFIER.includes(etat.outil) && etat.modifEtape !== 'cible') { // l'objet visé (à cliquer) en contour bleu
+      const echelle = vue?.vue?.().echelle;
+      const sous = p && echelle ? objetSous(p, 10 / echelle) : null;
+      const vise = sous && modifiable(sous) ? sous : null;
+      if ((vise?.id ?? null) !== (etat.survolModif?.id ?? null)) { etat.survolModif = vise; vue?.redessinerDessus(); }
+      return;
+    }
+    if (etat.survolModif) { etat.survolModif = null; vue?.redessinerDessus(); }
     if (!surbrillanceActive()) {
       if (etat.ligneSurvolee) { etat.ligneSurvolee = null; vue?.redessinerDessus(); }
       return;
     }
     const echelle = vue?.vue?.().echelle;
-    const seg = p && echelle ? (etat.orienter?.mode === 'ligne' ? ligneVisee({ est: p[0], nord: p[1] }, 15 / echelle)?.seg : limiteSousLePoint(p, 15 / echelle)) ?? null : null;
+    const seg = p && echelle ? (etat.orienter?.mode === 'ligne' || etat.outil === 'decaler' ? ligneVisee({ est: p[0], nord: p[1] }, 15 / echelle)?.seg : limiteSousLePoint(p, 15 / echelle)) ?? null : null;
     const cle = seg ? seg.flat().map((v) => v.toFixed(3)).join(',') : '';
     if (cle === (etat.ligneSurvolee ? etat.ligneSurvolee.flat().map((v) => v.toFixed(3)).join(',') : '')) return;
     etat.ligneSurvolee = seg;
@@ -2094,6 +2104,7 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Dessiné par</span><input type="text" maxlength="40" value="${echapper(r.auteur)}" placeholder="${echapper(auteur())}" data-feuille="auteur"></label>
       <label class="champ-calage"><span>Logo</span><select data-feuille="logo">${options([['perrin', 'Perrin'], ['natalini', 'Natalini'], ['ronchi', 'Ronchi'], ['aucun', 'Sans logo'], ['image', r.logo?.startsWith?.('data:') ? 'Image choisie' : 'Autre image…']], r.logo?.startsWith?.('data:') ? 'image' : r.logo)}</select></label>
       ${r.logo?.startsWith?.('data:') ? '<button type="button" class="lien-calage" data-action="feuille-logo">Changer d\'image…</button>' : ''}
+      ${htmlCartouchePerso(r)}
       ${r.coupe ? '<p class="aide-calage">La coupe est celle montrée sous le plan (bouton « Coupe » de Dessiner).</p>' : ''}`;
     }
     if (cle === 'situation') {
@@ -2106,6 +2117,31 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Épaisseur du rectangle rouge (mm)</span><input type="number" min="0.2" max="3" step="0.1" value="${r.situation.epaisseur}" data-situation="epaisseur"></label>` : ''}`;
     }
     return htmlPanneauDetails(r, p);
+  }
+
+  /** 0.361.0 : informations du cartouche : ordre (▲ ▼), case pour les montrer, taille du texte (points). */
+  function htmlCartouchePerso(r) {
+    const perso = r.cartouchePerso ?? cartouchePersoDe({});
+    const noms = Object.fromEntries(CHAMPS_CARTOUCHE.map(([c, nom]) => [c, nom]));
+    const lignes = perso.ordre.map((c, i) => `<div class="ligne-cartouche">
+      <input type="checkbox" data-cartouche="visible" data-cle="${c}" ${perso.champs[c].visible ? 'checked' : ''} aria-label="Montrer : ${echapper(noms[c])}">
+      <span>${echapper(noms[c])}</span>
+      <input type="number" min="${TAILLE_CARTOUCHE_MIN}" max="${TAILLE_CARTOUCHE_MAX}" step="0.5" value="${perso.champs[c].taille}" data-cartouche="taille" data-cle="${c}" title="Taille du texte (points)" aria-label="Taille : ${echapper(noms[c])}">
+      <button type="button" class="bouton-secondaire petit" data-cartouche-ordre="-1" data-cle="${c}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">▲</button>
+      <button type="button" class="bouton-secondaire petit" data-cartouche-ordre="1" data-cle="${c}" ${i === perso.ordre.length - 1 ? 'disabled' : ''} aria-label="Descendre">▼</button></div>`).join('');
+    return `<div class="cartouche-perso"><b>Informations (ordre, taille en pt)</b>${lignes}
+      ${r.cartouchePerso ? '<button type="button" class="lien-calage" data-cartouche-standard>Remettre le cartouche standard</button>' : '<p class="aide-calage">Standard : toucher une case, une taille ou ▲ ▼ le personnalise.</p>'}</div>`;
+  }
+
+  /** Change le réglage sur mesure du cartouche (modif(perso) change une copie). */
+  function changerCartouchePerso(modif) {
+    if (!avantChangement()) return;
+    const perso = JSON.parse(JSON.stringify(reglagesFeuille(plan()).cartouchePerso ?? cartouchePersoDe({})));
+    modif(perso);
+    plan().feuille = { ...(plan().feuille ?? {}), cartouchePerso: modif === null ? undefined : perso };
+    enregistrer();
+    majFeuille();
+    majPanneauFeuille();
   }
 
   const TITRES_POPUP = { cartouche: 'Cartouche', situation: 'Vue de situation', nord: 'Flèche du nord', echelle: 'Échelle', legende: 'Légende', detail: 'Cadres de détail' };
@@ -2423,6 +2459,13 @@ export function ouvrirPlansChantier({
       majFeuille();
       return vue?.redessiner();
     }
+    if (c.dataset.cartouche) {
+      const cle = c.dataset.cle;
+      if (c.dataset.cartouche === 'visible') return changerCartouchePerso((pp) => { pp.champs[cle].visible = c.checked; });
+      const v = Number(String(c.value).replace(',', '.'));
+      if (!Number.isFinite(v) || v < TAILLE_CARTOUCHE_MIN || v > TAILLE_CARTOUCHE_MAX) { message(`Taille du texte : entre ${TAILLE_CARTOUCHE_MIN} et ${TAILLE_CARTOUCHE_MAX} points.`, 3500); return majPanneauFeuille(); }
+      return changerCartouchePerso((pp) => { pp.champs[cle].taille = v; });
+    }
     if (c.dataset.situation) {
       if (!avantChangement()) return majPanneauFeuille();
       const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? nombreDe(c) : c.value;
@@ -2717,7 +2760,7 @@ export function ouvrirPlansChantier({
     page.querySelector('[data-action="biblio"]')?.setAttribute('aria-pressed', String(etat.biblio.ouvert));
     page.querySelector('[data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     const toile = page.querySelector('[data-toile]');
-    if (toile) toile.dataset.outil = etat.outil;
+    if (toile) { toile.dataset.outil = etat.outil; toile.dataset.selection = choixLigneEnCours() ? 'oui' : ''; }
     majConsigne();
   }
 
@@ -3415,6 +3458,24 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'degrouper') return faireDegrouper(groupeChoisi()?.id);
     if (b.dataset.action === 'entrer-groupe') { const g = groupeChoisi(); return g ? entrerDansGroupe(g.id) : undefined; }
     if (b.dataset.action === 'sortir-groupe') return echap();
+    if (b.dataset.cartoucheOrdre) {
+      const cle = b.dataset.cle;
+      const pas = Number(b.dataset.cartoucheOrdre);
+      return changerCartouchePerso((pp) => {
+        const i = pp.ordre.indexOf(cle);
+        const j = i + pas;
+        if (j >= 0 && j < pp.ordre.length) [pp.ordre[i], pp.ordre[j]] = [pp.ordre[j], pp.ordre[i]];
+      });
+    }
+    if (b.dataset.cartoucheStandard !== undefined) {
+      if (!avantChangement()) return;
+      const f = { ...(plan().feuille ?? {}) };
+      delete f.cartouchePerso;
+      plan().feuille = f;
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
+    }
     if (b.dataset.action === 'fermer-biblio') {
       etat.biblio.ouvert = false;
       majBiblio();
@@ -3498,6 +3559,7 @@ export function ouvrirPlansChantier({
       if (etat.outil !== 'choisir') etat.dernierOutil = etat.outil; // touche Espace : relancer le dernier outil
       etat.multi.clear();
       etat.modifEtape = 'objets';
+      etat.survolModif = null;
       etat.saisie = null;
       etat.attenteRepere = null;
       if (etat.outil !== 'choisir') etat.choisi = null;

@@ -33,8 +33,35 @@ export function reglagesFeuille(plan) {
     ...reglagesElements(f),
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une', phase: f.phase ?? '',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
+    cartouchePerso: cartouchePersoDe(f.cartouchePerso), plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', chantier: f.chantier ?? '', cartouche: ['bd', 'bg', 'hd', 'hg'].includes(f.cartouche) ? f.cartouche : 'bd', positions: f.positions ?? {}, rotation: rotationDeFeuille(f.rotation), details: detailsDe(f), logo: f.logo ?? 'perrin',
   };
+}
+
+// 0.361.0 : cartouche sur mesure. Chaque information : [clé, nom, taille de départ (points), gras].
+export const CHAMPS_CARTOUCHE = [
+  ['affaire', 'Affaire - désignation', 8, true], ['projet', 'Projet', 6.5, false], ['titre', 'Titre du plan', 9.5, true], ['indice', 'Indice', 8, true],
+  ['phase', 'Phase', 7, false], ['echelle', 'Échelle', 6.5, false], ['format', 'Format', 6.5, false], ['date', 'Date', 6.5, false], ['auteur', 'Dessiné par', 6.5, false],
+];
+export const TAILLE_CARTOUCHE_MIN = 4;
+export const TAILLE_CARTOUCHE_MAX = 16;
+
+/**
+ * Réglage « sur mesure » du cartouche, complété : { ordre: [clés], champs: { clé: { visible, taille } } }.
+ * Une information oubliée est ajoutée à la fin ; une taille hors limites est ramenée entre 4 et 16 points.
+ * Sans réglage (null / undefined) : cartouche standard (renvoie null).
+ */
+export function cartouchePersoDe(f) {
+  if (!f || typeof f !== 'object') return null;
+  const cles = CHAMPS_CARTOUCHE.map(([c]) => c);
+  const ordre = [...(Array.isArray(f.ordre) ? f.ordre.filter((c, i, a) => cles.includes(c) && a.indexOf(c) === i) : []), ...cles];
+  const ordreFinal = ordre.filter((c, i) => ordre.indexOf(c) === i);
+  const champs = {};
+  for (const [c, , taille] of CHAMPS_CARTOUCHE) {
+    const v = f.champs?.[c] ?? {};
+    const t = Number(v.taille);
+    champs[c] = { visible: v.visible !== false, taille: Number.isFinite(t) && t > 0 ? Math.min(TAILLE_CARTOUCHE_MAX, Math.max(TAILLE_CARTOUCHE_MIN, t)) : taille };
+  }
+  return { ordre: ordreFinal, champs };
 }
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
@@ -315,7 +342,8 @@ export const optionsMiseEnPage = (r) => ({ coin: r.cartouche, positions: r.posit
  * date, indice, auteur. cartouche : cadre du cartouche ; k : taille (A3 = 1) ; champs : { affaire, projet, titre, phase,
  * echelle, format, date, indice, auteur }. La partie gauche (40 %) est pour le logo.
  */
-export function textesCartouche(cartouche, k, champs) {
+export function textesCartouche(cartouche, k, champs, perso = null) {
+  if (perso) return textesCartouchePerso(cartouche, k, champs, perso);
   const x0 = cartouche.x + cartouche.l * 0.4 + 3 * k;
   const y = (f) => cartouche.y + cartouche.h * f;
   const t = (texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: String(texte ?? ''), x, y: yy, taille: taille * k, gras, couleur });
@@ -357,5 +385,31 @@ export function plansDeLaFeuille(tous, deLEcran, reglages) {
     if (!m) copiesOpacite.set(p, (m = new Map()));
     if (!m.has(transparence)) m.set(transparence, Object.assign(Object.create(p), { transparence, sourcePlan: p.sourcePlan ?? p }) /* Object.create : un plan recalé hérite de son plan d'origine (un { ...p } perdait calques, couleur… et faisait une page blanche) */);
     return m.get(transparence);
+  });
+}
+
+/**
+ * Cartouche sur mesure (0.361.0) : les informations visibles, dans l'ordre choisi, l'une sous l'autre, chacune à sa taille.
+ * Si elles ne tiennent pas dans la hauteur, toutes les tailles sont réduites dans la même proportion.
+ */
+function textesCartouchePerso(cartouche, k, champs, perso) {
+  const x0 = cartouche.x + cartouche.l * 0.4 + 3 * k;
+  const contenu = {
+    affaire: champs.affaire, projet: champs.projet, titre: champs.titre, indice: `Indice ${champs.indice}`, phase: champs.phase,
+    echelle: `Échelle 1:${champs.echelle}`, format: `Format ${champs.format}`, date: `Date ${champs.date}`, auteur: champs.auteur ? `Dessiné par ${champs.auteur}` : '',
+  };
+  const gras = Object.fromEntries(CHAMPS_CARTOUCHE.map(([c, , , g]) => [c, g]));
+  const lignes = perso.ordre
+    .filter((c) => perso.champs[c].visible && String(contenu[c] ?? '').trim())
+    .map((c) => ({ texte: String(contenu[c]), taille: perso.champs[c].taille * k, gras: gras[c], couleur: c === 'phase' ? '#b45309' : '#1b2b36' }));
+  const mmParPoint = 0.3528 * 1.4; // hauteur d'une ligne = taille × 1,4
+  const total = lignes.reduce((n, l) => n + l.taille * mmParPoint, 0);
+  const reduction = total > cartouche.h * 0.94 ? (cartouche.h * 0.94) / total : 1;
+  let y = cartouche.y + (cartouche.h - Math.min(total, cartouche.h * 0.94)) / 2;
+  return lignes.map((l) => {
+    const taille = l.taille * reduction;
+    const h = taille * mmParPoint;
+    y += h;
+    return { texte: l.texte, x: x0, y: y - h / 2, taille, gras: l.gras, couleur: l.couleur };
   });
 }
