@@ -38,7 +38,7 @@ export const MODELE_LIEBHERR_81K = {
   type: 'automontante',
   court: '81 K.1',
   nomsTableaux: ['LM 1', 'Load-Plus'], // noms des deux tableaux de charge dans la liste « Charges »
-  notes: 'Fiche technique Liebherr 81 K.1 (TCS-000878-LBC-01, 04.20). Tableau 1 = LM 1, Tableau 2 = Load-Plus (vitesses et conditions de fonctionnement différentes). HSC = hauteurs sous crochet de la page 1 (flèche horizontale) ; la page 2 donne 1,5 m de moins (15,9 à 38,9 m) : à vérifier. Flèche relevée à 30° non gérée.',
+  notes: 'Fiche technique Liebherr 81 K.1 (TCS-000878-LBC-01, 04.20). Tableau 1 = LM 1, Tableau 2 = Load-Plus (vitesses et conditions de fonctionnement différentes). HSC = hauteurs sous crochet de la page 1 (flèche horizontale), validées par l\'utilisateur le 28.11 ; rayon arrière 3,50 m (lest 35 t) retenu. Flèche relevée à 30° non gérée.',
   estimes: ['flecheDebut', 'contreFlecheLargeur', 'teteAuDessusFleche'],
   dim: {
     flecheLargeur: 0.87, flecheDebut: 0, flecheProfondeur: 0.84, flecheAuDessusHsc: 2.0, teteAuDessusFleche: 3.2,

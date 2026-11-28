@@ -92,7 +92,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.359.0)
+## Fonctionnalités (état à la 0.359.1)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -150,7 +150,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **0.336.0 (lot 4)** : popups Cartouche / Situation / Détails dans Présentation ; outils de Dessin rangés par type avec couleur (Tracer, Annoter, Symboles, Construction). Les 4 lots du 26.11 sont faits ; **corrections à venir selon l'essai de l'utilisateur**.
 - **0.335.0 (lots 2 et 3)** : pastilles **Fond / Plan / Points** sur le plan (Dessin et Présentation, `pastilles.js`, appui long = tout montrer / cacher, calque gelé = sans accroche) ; onglets Gestion / Dessin / Présentation ; outils dans le bandeau du haut ; bouton Répliquer. **Reste : lot 4** (popups cartouche / situation / détail, outils rangés par type). Appli sur site et Topo Bureau seulement (pas de téléphone).
 - **0.334.0 (lot 1 du 26.11)** : décaler une construction donne une construction (couleur et trait gardés) ; couleur au choix des constructions ; outil **Mesure** (longueur / angle / surface, rien d'enregistré, `topo/mesure-plan.js`) ; plus de titre en haut à gauche ; « Présentation 1 » d'office ; surbrillance de la ligne visée par « Aligner ». **Lots 2 à 4 à faire (maquettes à valider d'abord)** : pastilles Fond / Plan / Points + bouton « Répliquer » dans Feuille ; onglets Gestion de plan chantier / Dessin / Présentation ; popups cartouche / situation / détail et outils rangés par type.
-- **Grues livrées (fiche technique)** : Liebherr 172 EC-B, Condecta EURO 4513, **Liebherr 81 K.1 (0.359.0, HSC page 1 vs page 2 à vérifier)** ; une nouvelle grue = un fichier `topo/grue-<nom>-donnees.js` + `MODELES_DE_BASE` (grue-modele.js) + un test.
+- **Grues livrées (fiche technique)** : Liebherr 172 EC-B, Condecta EURO 4513, **Liebherr 81 K.1 (0.359.0 ; validé le 28.11 : HSC de la page 1, estimés gardés, rayon arrière 3,50 m)** ; une nouvelle grue = un fichier `topo/grue-<nom>-donnees.js` + `MODELES_DE_BASE` (grue-modele.js) + un test.
 - **Bandeau de l'élément (0.358.0)** : réglages propres en onglets (`htmlOngletsBandeau`, un `.groupe-grue` titré = un onglet) ; nouveau réglage long : le ranger dans un `.groupe-grue`. Grue : Fondation Aucune / Massifs / Radier (`radierL` × `radierB`).
 - **Survol (0.357.0, Expert)** : 0,6 s immobile = bulle `.bulle-survol` + contour bleu ; Tab / Maj+Tab = objet dessous / dessus (`objetsSousLePoint`) ; clic = l'objet montré.
 - **Groupes (0.356.0, Expert)** : `topo/groupes-chantier.js`, `plan.groupes` + `objet.groupe` ; clic = groupe entier (sélection multiple), double-clic = entrer (le reste estompé), Ctrl+G / Ctrl+Maj+G ; un objet = un groupe ; même phase début / fin pour tout le groupe.
